@@ -1,0 +1,225 @@
+/* style.css - 커스텀 스타일 */
+
+/* 기본 설정 */
+* {
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
+}
+
+html, body {
+  overflow-x: hidden;
+  width: 100%;
+}
+
+/* iOS에서 input 확대 방지 (16px 이상이면 확대 안 됨) */
+input, select, textarea {
+  font-size: 16px !important;
+}
+
+/* safe-area 대응 (노치 폰) */
+body {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+header {
+  width: 100%;
+  padding-top: env(safe-area-inset-top, 0);
+  padding-left: env(safe-area-inset-left, 0);
+  padding-right: env(safe-area-inset-right, 0);
+}
+
+/* 탭 네비게이션 */
+.tab-active {
+  color: #16a34a !important;
+  border-bottom-color: #16a34a !important;
+  font-weight: 600;
+}
+
+[data-tab] {
+  min-height: 44px; /* 최소 터치 영역 */
+}
+
+/* 토너먼트 브래킷 */
+.bracket-container {
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+}
+
+.bracket {
+  padding: 16px 0;
+}
+
+.bracket-round {
+  padding: 0 4px;
+}
+
+.bracket-match {
+  transition: transform 0.15s ease;
+}
+
+.bracket-match:hover .match-card {
+  transform: translateY(-1px);
+}
+
+.bracket-connector {
+  position: relative;
+}
+
+/* 브래킷 스크롤 힌트 (그라데이션) */
+.bracket-scroll-hint {
+  position: relative;
+}
+.bracket-scroll-hint::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 40px;
+  background: linear-gradient(to right, transparent, rgba(249,250,251,0.9));
+  pointer-events: none;
+  z-index: 1;
+  transition: opacity 0.3s;
+}
+.bracket-scroll-hint.scrolled-end::after {
+  opacity: 0;
+}
+
+/* 스코어 입력 모달 */
+.score-input::-webkit-inner-spin-button,
+.score-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.score-input[type='number'] {
+  -moz-appearance: textfield;
+}
+
+/* 스크롤바 스타일 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* 포맷 선택 라디오 */
+.format-option input:checked + div {
+  border-color: #16a34a;
+  background-color: #f0fdf4;
+}
+
+/* 애니메이션 */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+#main-content > * {
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* 모달 배경 애니메이션 */
+#score-modal {
+  animation: fadeIn 0.15s ease-out;
+}
+
+/* 검색형 드롭다운 */
+.searchable-dropdown {
+  animation: fadeIn 0.1s ease-out;
+}
+.searchable-dropdown .search-option:first-child {
+  border-radius: 8px 8px 0 0;
+}
+.searchable-dropdown .search-option:last-child {
+  border-radius: 0 0 8px 8px;
+}
+
+/* 모바일 최적화 */
+@media (max-width: 640px) {
+  /* 브래킷 축소 */
+  .bracket-round {
+    min-width: 150px !important;
+  }
+  .match-player {
+    padding: 6px 8px !important;
+  }
+  .match-player span {
+    max-width: 90px;
+    font-size: 12px !important;
+  }
+
+  /* 리그 매치 행: 모바일에서 세로 배치 */
+  .league-match-mobile {
+    flex-direction: column !important;
+    gap: 4px;
+    padding: 12px !important;
+  }
+  .league-match-mobile .league-p1,
+  .league-match-mobile .league-p2 {
+    justify-content: center !important;
+    text-align: center;
+  }
+  .league-match-mobile .league-score {
+    min-width: auto !important;
+    margin: 4px 0 !important;
+  }
+
+  /* 복식 팀 폼: 세로 스택 */
+  #team-form {
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+  #team-form > .flex-1 {
+    width: 100%;
+  }
+  #team-form > button {
+    align-self: stretch !important;
+    width: 100%;
+  }
+
+  /* 팀 엔트리 */
+  .team-entry {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  /* 모달 작은 화면 대응 */
+  #score-modal > div {
+    margin: 8px;
+    padding: 16px !important;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  /* 순위표 글자 크기 */
+  .standings-table th,
+  .standings-table td {
+    padding: 6px 4px !important;
+    font-size: 12px !important;
+  }
+}
+
+/* 매우 작은 화면 (320px) */
+@media (max-width: 380px) {
+  .bracket-round {
+    min-width: 130px !important;
+  }
+  .match-player span {
+    max-width: 70px;
+    font-size: 11px !important;
+  }
+  [data-tab] {
+    font-size: 12px !important;
+    padding-left: 4px !important;
+    padding-right: 4px !important;
+  }
+}
