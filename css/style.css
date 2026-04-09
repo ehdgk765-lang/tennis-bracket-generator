@@ -143,8 +143,21 @@ header {
   border-radius: 0 0 8px 8px;
 }
 
+/* 대진표 시간표 그리드 */
+.schedule-grid {
+  gap: 8px;
+}
+
+.schedule-match-card {
+  min-height: 80px;
+}
+
 /* 모바일 최적화 */
 @media (max-width: 640px) {
+  /* 대진표: 모바일에서 1열로 */
+  .schedule-grid {
+    grid-template-columns: 1fr !important;
+  }
   /* 브래킷 축소 */
   .bracket-round {
     min-width: 150px !important;

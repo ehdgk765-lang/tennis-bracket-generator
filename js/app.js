@@ -1,4 +1,4 @@
-// app.js - 앱 초기화, 탭 전환, 대회 생성
+// app.js - 앱 초기화, 탭 전환, 대회/대진표 생성
 const GAME_TYPES = {
   MS: { label: '남자단식', icon: '🏃‍♂️', gender: 'M', doubles: false },
   WS: { label: '여자단식', icon: '🏃‍♀️', gender: 'F', doubles: false },
@@ -44,6 +44,9 @@ const App = {
       case 'create':
         this.renderCreateForm(content);
         break;
+      case 'schedule':
+        this.renderScheduleForm(content);
+        break;
       case 'active':
         this.renderTournamentList(content, 'active', tournamentId);
         break;
@@ -53,7 +56,8 @@ const App = {
     }
   },
 
-  // 경기 종류에 따른 자격 선수 필터링
+  // ─── 대회 만들기 (토너먼트/리그) ───
+
   getEligiblePlayers(gameType) {
     const players = Storage.getPlayers();
     const config = GAME_TYPES[gameType];
@@ -86,7 +90,7 @@ const App = {
             <div class="grid grid-cols-3 gap-2 sm:grid-cols-5">
               ${Object.entries(GAME_TYPES).map(([key, cfg], i) => `
                 <label class="cursor-pointer">
-                  <input type="radio" name="gameType" value="${key}" ${i === 0 ? 'checked' : ''} class="sr-only peer">
+                  <input type="radio" name="gameType" value="${key}" ${key === 'XD' ? 'checked' : ''} class="sr-only peer">
                   <div class="border-2 border-gray-200 rounded-xl py-2.5 px-1 text-center peer-checked:border-green-500 peer-checked:bg-green-50 transition">
                     <div class="text-lg">${cfg.icon}</div>
                     <div class="text-xs font-semibold text-gray-700 mt-0.5">${cfg.label}</div>
@@ -133,7 +137,6 @@ const App = {
             </div>
           </div>
 
-          <!-- 참가자 영역: 경기 종류에 따라 동적 렌더 -->
           <div id="participants-section"></div>
 
           <button type="submit"
@@ -145,16 +148,13 @@ const App = {
 
     if (allPlayers.length < 2) return;
 
-    // 경기 종류 변경 시 참가자 섹션 다시 렌더
     const gameTypeRadios = container.querySelectorAll('input[name="gameType"]');
     gameTypeRadios.forEach(r => {
       r.onchange = () => this.renderParticipantsSection(container);
     });
 
-    // 최초 렌더
     this.renderParticipantsSection(container);
 
-    // 폼 제출
     container.querySelector('#create-form').onsubmit = (e) => {
       e.preventDefault();
 
@@ -169,12 +169,9 @@ const App = {
       let participants;
 
       if (config.doubles) {
-        // 복식: 팀 목록 수집
-        participants = this.collectTeams(container, gameType);
-        if (!participants) return; // 에러는 collectTeams에서 처리
-        if (participants.length < 2) { alert('최소 2팀 이상 필요합니다.'); return; }
+        participants = this.collectDoublesTeams(container, gameType);
+        if (!participants) return;
       } else {
-        // 단식: 선택된 선수 수집
         const selected = Array.from(container.querySelectorAll('.player-checkbox:checked')).map(cb => cb.value);
         if (selected.length < 2) { alert('2명 이상 선택해주세요.'); return; }
         participants = selected;
@@ -204,28 +201,26 @@ const App = {
     };
   },
 
-  // 참가자 섹션 동적 렌더
   renderParticipantsSection(container) {
     const section = container.querySelector('#participants-section');
     const gameType = container.querySelector('input[name="gameType"]:checked').value;
-    const config = GAME_TYPES[gameType];
 
-    if (config.doubles) {
-      this.renderDoublesSection(section, gameType);
+    if (gameType === 'XD') {
+      this.renderMixedSection(section);
     } else {
       this.renderSinglesSection(section, gameType);
     }
   },
 
-  // 단식 참가자 선택 UI
   renderSinglesSection(section, gameType) {
     const eligible = this.getEligiblePlayers(gameType);
     const config = GAME_TYPES[gameType];
+    const minPlayers = config.doubles ? 4 : 2;
 
-    if (eligible.length < 2) {
+    if (eligible.length < minPlayers) {
       section.innerHTML = `
         <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-center text-sm">
-          <p class="text-yellow-800">${config.label}에 참가 가능한 선수가 부족합니다. (현재 ${eligible.length}명)</p>
+          <p class="text-yellow-800">${config.label}에 참가 가능한 선수가 부족합니다. (현재 ${eligible.length}명, 최소 ${minPlayers}명 필요)</p>
         </div>`;
       return;
     }
@@ -250,7 +245,6 @@ const App = {
         </div>
       </div>`;
 
-    // 검색 필터
     const searchInput = section.querySelector('#player-search');
     const playerItems = section.querySelectorAll('.player-item');
     searchInput.oninput = () => {
@@ -274,7 +268,6 @@ const App = {
     let allSelected = false;
     selectAllBtn.onclick = () => {
       allSelected = !allSelected;
-      // 전체 선택/해제는 현재 보이는 항목만 대상
       section.querySelectorAll('.player-item').forEach(item => {
         if (item.style.display !== 'none') {
           item.querySelector('.player-checkbox').checked = allSelected;
@@ -285,195 +278,362 @@ const App = {
     };
   },
 
-  // 검색형 선수 선택 드롭다운 생성 (복식용)
-  createSearchableSelect(container, id, label, players) {
-    const wrapper = document.createElement('div');
-    wrapper.className = 'flex-1 relative';
-    wrapper.innerHTML = `
-      <label class="block text-xs text-gray-500 mb-1">${label}</label>
-      <input type="text" id="${id}" autocomplete="off"
-        class="searchable-select w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500"
-        placeholder="이름 검색..." data-value="">
-      <div id="${id}-dropdown" class="searchable-dropdown hidden absolute z-10 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto"></div>`;
-
-    container.appendChild(wrapper);
-
-    const input = wrapper.querySelector(`#${id}`);
-    const dropdown = wrapper.querySelector(`#${id}-dropdown`);
-
-    const renderOptions = (query) => {
-      const q = (query || '').toLowerCase();
-      const filtered = players.filter(p => !q || p.name.toLowerCase().includes(q));
-      if (filtered.length === 0) {
-        dropdown.innerHTML = '<div class="px-3 py-2 text-sm text-gray-400">결과 없음</div>';
-      } else {
-        dropdown.innerHTML = filtered.map(p => `
-          <div class="search-option px-3 py-2 text-sm text-gray-800 hover:bg-green-50 cursor-pointer transition flex items-center gap-2" data-name="${Results.escapeHtml(p.name)}">
-            <span>${Results.escapeHtml(p.name)}</span>
-            <span class="text-xs px-1.5 py-0.5 rounded font-medium ${p.gender === 'M' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}">${p.gender === 'M' ? '남' : '여'}</span>
-          </div>
-        `).join('');
-      }
-      dropdown.querySelectorAll('.search-option').forEach(opt => {
-        opt.onmousedown = (e) => {
-          e.preventDefault();
-          input.value = opt.dataset.name;
-          input.dataset.value = opt.dataset.name;
-          dropdown.classList.add('hidden');
-        };
-      });
-    };
-
-    input.onfocus = () => {
-      renderOptions(input.value);
-      dropdown.classList.remove('hidden');
-    };
-    input.oninput = () => {
-      input.dataset.value = '';
-      renderOptions(input.value);
-      dropdown.classList.remove('hidden');
-    };
-    input.onblur = () => {
-      setTimeout(() => dropdown.classList.add('hidden'), 150);
-    };
-  },
-
-  // 복식 팀 조합 UI
-  renderDoublesSection(section, gameType) {
-    const config = GAME_TYPES[gameType];
+  renderMixedSection(section) {
     const allPlayers = Storage.getPlayers();
-    let eligibleMales, eligibleFemales, eligibleAll;
+    const males = allPlayers.filter(p => p.gender === 'M');
+    const females = allPlayers.filter(p => p.gender === 'F');
 
-    if (gameType === 'XD') {
-      eligibleMales = allPlayers.filter(p => p.gender === 'M');
-      eligibleFemales = allPlayers.filter(p => p.gender === 'F');
-      if (eligibleMales.length < 1 || eligibleFemales.length < 1) {
-        section.innerHTML = `
-          <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-center text-sm">
-            <p class="text-yellow-800">혼합복식을 위해 남자 1명, 여자 1명 이상이 필요합니다.<br>(남 ${eligibleMales.length}명, 여 ${eligibleFemales.length}명)</p>
-          </div>`;
-        return;
-      }
-    } else {
-      eligibleAll = this.getEligiblePlayers(gameType);
-      if (eligibleAll.length < 2) {
-        section.innerHTML = `
-          <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-center text-sm">
-            <p class="text-yellow-800">${config.label}에 참가 가능한 선수가 부족합니다. (현재 ${eligibleAll.length}명)</p>
-          </div>`;
-        return;
-      }
-    }
-
-    section.innerHTML = `
-      <div>
-        <label class="block text-sm font-semibold text-gray-700 mb-2">팀 조합</label>
-        <div id="team-form" class="flex gap-2 items-end"></div>
-        <div id="team-list" class="mt-3 space-y-2"></div>
-        <div id="team-count" class="text-sm text-gray-500 mt-2">0팀 등록됨</div>
-      </div>`;
-
-    const teamForm = section.querySelector('#team-form');
-
-    if (gameType === 'XD') {
-      this.createSearchableSelect(teamForm, 'team-male', '남자 선수', eligibleMales);
-      this.createSearchableSelect(teamForm, 'team-female', '여자 선수', eligibleFemales);
-    } else {
-      this.createSearchableSelect(teamForm, 'team-p1', '선수 1', eligibleAll);
-      this.createSearchableSelect(teamForm, 'team-p2', '선수 2', eligibleAll);
-    }
-
-    const addBtn = document.createElement('button');
-    addBtn.type = 'button';
-    addBtn.className = 'px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-medium whitespace-nowrap self-end';
-    addBtn.textContent = '팀 추가';
-    addBtn.onclick = () => this.addTeam(section, gameType);
-    teamForm.appendChild(addBtn);
-  },
-
-  addTeam(section, gameType) {
-    let p1Name, p2Name, input1, input2;
-
-    if (gameType === 'XD') {
-      input1 = section.querySelector('#team-male');
-      input2 = section.querySelector('#team-female');
-      p1Name = input1.dataset.value || input1.value.trim();
-      p2Name = input2.dataset.value || input2.value.trim();
-      if (!p1Name || !p2Name) { alert('남자 선수와 여자 선수를 모두 선택해주세요.'); return; }
-    } else {
-      input1 = section.querySelector('#team-p1');
-      input2 = section.querySelector('#team-p2');
-      p1Name = input1.dataset.value || input1.value.trim();
-      p2Name = input2.dataset.value || input2.value.trim();
-      if (!p1Name || !p2Name) { alert('두 선수를 모두 선택해주세요.'); return; }
-      if (p1Name === p2Name) { alert('같은 선수를 선택할 수 없습니다.'); return; }
-    }
-
-    // 입력된 이름이 실제 선수인지 확인
-    const allPlayers = Storage.getPlayers();
-    if (!allPlayers.some(p => p.name === p1Name) || !allPlayers.some(p => p.name === p2Name)) {
-      alert('등록된 선수 이름을 선택해주세요.');
+    if (males.length < 2 || females.length < 2) {
+      section.innerHTML = `
+        <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-center text-sm">
+          <p class="text-yellow-800">혼합복식: 남자 2명, 여자 2명 이상 필요합니다. (남 ${males.length}명, 여 ${females.length}명)</p>
+        </div>`;
       return;
     }
 
-    const teamName = `${p1Name} / ${p2Name}`;
-    const teamList = section.querySelector('#team-list');
+    const renderList = (players, prefix, genderLabel, badgeClass) => `
+      <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-2">
+          ${genderLabel}자 선수 선택
+          <span id="${prefix}-count" class="text-green-600 font-normal">(0명 선택)</span>
+        </label>
+        <input type="text" id="${prefix}-search" placeholder="이름 검색..."
+          class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm mb-2">
+        <div class="flex justify-between items-center mb-2">
+          <span class="text-sm text-gray-500">${players.length}명 중 선택</span>
+          <button type="button" id="${prefix}-all-btn" class="text-sm text-green-600 font-medium hover:underline">전체 선택</button>
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl max-h-40 overflow-y-auto divide-y divide-gray-50">
+          ${players.map(p => `
+            <label class="${prefix}-item player-item flex items-center px-4 py-2.5 hover:bg-gray-50 cursor-pointer transition" data-name="${Results.escapeHtml(p.name.toLowerCase())}">
+              <input type="checkbox" name="${prefix}" value="${Results.escapeHtml(p.name)}" class="${prefix}-cb w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500">
+              <span class="ml-3 text-sm text-gray-800">${Results.escapeHtml(p.name)}</span>
+              <span class="ml-2 text-xs px-1.5 py-0.5 rounded font-medium ${badgeClass}">${genderLabel}</span>
+            </label>
+          `).join('')}
+        </div>
+      </div>`;
 
-    // 중복 팀 검사
-    const existingTeams = teamList.querySelectorAll('.team-entry');
-    for (const entry of existingTeams) {
-      if (entry.dataset.team === teamName) {
-        alert('이미 등록된 팀입니다.');
-        return;
-      }
-      const parts = entry.dataset.team.split(' / ');
-      if (parts.includes(p1Name) || parts.includes(p2Name)) {
-        alert(`${parts.includes(p1Name) ? p1Name : p2Name} 선수는 이미 다른 팀에 속해 있습니다.`);
-        return;
-      }
-    }
+    section.innerHTML = `
+      <div class="space-y-4">
+        ${renderList(males, 'xd-male', '남', 'bg-blue-100 text-blue-700')}
+        ${renderList(females, 'xd-female', '여', 'bg-pink-100 text-pink-700')}
+        <p class="text-xs text-gray-400">남녀 같은 수를 선택하면 자동으로 팀이 구성됩니다.</p>
+      </div>`;
 
-    // 입력 초기화
-    input1.value = '';
-    input1.dataset.value = '';
-    input2.value = '';
-    input2.dataset.value = '';
+    const bindList = (prefix) => {
+      const search = section.querySelector(`#${prefix}-search`);
+      const items = section.querySelectorAll(`.${prefix}-item`);
+      const countEl = section.querySelector(`#${prefix}-count`);
+      const allBtn = section.querySelector(`#${prefix}-all-btn`);
 
-    const teamEl = document.createElement('div');
-    teamEl.className = 'team-entry flex items-center justify-between bg-white border border-gray-200 rounded-xl px-4 py-2.5';
-    teamEl.dataset.team = teamName;
-    teamEl.innerHTML = `
-      <div class="flex items-center gap-2">
-        <span class="w-6 h-6 bg-green-100 text-green-700 rounded-full flex items-center justify-center text-xs font-bold">${teamList.children.length + 1}</span>
-        <span class="text-sm font-medium text-gray-800">${Results.escapeHtml(p1Name)}</span>
-        <span class="text-gray-400">&</span>
-        <span class="text-sm font-medium text-gray-800">${Results.escapeHtml(p2Name)}</span>
-      </div>
-      <button type="button" class="remove-team-btn text-red-400 hover:text-red-600 text-sm px-2 py-1 rounded hover:bg-red-50 transition">삭제</button>`;
+      search.oninput = () => {
+        const q = search.value.trim().toLowerCase();
+        items.forEach(item => {
+          item.style.display = (!q || item.dataset.name.includes(q)) ? '' : 'none';
+        });
+      };
 
-    teamEl.querySelector('.remove-team-btn').onclick = () => {
-      teamEl.remove();
-      this.updateTeamNumbers(section);
+      const updateCount = () => {
+        const checked = section.querySelectorAll(`.${prefix}-cb:checked`).length;
+        countEl.textContent = `(${checked}명 선택)`;
+      };
+
+      section.querySelectorAll(`.${prefix}-cb`).forEach(cb => { cb.onchange = updateCount; });
+
+      let allSelected = false;
+      allBtn.onclick = () => {
+        allSelected = !allSelected;
+        items.forEach(item => {
+          if (item.style.display !== 'none') {
+            item.querySelector(`.${prefix}-cb`).checked = allSelected;
+          }
+        });
+        allBtn.textContent = allSelected ? '선택 해제' : '전체 선택';
+        updateCount();
+      };
     };
 
-    teamList.appendChild(teamEl);
-    this.updateTeamNumbers(section);
+    bindList('xd-male');
+    bindList('xd-female');
   },
 
-  updateTeamNumbers(section) {
-    const entries = section.querySelectorAll('.team-entry');
-    entries.forEach((entry, i) => {
-      entry.querySelector('.w-6').textContent = i + 1;
+  shuffleArray(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  },
+
+  collectDoublesTeams(container, gameType) {
+    if (gameType === 'XD') {
+      const males = Array.from(container.querySelectorAll('.xd-male-cb:checked')).map(cb => cb.value);
+      const females = Array.from(container.querySelectorAll('.xd-female-cb:checked')).map(cb => cb.value);
+      if (males.length < 2 || females.length < 2) {
+        alert('혼합복식: 남자 2명, 여자 2명 이상 선택해주세요.');
+        return null;
+      }
+      if (males.length !== females.length) {
+        alert(`남녀 수가 같아야 합니다. (남 ${males.length}명, 여 ${females.length}명)`);
+        return null;
+      }
+      const sm = this.shuffleArray(males);
+      const sf = this.shuffleArray(females);
+      return sm.map((m, i) => `${m} / ${sf[i]}`);
+    } else {
+      const selected = Array.from(container.querySelectorAll('.player-checkbox:checked')).map(cb => cb.value);
+      if (selected.length < 4) {
+        alert('복식: 최소 4명 이상 선택해주세요.');
+        return null;
+      }
+      if (selected.length % 2 !== 0) {
+        alert('복식: 짝수 인원을 선택해주세요.');
+        return null;
+      }
+      const shuffled = this.shuffleArray(selected);
+      const teams = [];
+      for (let i = 0; i < shuffled.length; i += 2) {
+        teams.push(`${shuffled[i]} / ${shuffled[i + 1]}`);
+      }
+      return teams;
+    }
+  },
+
+  // ─── 대진표 만들기 (시간/코트 기반) ───
+
+  generateTimeOptions(selectedValue) {
+    const options = [];
+    for (let h = 6; h <= 22; h++) {
+      for (let m = 0; m < 60; m += 30) {
+        if (h === 22 && m > 0) break;
+        const val = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+        options.push(`<option value="${val}" ${val === selectedValue ? 'selected' : ''}>${val}</option>`);
+      }
+    }
+    return options.join('');
+  },
+
+  renderScheduleForm(container) {
+    const allPlayers = Storage.getPlayers();
+    const males = allPlayers.filter(p => p.gender === 'M');
+    const females = allPlayers.filter(p => p.gender === 'F');
+
+    if (allPlayers.length < 4) {
+      container.innerHTML = `
+        <div class="max-w-lg mx-auto">
+          <h2 class="text-2xl font-bold text-gray-800 mb-6">대진표 만들기</h2>
+          <div class="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-center">
+            <p class="text-yellow-800 font-medium mb-2">복식 경기를 위해 최소 4명의 선수가 필요합니다.</p>
+            <p class="text-yellow-700 text-sm mb-3">현재: 남 ${males.length}명, 여 ${females.length}명</p>
+            <button onclick="App.navigate('players')" class="text-green-600 font-semibold hover:underline">선수 관리로 이동</button>
+          </div>
+        </div>`;
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="max-w-lg mx-auto">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">대진표 만들기</h2>
+
+        <form id="schedule-form" class="space-y-5">
+          <!-- 시간 설정 -->
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">시간 설정</label>
+            <div class="flex items-center gap-2">
+              <select id="start-time" class="flex-1 px-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white">
+                ${this.generateTimeOptions('08:00')}
+              </select>
+              <span class="text-gray-500 font-medium">~</span>
+              <select id="end-time" class="flex-1 px-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white">
+                ${this.generateTimeOptions('10:00')}
+              </select>
+            </div>
+            <p id="time-info" class="text-xs text-gray-500 mt-1"></p>
+          </div>
+
+          <!-- 코트 수 -->
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">코트 수</label>
+            <div class="flex gap-2">
+              ${[1, 2, 3, 4].map(n => `
+                <label class="flex-1 cursor-pointer">
+                  <input type="radio" name="courts" value="${n}" ${n === 2 ? 'checked' : ''} class="sr-only peer">
+                  <div class="border-2 border-gray-200 rounded-xl py-2.5 text-center peer-checked:border-green-500 peer-checked:bg-green-50 transition">
+                    <span class="font-semibold text-gray-800">${n}면</span>
+                  </div>
+                </label>
+              `).join('')}
+            </div>
+          </div>
+
+          <!-- 남자 선수 선택 -->
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">
+              남자 선수 <span id="male-count" class="text-green-600 font-normal">(0/${males.length}명 선택)</span>
+            </label>
+            ${males.length === 0 ? '<p class="text-sm text-gray-400">등록된 남자 선수가 없습니다.</p>' : `
+            <div class="bg-white border border-gray-200 rounded-xl max-h-40 overflow-y-auto divide-y divide-gray-50">
+              ${males.map(p => `
+                <label class="flex items-center px-4 py-2.5 hover:bg-gray-50 cursor-pointer transition">
+                  <input type="checkbox" name="males" value="${Results.escapeHtml(p.name)}" class="male-cb w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500">
+                  <span class="ml-3 text-sm text-gray-800">${Results.escapeHtml(p.name)}</span>
+                  <span class="ml-2 text-xs px-1.5 py-0.5 rounded font-medium bg-blue-100 text-blue-700">남</span>
+                </label>
+              `).join('')}
+            </div>`}
+          </div>
+
+          <!-- 여자 선수 선택 -->
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">
+              여자 선수 <span id="female-count" class="text-green-600 font-normal">(0/${females.length}명 선택)</span>
+            </label>
+            ${females.length === 0 ? '<p class="text-sm text-gray-400">등록된 여자 선수가 없습니다.</p>' : `
+            <div class="bg-white border border-gray-200 rounded-xl max-h-40 overflow-y-auto divide-y divide-gray-50">
+              ${females.map(p => `
+                <label class="flex items-center px-4 py-2.5 hover:bg-gray-50 cursor-pointer transition">
+                  <input type="checkbox" name="females" value="${Results.escapeHtml(p.name)}" class="female-cb w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500">
+                  <span class="ml-3 text-sm text-gray-800">${Results.escapeHtml(p.name)}</span>
+                  <span class="ml-2 text-xs px-1.5 py-0.5 rounded font-medium bg-pink-100 text-pink-700">여</span>
+                </label>
+              `).join('')}
+            </div>`}
+          </div>
+
+          <!-- 미리보기 정보 -->
+          <div id="preview-info" class="bg-gray-50 rounded-xl p-4 text-sm text-gray-600 hidden">
+          </div>
+
+          <button type="submit"
+            class="w-full py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition font-semibold text-lg">
+            대진표 생성
+          </button>
+        </form>
+      </div>`;
+
+    const updateCounts = () => {
+      const maleChecked = container.querySelectorAll('.male-cb:checked').length;
+      const femaleChecked = container.querySelectorAll('.female-cb:checked').length;
+      container.querySelector('#male-count').textContent = `(${maleChecked}/${males.length}명 선택)`;
+      container.querySelector('#female-count').textContent = `(${femaleChecked}/${females.length}명 선택)`;
+      this.updateSchedulePreview(container);
+    };
+
+    container.querySelectorAll('.male-cb, .female-cb').forEach(cb => {
+      cb.onchange = updateCounts;
     });
-    section.querySelector('#team-count').textContent = `${entries.length}팀 등록됨`;
+
+    container.querySelector('#start-time').onchange = () => this.updateSchedulePreview(container);
+    container.querySelector('#end-time').onchange = () => this.updateSchedulePreview(container);
+    container.querySelectorAll('input[name="courts"]').forEach(r => {
+      r.onchange = () => this.updateSchedulePreview(container);
+    });
+
+    this.updateSchedulePreview(container);
+
+    container.querySelector('#schedule-form').onsubmit = (e) => {
+      e.preventDefault();
+
+      const startTime = container.querySelector('#start-time').value;
+      const endTime = container.querySelector('#end-time').value;
+      const courts = parseInt(container.querySelector('input[name="courts"]:checked').value);
+      const selectedMales = Array.from(container.querySelectorAll('.male-cb:checked')).map(cb => cb.value);
+      const selectedFemales = Array.from(container.querySelectorAll('.female-cb:checked')).map(cb => cb.value);
+
+      if (startTime >= endTime) {
+        alert('종료 시간은 시작 시간보다 뒤여야 합니다.');
+        return;
+      }
+
+      const totalPlayers = selectedMales.length + selectedFemales.length;
+      if (totalPlayers < 4) {
+        alert('최소 4명의 선수를 선택해주세요.');
+        return;
+      }
+
+      const possibleTypes = Schedule.getPossibleTypes(selectedMales, selectedFemales);
+      if (possibleTypes.length === 0) {
+        alert('선택한 선수 구성으로 복식 경기를 만들 수 없습니다.\n혼합복식: 남2+여2, 남자복식: 남4, 여자복식: 여4 이상 필요');
+        return;
+      }
+
+      const timeSlots = Schedule.generate(selectedMales, selectedFemales, courts, startTime, endTime);
+
+      if (timeSlots.length === 0) {
+        alert('시간이 부족합니다. 최소 30분 이상 설정해주세요.');
+        return;
+      }
+
+      const today = new Date().toISOString().slice(0, 10);
+      const tournament = {
+        id: Storage.generateId(),
+        name: `${today} ${startTime} 대진표`,
+        format: 'schedule',
+        setCount: 1,
+        courts,
+        startTime,
+        endTime,
+        males: selectedMales,
+        females: selectedFemales,
+        players: [...selectedMales, ...selectedFemales],
+        status: 'active',
+        createdAt: new Date().toISOString(),
+        completedAt: null,
+        timeSlots,
+      };
+
+      const tournaments = Storage.getTournaments();
+      tournaments.push(tournament);
+      Storage.saveTournaments(tournaments);
+
+      this.navigate('active', tournament.id);
+    };
   },
 
-  // 팀 목록 수집
-  collectTeams(container, gameType) {
-    const teamEntries = container.querySelectorAll('.team-entry');
-    const teams = Array.from(teamEntries).map(e => e.dataset.team);
-    return teams;
+  updateSchedulePreview(container) {
+    const startTime = container.querySelector('#start-time').value;
+    const endTime = container.querySelector('#end-time').value;
+    const courts = parseInt(container.querySelector('input[name="courts"]:checked').value);
+    const maleCount = container.querySelectorAll('.male-cb:checked').length;
+    const femaleCount = container.querySelectorAll('.female-cb:checked').length;
+
+    const preview = container.querySelector('#preview-info');
+    const timeInfo = container.querySelector('#time-info');
+
+    if (startTime >= endTime) {
+      timeInfo.textContent = '종료 시간을 시작 시간 이후로 설정해주세요.';
+      timeInfo.className = 'text-xs text-red-500 mt-1';
+      preview.classList.add('hidden');
+      return;
+    }
+
+    const slots = Schedule.calculateTimeSlots(startTime, endTime);
+    const totalGamesMax = slots.length * courts;
+
+    timeInfo.textContent = `${slots.length}개 타임 (30분 × ${slots.length})`;
+    timeInfo.className = 'text-xs text-gray-500 mt-1';
+
+    const possibleTypes = [];
+    if (maleCount >= 2 && femaleCount >= 2) possibleTypes.push('혼합복식');
+    if (maleCount >= 4) possibleTypes.push('남자복식');
+    if (femaleCount >= 4) possibleTypes.push('여자복식');
+
+    if (maleCount + femaleCount >= 4 && possibleTypes.length > 0) {
+      preview.classList.remove('hidden');
+      preview.innerHTML = `
+        <div class="space-y-1">
+          <p><span class="font-medium">총 경기:</span> 최대 ${totalGamesMax}경기 (${slots.length}타임 × ${courts}코트)</p>
+          <p><span class="font-medium">선수:</span> 남 ${maleCount}명, 여 ${femaleCount}명</p>
+          <p><span class="font-medium">가능한 게임:</span> ${possibleTypes.join(', ')}</p>
+        </div>`;
+    } else {
+      preview.classList.add('hidden');
+    }
   },
+
+  // ─── 목록 / 상세 ───
 
   renderTournamentList(container, statusFilter, openTournamentId) {
     const all = Storage.getTournaments();
@@ -497,17 +657,35 @@ const App = {
           <div class="text-5xl mb-4">${isActive ? '🎾' : '📋'}</div>
           <h2 class="text-xl font-bold text-gray-800 mb-2">${isActive ? '진행 중인 대회가 없습니다' : '완료된 대회가 없습니다'}</h2>
           <p class="text-gray-500 mb-4">${isActive ? '새 대회를 만들어보세요!' : '대회를 완료하면 여기에 표시됩니다.'}</p>
-          ${isActive ? '<button onclick="App.navigate(\'create\')" class="px-6 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 transition font-medium">대회 만들기</button>' : ''}
         </div>`;
       return;
     }
 
     container.innerHTML = `
       <div class="max-w-lg mx-auto">
-        <h2 class="text-2xl font-bold text-gray-800 mb-6">${isActive ? '진행 중인 대회' : '대회 기록'}</h2>
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">${isActive ? '진행 중' : '대회 기록'}</h2>
         <div class="space-y-3">
           ${tournaments.map(t => {
             const dateStr = new Date(t.createdAt).toLocaleDateString('ko-KR');
+
+            if (t.format === 'schedule') {
+              const allMatches = Schedule.getAllMatches(t);
+              const completed = allMatches.filter(m => m.winner).length;
+              return `
+                <div class="tournament-card bg-white border border-gray-200 rounded-2xl p-4 cursor-pointer hover:shadow-md hover:border-green-300 transition"
+                     data-id="${t.id}">
+                  <div class="flex items-center justify-between mb-2">
+                    <h3 class="font-bold text-gray-800">${Results.escapeHtml(t.name)}</h3>
+                    <span class="text-xs px-2 py-1 rounded-full bg-orange-100 text-orange-700">대진표</span>
+                  </div>
+                  <div class="flex items-center gap-4 text-sm text-gray-500">
+                    <span>남${t.males.length} · 여${t.females.length}</span>
+                    <span>${t.startTime}~${t.endTime}</span>
+                    <span>${completed}/${allMatches.length}경기</span>
+                  </div>
+                </div>`;
+            }
+
             const gameLabel = t.gameTypeLabel || (t.gameType ? GAME_TYPES[t.gameType]?.label : '');
             const isDoubles = t.gameType ? GAME_TYPES[t.gameType]?.doubles : false;
             const countLabel = isDoubles ? `${t.players.length}팀` : `${t.players.length}명`;
@@ -565,7 +743,7 @@ const App = {
 
     const actionBar = document.createElement('div');
     actionBar.className = 'flex justify-end mb-2';
-    actionBar.innerHTML = `<button id="delete-tournament-btn" class="text-sm text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg px-3 py-1 transition">대회 삭제</button>`;
+    actionBar.innerHTML = `<button id="delete-tournament-btn" class="text-sm text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg px-3 py-1 transition">삭제</button>`;
     detailContainer.appendChild(actionBar);
 
     actionBar.querySelector('#delete-tournament-btn').onclick = () => {
@@ -578,7 +756,9 @@ const App = {
     const viewContainer = document.createElement('div');
     detailContainer.appendChild(viewContainer);
 
-    if (tournament.format === 'tournament') {
+    if (tournament.format === 'schedule') {
+      Schedule.render(viewContainer, tournament);
+    } else if (tournament.format === 'tournament') {
       Tournament.render(viewContainer, tournament);
     } else {
       League.render(viewContainer, tournament);
