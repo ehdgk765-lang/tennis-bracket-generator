@@ -474,9 +474,15 @@ const App = {
               남자 선수 <span id="male-count" class="text-green-600 font-normal">(0/${males.length}명 선택)</span>
             </label>
             ${males.length === 0 ? '<p class="text-sm text-gray-400">등록된 남자 선수가 없습니다.</p>' : `
+            <input type="text" id="sch-male-search" placeholder="이름 검색..."
+              class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm mb-2">
+            <div class="flex justify-between items-center mb-2">
+              <span class="text-sm text-gray-500">${males.length}명 중 선택</span>
+              <button type="button" id="sch-male-all-btn" class="text-sm text-green-600 font-medium hover:underline">전체 선택</button>
+            </div>
             <div class="bg-white border border-gray-200 rounded-xl max-h-40 overflow-y-auto divide-y divide-gray-50">
               ${males.map(p => `
-                <label class="flex items-center px-4 py-2.5 hover:bg-gray-50 cursor-pointer transition">
+                <label class="sch-male-item flex items-center px-4 py-2.5 hover:bg-gray-50 cursor-pointer transition" data-name="${Results.escapeHtml(p.name.toLowerCase())}">
                   <input type="checkbox" name="males" value="${Results.escapeHtml(p.name)}" class="male-cb w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500">
                   <span class="ml-3 text-sm text-gray-800">${Results.escapeHtml(p.name)}</span>
                   <span class="ml-2 text-xs px-1.5 py-0.5 rounded font-medium bg-blue-100 text-blue-700">남</span>
@@ -491,9 +497,15 @@ const App = {
               여자 선수 <span id="female-count" class="text-green-600 font-normal">(0/${females.length}명 선택)</span>
             </label>
             ${females.length === 0 ? '<p class="text-sm text-gray-400">등록된 여자 선수가 없습니다.</p>' : `
+            <input type="text" id="sch-female-search" placeholder="이름 검색..."
+              class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm mb-2">
+            <div class="flex justify-between items-center mb-2">
+              <span class="text-sm text-gray-500">${females.length}명 중 선택</span>
+              <button type="button" id="sch-female-all-btn" class="text-sm text-green-600 font-medium hover:underline">전체 선택</button>
+            </div>
             <div class="bg-white border border-gray-200 rounded-xl max-h-40 overflow-y-auto divide-y divide-gray-50">
               ${females.map(p => `
-                <label class="flex items-center px-4 py-2.5 hover:bg-gray-50 cursor-pointer transition">
+                <label class="sch-female-item flex items-center px-4 py-2.5 hover:bg-gray-50 cursor-pointer transition" data-name="${Results.escapeHtml(p.name.toLowerCase())}">
                   <input type="checkbox" name="females" value="${Results.escapeHtml(p.name)}" class="female-cb w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500">
                   <span class="ml-3 text-sm text-gray-800">${Results.escapeHtml(p.name)}</span>
                   <span class="ml-2 text-xs px-1.5 py-0.5 rounded font-medium bg-pink-100 text-pink-700">여</span>
@@ -524,6 +536,36 @@ const App = {
     container.querySelectorAll('.male-cb, .female-cb').forEach(cb => {
       cb.onchange = updateCounts;
     });
+
+    // 검색 & 전체선택 바인딩
+    const bindScheduleList = (prefix, cbClass) => {
+      const search = container.querySelector(`#sch-${prefix}-search`);
+      const items = container.querySelectorAll(`.sch-${prefix}-item`);
+      const allBtn = container.querySelector(`#sch-${prefix}-all-btn`);
+      if (!search || !allBtn) return;
+
+      search.oninput = () => {
+        const q = search.value.trim().toLowerCase();
+        items.forEach(item => {
+          item.style.display = (!q || item.dataset.name.includes(q)) ? '' : 'none';
+        });
+      };
+
+      let allSelected = false;
+      allBtn.onclick = () => {
+        allSelected = !allSelected;
+        items.forEach(item => {
+          if (item.style.display !== 'none') {
+            item.querySelector(`.${cbClass}`).checked = allSelected;
+          }
+        });
+        allBtn.textContent = allSelected ? '선택 해제' : '전체 선택';
+        updateCounts();
+      };
+    };
+
+    bindScheduleList('male', 'male-cb');
+    bindScheduleList('female', 'female-cb');
 
     container.querySelector('#start-time').onchange = () => this.updateSchedulePreview(container);
     container.querySelector('#end-time').onchange = () => this.updateSchedulePreview(container);
