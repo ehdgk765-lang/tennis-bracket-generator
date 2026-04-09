@@ -41,7 +41,8 @@ const Players = {
                   <div class="flex items-center gap-3 min-w-0">
                     <span class="w-7 h-7 bg-green-100 text-green-700 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">${i + 1}</span>
                     <span class="text-gray-800 font-medium truncate">${this.escapeHtml(p.name)}</span>
-                    <span class="text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${p.gender === 'M' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}">${p.gender === 'M' ? '남' : '여'}</span>
+                    <button class="gender-toggle-btn text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0 cursor-pointer active:scale-95 transition ${p.gender === 'M' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}"
+                      data-id="${p.id}">${p.gender === 'M' ? '남' : '여'}</button>
                   </div>
                   <button class="delete-player-btn text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg px-3 py-1 transition text-sm flex-shrink-0 ml-2"
                     data-id="${p.id}">삭제</button>
@@ -79,6 +80,17 @@ const Players = {
     input.onkeydown = (e) => {
       if (e.key === 'Enter') addPlayer();
     };
+
+    container.querySelectorAll('.gender-toggle-btn').forEach(btn => {
+      btn.onclick = () => {
+        const players = Storage.getPlayers();
+        const player = players.find(p => p.id === btn.dataset.id);
+        if (!player) return;
+        player.gender = player.gender === 'M' ? 'F' : 'M';
+        Storage.savePlayers(players);
+        this.render(container);
+      };
+    });
 
     container.querySelectorAll('.delete-player-btn').forEach(btn => {
       btn.onclick = () => {

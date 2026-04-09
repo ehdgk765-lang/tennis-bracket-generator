@@ -3,6 +3,7 @@ const SCHEDULE_GAME_TYPES = {
   XD: { label: '혼합복식', icon: '👫', badgeClass: 'bg-purple-100 text-purple-700', needM: 2, needF: 2 },
   MD: { label: '남자복식', icon: '👬', badgeClass: 'bg-blue-100 text-blue-700', needM: 4, needF: 0 },
   WD: { label: '여자복식', icon: '👭', badgeClass: 'bg-pink-100 text-pink-700', needM: 0, needF: 4 },
+  FD: { label: '섞어복식', icon: '🔀', badgeClass: 'bg-orange-100 text-orange-700', needM: 0, needF: 0, needAny: 4 },
 };
 
 const Schedule = {
@@ -24,11 +25,12 @@ const Schedule = {
   },
 
   // 가용 선수로 가능한 게임 타입 확인
-  getPossibleTypes(availMales, availFemales) {
+  getPossibleTypes(availMales, availFemales, allowMixed) {
     const types = [];
     if (availMales.length >= 2 && availFemales.length >= 2) types.push('XD');
     if (availMales.length >= 4) types.push('MD');
     if (availFemales.length >= 4) types.push('WD');
+    if (allowMixed && (availMales.length + availFemales.length) >= 4) types.push('FD');
     return types;
   },
 
@@ -50,11 +52,11 @@ const Schedule = {
   },
 
   // N개 코트에 대한 모든 게임 타입 조합 생성
-  generatePlans(numCourts) {
-    const types = ['XD', 'MD', 'WD'];
+  generatePlans(numCourts, allowMixed) {
+    const types = allowMixed ? ['XD', 'MD', 'WD', 'FD'] : ['XD', 'MD', 'WD'];
     if (numCourts === 0) return [[]];
     const result = [];
-    const sub = this.generatePlans(numCourts - 1);
+    const sub = this.generatePlans(numCourts - 1, allowMixed);
     for (const t of types) {
       for (const s of sub) {
         result.push([t, ...s]);
@@ -65,21 +67,24 @@ const Schedule = {
 
   // 플랜이 선수 수로 실행 가능한지 확인
   isPlanValid(plan, maleCount, femaleCount) {
-    let needM = 0, needF = 0;
+    let needM = 0, needF = 0, needAny = 0;
     for (const type of plan) {
       const cfg = SCHEDULE_GAME_TYPES[type];
       needM += cfg.needM;
       needF += cfg.needF;
+      if (cfg.needAny) needAny += cfg.needAny;
     }
-    return maleCount >= needM && femaleCount >= needF;
+    const remainM = maleCount - needM;
+    const remainF = femaleCount - needF;
+    return remainM >= 0 && remainF >= 0 && (remainM + remainF) >= needAny;
   },
 
   // 한 타임슬롯의 매치 생성 (플랜 기반)
-  generateSlotMatches(males, females, courts, gameCounts) {
+  generateSlotMatches(males, females, courts, gameCounts, allowMixed) {
     // 코트를 최대한 채우는 유효한 플랜 찾기
     let validPlans = [];
     for (let n = courts; n >= 1; n--) {
-      const plans = this.generatePlans(n);
+      const plans = this.generatePlans(n, allowMixed);
       validPlans = plans.filter(p => this.isPlanValid(p, males.length, females.length));
       if (validPlans.length > 0) break;
     }
@@ -95,10 +100,35 @@ const Schedule = {
 
     const matches = [];
 
-    plan.forEach((gameType, i) => {
-      let team1, team2;
+    // 성별 지정 타입(XD/MD/WD) 먼저, FD(섞어복식)는 나중에 처리
+    // (isPlanValid가 성별 타입 우선 소비를 가정하므로 실행 순서를 맞춤)
+    const orderedPlan = plan.map((gameType, idx) => ({ gameType, court: idx + 1 }));
+    orderedPlan.sort((a, b) => (a.gameType === 'FD' ? 1 : 0) - (b.gameType === 'FD' ? 1 : 0));
 
-      if (gameType === 'XD') {
+    orderedPlan.forEach(({ gameType, court }) => {
+      let team1, team2;
+      let displayType = gameType;
+
+      if (gameType === 'FD') {
+        // 섞어복식: 성별 무관, 남은 전체 풀에서 4명 선택
+        let allAvail = this.sortByCountShuffled([...availM, ...availF], gameCounts);
+        const picked = allAvail.slice(0, 4);
+        picked.forEach(p => {
+          let idx = availM.indexOf(p);
+          if (idx >= 0) { availM.splice(idx, 1); return; }
+          idx = availF.indexOf(p);
+          if (idx >= 0) availF.splice(idx, 1);
+        });
+        const s = this.shuffle(picked);
+        team1 = [s[0], s[1]];
+        team2 = [s[2], s[3]];
+        picked.forEach(p => gameCounts[p]++);
+
+        // 실제 성별 구성에 따라 표시 타입 결정
+        const mCount = picked.filter(p => males.includes(p)).length;
+        if (mCount === 4) displayType = 'MD';
+        else if (mCount === 0) displayType = 'WD';
+      } else if (gameType === 'XD') {
         const mPicked = availM.splice(0, 2);
         const fPicked = availF.splice(0, 2);
         const sm = this.shuffle(mPicked);
@@ -122,9 +152,9 @@ const Schedule = {
 
       matches.push({
         id: Storage.generateId(),
-        court: i + 1,
-        gameType,
-        gameTypeLabel: SCHEDULE_GAME_TYPES[gameType].label,
+        court,
+        gameType: displayType,
+        gameTypeLabel: SCHEDULE_GAME_TYPES[displayType].label,
         player1: team1.join(' / '),
         player2: team2.join(' / '),
         scores: null,
@@ -136,13 +166,13 @@ const Schedule = {
   },
 
   // 대진표 생성
-  generate(males, females, courts, startTime, endTime) {
+  generate(males, females, courts, startTime, endTime, allowMixed) {
     const slots = this.calculateTimeSlots(startTime, endTime);
     const gameCounts = {};
     [...males, ...females].forEach(p => { gameCounts[p] = 0; });
 
     const timeSlots = slots.map(time => {
-      const matches = this.generateSlotMatches(males, females, courts, gameCounts);
+      const matches = this.generateSlotMatches(males, females, courts, gameCounts, allowMixed);
       return { time, matches };
     });
 

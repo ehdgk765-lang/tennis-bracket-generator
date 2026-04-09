@@ -435,7 +435,13 @@ const App = {
 
     container.innerHTML = `
       <div class="max-w-lg mx-auto">
-        <h2 class="text-2xl font-bold text-gray-800 mb-6">대진표 만들기</h2>
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-2xl font-bold text-gray-800">대진표 만들기</h2>
+          <label class="flex items-center gap-1.5 cursor-pointer">
+            <input type="checkbox" id="allow-mixed" class="w-3.5 h-3.5 text-green-600 rounded border-gray-300 focus:ring-green-500">
+            <span class="text-xs text-gray-500">섞어복식 허용</span>
+          </label>
+        </div>
 
         <form id="schedule-form" class="space-y-5">
           <!-- 시간 설정 -->
@@ -575,6 +581,11 @@ const App = {
 
     this.updateSchedulePreview(container);
 
+    const allowMixedCb = container.querySelector('#allow-mixed');
+    if (allowMixedCb) {
+      allowMixedCb.onchange = () => this.updateSchedulePreview(container);
+    }
+
     container.querySelector('#schedule-form').onsubmit = (e) => {
       e.preventDefault();
 
@@ -595,13 +606,15 @@ const App = {
         return;
       }
 
-      const possibleTypes = Schedule.getPossibleTypes(selectedMales, selectedFemales);
+      const allowMixed = container.querySelector('#allow-mixed')?.checked || false;
+
+      const possibleTypes = Schedule.getPossibleTypes(selectedMales, selectedFemales, allowMixed);
       if (possibleTypes.length === 0) {
-        alert('선택한 선수 구성으로 복식 경기를 만들 수 없습니다.\n혼합복식: 남2+여2, 남자복식: 남4, 여자복식: 여4 이상 필요');
+        alert('선택한 선수 구성으로 복식 경기를 만들 수 없습니다.\n혼합복식: 남2+여2, 남자복식: 남4, 여자복식: 여4 이상 필요\n또는 섞어복식 허용을 체크해주세요.');
         return;
       }
 
-      const timeSlots = Schedule.generate(selectedMales, selectedFemales, courts, startTime, endTime);
+      const timeSlots = Schedule.generate(selectedMales, selectedFemales, courts, startTime, endTime, allowMixed);
 
       if (timeSlots.length === 0) {
         alert('시간이 부족합니다. 최소 30분 이상 설정해주세요.');
@@ -617,6 +630,7 @@ const App = {
         courts,
         startTime,
         endTime,
+        allowMixed,
         males: selectedMales,
         females: selectedFemales,
         players: [...selectedMales, ...selectedFemales],
@@ -657,10 +671,12 @@ const App = {
     timeInfo.textContent = `${slots.length}개 타임 (30분 × ${slots.length})`;
     timeInfo.className = 'text-xs text-gray-500 mt-1';
 
+    const allowMixed = container.querySelector('#allow-mixed')?.checked || false;
     const possibleTypes = [];
     if (maleCount >= 2 && femaleCount >= 2) possibleTypes.push('혼합복식');
     if (maleCount >= 4) possibleTypes.push('남자복식');
     if (femaleCount >= 4) possibleTypes.push('여자복식');
+    if (allowMixed && (maleCount + femaleCount) >= 4) possibleTypes.push('섞어복식');
 
     if (maleCount + femaleCount >= 4 && possibleTypes.length > 0) {
       preview.classList.remove('hidden');
@@ -718,7 +734,7 @@ const App = {
                      data-id="${t.id}">
                   <div class="flex items-center justify-between mb-2">
                     <h3 class="font-bold text-gray-800">${Results.escapeHtml(t.name)}</h3>
-                    <span class="text-xs px-2 py-1 rounded-full bg-orange-100 text-orange-700">대진표</span>
+                    <span class="text-xs px-2 py-1 rounded-full bg-orange-100 text-orange-700">대진표 만들기</span>
                   </div>
                   <div class="flex items-center gap-4 text-sm text-gray-500">
                     <span>남${t.males.length} · 여${t.females.length}</span>
