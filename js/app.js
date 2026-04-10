@@ -446,6 +446,14 @@ const App = {
         </div>
 
         <form id="schedule-form" class="space-y-5">
+          <!-- 대진표 이름 -->
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">대진표 이름</label>
+            <input type="text" id="schedule-name" maxlength="30"
+              class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500"
+              placeholder="미입력 시 날짜+시간으로 자동 생성">
+          </div>
+
           <!-- 시간 설정 -->
           <div>
             <label class="block text-sm font-semibold text-gray-700 mb-2">시간 설정</label>
@@ -626,9 +634,10 @@ const App = {
       }
 
       const today = new Date().toISOString().slice(0, 10);
+      const customName = container.querySelector('#schedule-name').value.trim();
       const tournament = {
         id: Storage.generateId(),
-        name: `${today} ${startTime} 대진표`,
+        name: customName || `${today} ${startTime} 대진표`,
         format: 'schedule',
         setCount: 1,
         courts,

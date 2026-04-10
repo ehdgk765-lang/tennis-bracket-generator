@@ -257,23 +257,29 @@ const Schedule = {
 
     container.innerHTML = `
       <div>
-        <div class="flex items-center justify-between mb-4">
+        <div id="schedule-header" class="flex items-center justify-between mb-4 pb-1">
           <div>
-            <h3 class="text-xl font-bold text-gray-800">${Results.escapeHtml(tournament.name)}</h3>
+            <h3 id="schedule-title" class="text-xl font-bold text-gray-800 cursor-pointer hover:text-green-700 transition" title="클릭하여 이름 수정">${Results.escapeHtml(tournament.name)} <svg class="w-3.5 h-3.5 inline-block text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></h3>
             <p class="text-sm text-gray-500 mt-1">
               ${tournament.startTime} ~ ${tournament.endTime} · 코트 ${tournament.courts}면 ·
               남${tournament.males.length} 여${tournament.females.length}
             </p>
           </div>
-          <span class="text-sm font-medium ${isComplete ? 'text-green-600' : 'text-orange-600'}">
-            ${completedMatches}/${totalMatches} 완료
-          </span>
+          <div class="flex items-center gap-2">
+            <button id="pdf-download-btn" class="text-sm px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 transition font-medium flex items-center gap-1">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              PDF
+            </button>
+            <span class="text-sm font-medium ${isComplete ? 'text-green-600' : 'text-orange-600'}">
+              ${completedMatches}/${totalMatches} 완료
+            </span>
+          </div>
         </div>
 
         <!-- 시간표 -->
         <div class="space-y-4 mb-6">
-          ${tournament.timeSlots.map(slot => `
-            <div>
+          ${tournament.timeSlots.map((slot, si) => `
+            <div class="schedule-slot" data-slot="${si}">
               <div class="flex items-center gap-2 mb-2">
                 <span class="text-sm font-bold text-gray-700 bg-gray-100 px-3 py-1 rounded-full">${slot.time}</span>
                 <div class="flex-1 border-t border-gray-200"></div>
@@ -286,7 +292,7 @@ const Schedule = {
         </div>
 
         <!-- 선수별 통계 -->
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div id="stats-section" class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div class="px-4 py-3 bg-gray-50/50 border-b border-gray-100">
             <span class="font-semibold text-gray-700 text-sm">선수별 통계</span>
           </div>
@@ -324,6 +330,25 @@ const Schedule = {
         </div>
       </div>`;
 
+    // PDF 다운로드
+    const pdfBtn = container.querySelector('#pdf-download-btn');
+    if (pdfBtn) {
+      pdfBtn.onclick = () => this.exportPDF(container, tournament);
+    }
+
+    // 대진표 이름 수정
+    const titleEl = container.querySelector('#schedule-title');
+    if (titleEl) {
+      titleEl.onclick = () => {
+        const newName = prompt('대진표 이름을 입력하세요', tournament.name);
+        if (newName !== null && newName.trim() !== '') {
+          tournament.name = newName.trim();
+          Storage.updateTournament(tournament);
+          this.render(container, tournament);
+        }
+      };
+    }
+
     // 매치 카드 클릭 → 스코어 입력
     container.querySelectorAll('.schedule-match-card').forEach(card => {
       card.onclick = () => {
@@ -350,6 +375,126 @@ const Schedule = {
     });
   },
 
+  // PDF 내보내기 (타임슬롯 단위 캡처, 페이지당 4개)
+  async exportPDF(container, tournament) {
+    const btn = container.querySelector('#pdf-download-btn');
+    const origText = btn.innerHTML;
+    btn.innerHTML = '생성 중...';
+    btn.disabled = true;
+
+    try {
+      const { jsPDF } = window.jspdf;
+      const captureOpts = { scale: 2, useCORS: true, backgroundColor: '#ffffff', scrollY: -window.scrollY };
+
+      // PDF에서 숨길 요소 (기록 탭에서는 통계 포함)
+      const hideSelector = tournament.status === 'completed'
+        ? '#pdf-download-btn, .schedule-match-card p'
+        : '#pdf-download-btn, .schedule-match-card p, #stats-section';
+      const hideEls = container.querySelectorAll(hideSelector);
+      hideEls.forEach(el => el.style.display = 'none');
+
+      // 캡처 시 고정 너비 적용 (좁게 → PDF에서 글씨가 크게 보임)
+      const slotCaptureW = '450px';
+      const headerCaptureW = '700px';
+
+      // 헤더 캡처
+      const headerEl = container.querySelector('#schedule-header');
+      const origHeaderW = headerEl.style.width;
+      headerEl.style.width = headerCaptureW;
+      const headerCanvas = await html2canvas(headerEl, captureOpts);
+      headerEl.style.width = origHeaderW;
+
+      // 각 타임슬롯 개별 캡처 (좁은 너비로 캡처)
+      const slotEls = container.querySelectorAll('.schedule-slot');
+      const slotCanvases = [];
+      for (const el of slotEls) {
+        const origW = el.style.width;
+        el.style.width = slotCaptureW;
+        slotCanvases.push(await html2canvas(el, captureOpts));
+        el.style.width = origW;
+      }
+
+      // 통계 테이블 캡처 (기록 탭일 때만)
+      let statsCanvas = null;
+      const statsEl = container.querySelector('#stats-section');
+      if (tournament.status === 'completed' && statsEl) {
+        const origStatsW = statsEl.style.width;
+        statsEl.style.width = headerCaptureW;
+        statsCanvas = await html2canvas(statsEl, captureOpts);
+        statsEl.style.width = origStatsW;
+      }
+
+      // 숨긴 요소 복원
+      hideEls.forEach(el => el.style.display = '');
+
+      // PDF 생성 (2열, 페이지에 들어가는 만큼 채움)
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const margin = 10;
+      const colGap = 4;
+      const rowGap = 4;
+      const contentW = 210 - margin * 2;
+      const colW = (contentW - colGap) / 2;
+      const pageH = 297;
+
+      // 슬롯 1개의 자연 높이 (모두 동일한 코트 수이므로 첫 번째로 계산)
+      const slotRowH = slotCanvases.length > 0
+        ? (slotCanvases[0].height * colW) / slotCanvases[0].width
+        : 0;
+
+      const headerH = (headerCanvas.height * contentW) / headerCanvas.width;
+      let currentY = margin;
+      let slotIdx = 0;
+      let pageNum = 0;
+
+      while (slotIdx < slotCanvases.length) {
+        if (pageNum > 0) pdf.addPage();
+        currentY = margin;
+
+        // 첫 페이지에 헤더 삽입
+        if (pageNum === 0) {
+          pdf.addImage(headerCanvas.toDataURL('image/png'), 'PNG', margin, currentY, contentW, headerH);
+          currentY += headerH + rowGap;
+        }
+
+        // 남은 공간에 행을 채울 수 있는 만큼 배치
+        while (slotIdx < slotCanvases.length) {
+          const remainH = pageH - margin - currentY;
+          if (remainH < slotRowH * 0.9) break; // 다음 행이 들어갈 공간 부족
+
+          // 2열 배치
+          for (let col = 0; col < 2 && slotIdx < slotCanvases.length; col++) {
+            const canvas = slotCanvases[slotIdx];
+            const x = margin + col * (colW + colGap);
+            pdf.addImage(canvas.toDataURL('image/png'), 'PNG', x, currentY, colW, slotRowH);
+            slotIdx++;
+          }
+
+          currentY += slotRowH + rowGap;
+        }
+
+        pageNum++;
+      }
+
+      // 통계 테이블 추가 (기록 탭)
+      if (statsCanvas) {
+        const statsH = (statsCanvas.height * contentW) / statsCanvas.width;
+        const remainH = pageH - margin - currentY;
+
+        if (statsH > remainH) pdf.addPage();
+        const statsY = statsH > remainH ? margin : currentY;
+        pdf.addImage(statsCanvas.toDataURL('image/png'), 'PNG', margin, statsY, contentW, statsH);
+      }
+
+      pdf.save(`${tournament.name}.pdf`);
+    } catch (e) {
+      console.error('PDF 생성 오류:', e);
+      alert('PDF 생성 중 오류가 발생했습니다.');
+    } finally {
+      btn.innerHTML = origText;
+      btn.disabled = false;
+    }
+  },
+
   // 매치 카드 HTML
   renderMatchCard(match) {
     const cfg = SCHEDULE_GAME_TYPES[match.gameType];
@@ -367,15 +512,15 @@ const Schedule = {
           <span class="text-xs text-gray-400">코트 ${match.court}</span>
         </div>
         <div class="space-y-0.5">
-          <div class="flex items-center justify-between ${isWin1 ? 'bg-green-50' : 'bg-gray-50'} rounded-lg px-2 py-1.5">
-            <span class="text-xs sm:text-sm font-medium ${isWin1 ? 'text-green-700' : 'text-gray-800'} flex-1" style="overflow:hidden">
+          <div class="flex items-center justify-between ${isWin1 ? 'bg-green-50' : 'bg-gray-50'} rounded-lg px-2 py-2.5">
+            <span class="text-xs sm:text-sm font-medium ${isWin1 ? 'text-green-700' : 'text-gray-800'} flex-1" style="min-width:0">
               ${isWin1 ? '🏆 ' : ''}${t1Html}
             </span>
             ${hasScore ? `<span class="text-xs font-bold ${isWin1 ? 'text-green-600' : 'text-gray-500'} ml-1 flex-shrink-0">${match.scores[0][0]}</span>` : ''}
           </div>
           <div class="text-center text-xs text-gray-300 leading-tight">vs</div>
-          <div class="flex items-center justify-between ${isWin2 ? 'bg-green-50' : 'bg-gray-50'} rounded-lg px-2 py-1.5">
-            <span class="text-xs sm:text-sm font-medium ${isWin2 ? 'text-green-700' : 'text-gray-800'} flex-1" style="overflow:hidden">
+          <div class="flex items-center justify-between ${isWin2 ? 'bg-green-50' : 'bg-gray-50'} rounded-lg px-2 py-2.5">
+            <span class="text-xs sm:text-sm font-medium ${isWin2 ? 'text-green-700' : 'text-gray-800'} flex-1" style="min-width:0">
               ${isWin2 ? '🏆 ' : ''}${t2Html}
             </span>
             ${hasScore ? `<span class="text-xs font-bold ${isWin2 ? 'text-green-600' : 'text-gray-500'} ml-1 flex-shrink-0">${match.scores[0][1]}</span>` : ''}
