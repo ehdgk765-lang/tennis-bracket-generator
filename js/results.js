@@ -14,6 +14,8 @@ const Results = {
 
     const player1Name = match.player1 || 'BYE';
     const player2Name = match.player2 || 'BYE';
+    const t1Html = this.formatTeamHtml(player1Name);
+    const t2Html = this.formatTeamHtml(player2Name);
 
     let setsHTML = '';
     for (let i = 0; i < setCount; i++) {
@@ -34,10 +36,14 @@ const Results = {
       <div class="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl max-w-sm w-full p-5 sm:p-6 max-h-[90vh] overflow-y-auto">
         <div class="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-3 sm:hidden"></div>
         <h3 class="text-lg font-bold text-center mb-4">스코어 입력</h3>
-        <div class="flex justify-between items-center mb-4 px-1 sm:px-2">
-          <span class="font-semibold text-green-700 text-xs sm:text-sm flex-1 text-center truncate">${this.escapeHtml(player1Name)}</span>
-          <span class="text-gray-400 mx-2 flex-shrink-0">vs</span>
-          <span class="font-semibold text-blue-700 text-xs sm:text-sm flex-1 text-center truncate">${this.escapeHtml(player2Name)}</span>
+        <div class="space-y-1.5 mb-4">
+          <div class="bg-green-50 rounded-xl px-3 py-2 text-center">
+            <span class="font-semibold text-green-700 text-xs sm:text-sm">${t1Html}</span>
+          </div>
+          <div class="text-center text-xs text-gray-400 font-medium">vs</div>
+          <div class="bg-blue-50 rounded-xl px-3 py-2 text-center">
+            <span class="font-semibold text-blue-700 text-xs sm:text-sm">${t2Html}</span>
+          </div>
         </div>
         <div class="space-y-3 mb-5">${setsHTML}</div>
         <div id="score-error" class="text-red-500 text-sm text-center mb-3 hidden"></div>
@@ -129,6 +135,17 @@ const Results = {
   formatScores(scores) {
     if (!scores || scores.length === 0) return '-';
     return scores.map(([s1, s2]) => `${s1}-${s2}`).join(', ');
+  },
+
+  // 팀 문자열("A / B")을 NTRP 포함 HTML로 변환
+  formatTeamHtml(teamStr) {
+    const allPlayers = Storage.getPlayers();
+    const names = teamStr.split(' / ');
+    return names.map(name => {
+      const pd = allPlayers.find(p => p.name === name);
+      const ntrp = (pd?.ntrp || 2.5).toFixed(1);
+      return `${this.escapeHtml(name)}<span class="text-yellow-600 text-xs ml-0.5">${ntrp}</span>`;
+    }).join(' <span class="text-gray-300 mx-0.5">/</span> ');
   },
 
   escapeHtml(text) {

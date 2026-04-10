@@ -240,6 +240,7 @@ const App = {
               <input type="checkbox" name="players" value="${Results.escapeHtml(p.name)}" class="player-checkbox w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500">
               <span class="ml-3 text-sm text-gray-800">${Results.escapeHtml(p.name)}</span>
               <span class="ml-2 text-xs px-1.5 py-0.5 rounded font-medium ${p.gender === 'M' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}">${p.gender === 'M' ? '남' : '여'}</span>
+              <span class="text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">${(p.ntrp || 2.5).toFixed(1)}</span>
             </label>
           `).join('')}
         </div>
@@ -309,6 +310,7 @@ const App = {
               <input type="checkbox" name="${prefix}" value="${Results.escapeHtml(p.name)}" class="${prefix}-cb w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500">
               <span class="ml-3 text-sm text-gray-800">${Results.escapeHtml(p.name)}</span>
               <span class="ml-2 text-xs px-1.5 py-0.5 rounded font-medium ${badgeClass}">${genderLabel}</span>
+              <span class="text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">${(p.ntrp || 2.5).toFixed(1)}</span>
             </label>
           `).join('')}
         </div>
@@ -492,6 +494,7 @@ const App = {
                   <input type="checkbox" name="males" value="${Results.escapeHtml(p.name)}" class="male-cb w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500">
                   <span class="ml-3 text-sm text-gray-800">${Results.escapeHtml(p.name)}</span>
                   <span class="ml-2 text-xs px-1.5 py-0.5 rounded font-medium bg-blue-100 text-blue-700">남</span>
+                  <span class="text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">${(p.ntrp || 2.5).toFixed(1)}</span>
                 </label>
               `).join('')}
             </div>`}
@@ -515,6 +518,7 @@ const App = {
                   <input type="checkbox" name="females" value="${Results.escapeHtml(p.name)}" class="female-cb w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500">
                   <span class="ml-3 text-sm text-gray-800">${Results.escapeHtml(p.name)}</span>
                   <span class="ml-2 text-xs px-1.5 py-0.5 rounded font-medium bg-pink-100 text-pink-700">여</span>
+                  <span class="text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">${(p.ntrp || 2.5).toFixed(1)}</span>
                 </label>
               `).join('')}
             </div>`}
@@ -734,7 +738,7 @@ const App = {
                      data-id="${t.id}">
                   <div class="flex items-center justify-between mb-2">
                     <h3 class="font-bold text-gray-800">${Results.escapeHtml(t.name)}</h3>
-                    <span class="text-xs px-2 py-1 rounded-full bg-orange-100 text-orange-700">대진표 만들기</span>
+                    <span class="text-xs px-2 py-1 rounded-full bg-orange-100 text-orange-700">대진표</span>
                   </div>
                   <div class="flex items-center gap-4 text-sm text-gray-500">
                     <span>남${t.males.length} · 여${t.females.length}</span>

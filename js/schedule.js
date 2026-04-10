@@ -44,6 +44,47 @@ const Schedule = {
     return a;
   },
 
+  // NTRP 맵 생성 (이름 → NTRP)
+  buildNtrpMap() {
+    const map = {};
+    Storage.getPlayers().forEach(p => { map[p.name] = p.ntrp || 2.5; });
+    return map;
+  },
+
+  // 4명을 NTRP 균형에 맞게 2팀으로 분배
+  balancedPair(players, ntrpMap) {
+    if (players.length !== 4) return [players.slice(0, 2), players.slice(2)];
+    const [a, b, c, d] = players;
+    const n = [ntrpMap[a] || 2.5, ntrpMap[b] || 2.5, ntrpMap[c] || 2.5, ntrpMap[d] || 2.5];
+
+    const pairings = [
+      { t1: [a, b], t2: [c, d], diff: Math.abs((n[0] + n[1]) - (n[2] + n[3])) },
+      { t1: [a, c], t2: [b, d], diff: Math.abs((n[0] + n[2]) - (n[1] + n[3])) },
+      { t1: [a, d], t2: [b, c], diff: Math.abs((n[0] + n[3]) - (n[1] + n[2])) },
+    ];
+
+    pairings.sort((x, y) => x.diff - y.diff);
+    const bestDiff = pairings[0].diff;
+    const best = pairings.filter(p => p.diff === bestDiff);
+    const chosen = best[Math.floor(Math.random() * best.length)];
+    return [chosen.t1, chosen.t2];
+  },
+
+  // XD(혼합복식)용 NTRP 균형 페어링: 각 팀 = 남1+여1
+  balancedPairXD(males, females, ntrpMap) {
+    const [m1, m2] = males;
+    const [f1, f2] = females;
+    const nm1 = ntrpMap[m1] || 2.5, nm2 = ntrpMap[m2] || 2.5;
+    const nf1 = ntrpMap[f1] || 2.5, nf2 = ntrpMap[f2] || 2.5;
+
+    const diff1 = Math.abs((nm1 + nf1) - (nm2 + nf2));
+    const diff2 = Math.abs((nm1 + nf2) - (nm2 + nf1));
+
+    if (diff1 < diff2) return [[m1, f1], [m2, f2]];
+    if (diff2 < diff1) return [[m1, f2], [m2, f1]];
+    return Math.random() < 0.5 ? [[m1, f1], [m2, f2]] : [[m1, f2], [m2, f1]];
+  },
+
   // 게임 수 기준 정렬 (동점자는 셔플)
   sortByCountShuffled(players, gameCounts) {
     const shuffled = this.shuffle([...players]);
@@ -94,14 +135,14 @@ const Schedule = {
     // 유효한 플랜 중 랜덤 선택
     const plan = validPlans[Math.floor(Math.random() * validPlans.length)];
 
-    // 가용 선수 정렬: 경기 수 적은 순 (동점 셔플)
+    // NTRP 맵 + 가용 선수 정렬: 경기 수 적은 순 (동점 셔플)
+    const ntrpMap = this.buildNtrpMap();
     let availM = this.sortByCountShuffled(males, gameCounts);
     let availF = this.sortByCountShuffled(females, gameCounts);
 
     const matches = [];
 
     // 성별 지정 타입(XD/MD/WD) 먼저, FD(섞어복식)는 나중에 처리
-    // (isPlanValid가 성별 타입 우선 소비를 가정하므로 실행 순서를 맞춤)
     const orderedPlan = plan.map((gameType, idx) => ({ gameType, court: idx + 1 }));
     orderedPlan.sort((a, b) => (a.gameType === 'FD' ? 1 : 0) - (b.gameType === 'FD' ? 1 : 0));
 
@@ -119,9 +160,7 @@ const Schedule = {
           idx = availF.indexOf(p);
           if (idx >= 0) availF.splice(idx, 1);
         });
-        const s = this.shuffle(picked);
-        team1 = [s[0], s[1]];
-        team2 = [s[2], s[3]];
+        [team1, team2] = this.balancedPair(picked, ntrpMap);
         picked.forEach(p => gameCounts[p]++);
 
         // 실제 성별 구성에 따라 표시 타입 결정
@@ -131,22 +170,15 @@ const Schedule = {
       } else if (gameType === 'XD') {
         const mPicked = availM.splice(0, 2);
         const fPicked = availF.splice(0, 2);
-        const sm = this.shuffle(mPicked);
-        const sf = this.shuffle(fPicked);
-        team1 = [sm[0], sf[0]];
-        team2 = [sm[1], sf[1]];
+        [team1, team2] = this.balancedPairXD(mPicked, fPicked, ntrpMap);
         [...mPicked, ...fPicked].forEach(p => gameCounts[p]++);
       } else if (gameType === 'MD') {
         const picked = availM.splice(0, 4);
-        const s = this.shuffle(picked);
-        team1 = [s[0], s[1]];
-        team2 = [s[2], s[3]];
+        [team1, team2] = this.balancedPair(picked, ntrpMap);
         picked.forEach(p => gameCounts[p]++);
       } else {
         const picked = availF.splice(0, 4);
-        const s = this.shuffle(picked);
-        team1 = [s[0], s[1]];
-        team2 = [s[2], s[3]];
+        [team1, team2] = this.balancedPair(picked, ntrpMap);
         picked.forEach(p => gameCounts[p]++);
       }
 
@@ -269,17 +301,24 @@ const Schedule = {
               </tr>
             </thead>
             <tbody>
-              ${playerStats.map(s => {
+              ${(() => { const allPlayersData = Storage.getPlayers(); return playerStats.map(s => {
                 const winRate = s.games > 0 ? Math.round((s.wins / s.games) * 100) : 0;
+                const pd = allPlayersData.find(pl => pl.name === s.name);
+                const gender = pd?.gender;
+                const ntrp = pd?.ntrp || 2.5;
                 return `
                   <tr class="border-b border-gray-50 hover:bg-gray-50">
-                    <td class="px-4 py-2 font-medium text-gray-800">${Results.escapeHtml(s.name)}</td>
+                    <td class="px-4 py-2 font-medium text-gray-800">
+                      ${Results.escapeHtml(s.name)}
+                      <span class="text-xs px-1 py-0.5 rounded font-medium ${gender === 'M' ? 'bg-blue-100 text-blue-700' : gender === 'F' ? 'bg-pink-100 text-pink-700' : 'bg-gray-100 text-gray-500'}">${gender === 'M' ? '남' : gender === 'F' ? '여' : '-'}</span>
+                      <span class="text-xs px-1 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">${ntrp.toFixed(1)}</span>
+                    </td>
                     <td class="text-center px-2 py-2 text-gray-600">${s.games}</td>
                     <td class="text-center px-2 py-2 text-green-600 font-medium">${s.wins}</td>
                     <td class="text-center px-2 py-2 text-red-500">${s.losses}</td>
                     <td class="text-center px-2 py-2 text-gray-600">${s.games > 0 ? winRate + '%' : '-'}</td>
                   </tr>`;
-              }).join('')}
+              }).join(''); })()}
             </tbody>
           </table>
         </div>
@@ -315,29 +354,34 @@ const Schedule = {
   renderMatchCard(match) {
     const cfg = SCHEDULE_GAME_TYPES[match.gameType];
     const hasScore = !!match.winner;
+    const t1Html = Results.formatTeamHtml(match.player1);
+    const t2Html = Results.formatTeamHtml(match.player2);
+    const isWin1 = match.winner === match.player1;
+    const isWin2 = match.winner === match.player2;
 
     return `
-      <div class="schedule-match-card bg-white border ${hasScore ? 'border-green-200 bg-green-50/30' : 'border-gray-200'} rounded-xl p-3 cursor-pointer hover:shadow-md transition"
+      <div class="schedule-match-card bg-white border ${hasScore ? 'border-green-200' : 'border-gray-200'} rounded-xl p-3 cursor-pointer hover:shadow-md transition"
            data-match-id="${match.id}">
         <div class="flex items-center justify-between mb-2">
           <span class="text-xs px-2 py-0.5 rounded-full font-medium ${cfg.badgeClass}">${cfg.label}</span>
           <span class="text-xs text-gray-400">코트 ${match.court}</span>
         </div>
-        <div class="space-y-1">
-          <div class="flex items-center justify-between">
-            <span class="text-xs sm:text-sm font-medium ${match.winner === match.player1 ? 'text-green-700' : 'text-gray-800'} truncate flex-1">
-              ${match.winner === match.player1 ? '🏆 ' : ''}${Results.escapeHtml(match.player1)}
+        <div class="space-y-0.5">
+          <div class="flex items-center justify-between ${isWin1 ? 'bg-green-50' : 'bg-gray-50'} rounded-lg px-2 py-1.5">
+            <span class="text-xs sm:text-sm font-medium ${isWin1 ? 'text-green-700' : 'text-gray-800'} flex-1" style="overflow:hidden">
+              ${isWin1 ? '🏆 ' : ''}${t1Html}
             </span>
-            ${hasScore ? `<span class="text-xs font-bold text-gray-600 ml-1">${match.scores[0][0]}</span>` : ''}
+            ${hasScore ? `<span class="text-xs font-bold ${isWin1 ? 'text-green-600' : 'text-gray-500'} ml-1 flex-shrink-0">${match.scores[0][0]}</span>` : ''}
           </div>
-          <div class="flex items-center justify-between">
-            <span class="text-xs sm:text-sm font-medium ${match.winner === match.player2 ? 'text-green-700' : 'text-gray-800'} truncate flex-1">
-              ${match.winner === match.player2 ? '🏆 ' : ''}${Results.escapeHtml(match.player2)}
+          <div class="text-center text-xs text-gray-300 leading-tight">vs</div>
+          <div class="flex items-center justify-between ${isWin2 ? 'bg-green-50' : 'bg-gray-50'} rounded-lg px-2 py-1.5">
+            <span class="text-xs sm:text-sm font-medium ${isWin2 ? 'text-green-700' : 'text-gray-800'} flex-1" style="overflow:hidden">
+              ${isWin2 ? '🏆 ' : ''}${t2Html}
             </span>
-            ${hasScore ? `<span class="text-xs font-bold text-gray-600 ml-1">${match.scores[0][1]}</span>` : ''}
+            ${hasScore ? `<span class="text-xs font-bold ${isWin2 ? 'text-green-600' : 'text-gray-500'} ml-1 flex-shrink-0">${match.scores[0][1]}</span>` : ''}
           </div>
         </div>
-        ${!hasScore ? '<p class="text-xs text-gray-400 text-center mt-2">탭하여 스코어 입력</p>' : ''}
+        ${!hasScore ? '<p class="text-xs text-gray-400 text-center mt-1.5">탭하여 스코어 입력</p>' : ''}
       </div>`;
   },
 };

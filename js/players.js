@@ -1,4 +1,6 @@
 // players.js - 선수 관리 CRUD + UI 렌더링
+const NTRP_VALUES = [2.0, 2.5, 3.0, 3.5, 4.0];
+
 const Players = {
   render(container) {
     const players = Storage.getPlayers();
@@ -20,6 +22,10 @@ const Players = {
                 class="px-2 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm font-medium bg-white flex-shrink-0">
                 <option value="M">남</option>
                 <option value="F">여</option>
+              </select>
+              <select id="player-ntrp-select"
+                class="px-1 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm font-medium bg-white flex-shrink-0">
+                ${NTRP_VALUES.map(v => `<option value="${v}" ${v === 2.5 ? 'selected' : ''}>${v.toFixed(1)}</option>`).join('')}
               </select>
               <button id="add-player-btn"
                 class="px-4 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 active:bg-green-800 transition font-medium whitespace-nowrap flex-shrink-0">
@@ -43,6 +49,8 @@ const Players = {
                     <span class="text-gray-800 font-medium truncate">${this.escapeHtml(p.name)}</span>
                     <button class="gender-toggle-btn text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0 cursor-pointer active:scale-95 transition ${p.gender === 'M' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}"
                       data-id="${p.id}">${p.gender === 'M' ? '남' : '여'}</button>
+                    <button class="ntrp-toggle-btn text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0 cursor-pointer active:scale-95 transition bg-yellow-100 text-yellow-700"
+                      data-id="${p.id}">${(p.ntrp || 2.5).toFixed(1)}</button>
                   </div>
                   <button class="delete-player-btn text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg px-3 py-1 transition text-sm flex-shrink-0 ml-2"
                     data-id="${p.id}">삭제</button>
@@ -58,11 +66,13 @@ const Players = {
   bindEvents(container) {
     const input = container.querySelector('#player-name-input');
     const genderSelect = container.querySelector('#player-gender-select');
+    const ntrpSelect = container.querySelector('#player-ntrp-select');
     const addBtn = container.querySelector('#add-player-btn');
 
     const addPlayer = () => {
       const name = input.value.trim();
       const gender = genderSelect.value;
+      const ntrp = parseFloat(ntrpSelect.value);
       if (!name) return;
 
       const players = Storage.getPlayers();
@@ -71,7 +81,7 @@ const Players = {
         return;
       }
 
-      players.push({ id: Storage.generateId(), name, gender });
+      players.push({ id: Storage.generateId(), name, gender, ntrp });
       Storage.savePlayers(players);
       this.render(container);
     };
@@ -87,6 +97,19 @@ const Players = {
         const player = players.find(p => p.id === btn.dataset.id);
         if (!player) return;
         player.gender = player.gender === 'M' ? 'F' : 'M';
+        Storage.savePlayers(players);
+        this.render(container);
+      };
+    });
+
+    container.querySelectorAll('.ntrp-toggle-btn').forEach(btn => {
+      btn.onclick = () => {
+        const players = Storage.getPlayers();
+        const player = players.find(p => p.id === btn.dataset.id);
+        if (!player) return;
+        const current = player.ntrp || 2.5;
+        const idx = NTRP_VALUES.indexOf(current);
+        player.ntrp = NTRP_VALUES[(idx + 1) % NTRP_VALUES.length];
         Storage.savePlayers(players);
         this.render(container);
       };
