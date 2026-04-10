@@ -51,8 +51,19 @@ const Schedule = {
     return map;
   },
 
-  // 4명을 NTRP 균형에 맞게 2팀으로 분배
-  balancedPair(players, ntrpMap) {
+  // 팀 키 생성 (이름 정렬하여 고유 키)
+  teamKey(a, b) {
+    return [a, b].sort().join('|');
+  },
+
+  // usedTeams에 팀 등록
+  recordTeam(usedTeams, t) {
+    const key = this.teamKey(t[0], t[1]);
+    usedTeams.set(key, (usedTeams.get(key) || 0) + 1);
+  },
+
+  // 4명을 NTRP 균형 + 중복 팀 최소화로 2팀 분배
+  balancedPair(players, ntrpMap, usedTeams) {
     if (players.length !== 4) return [players.slice(0, 2), players.slice(2)];
     const [a, b, c, d] = players;
     const n = [ntrpMap[a] || 2.5, ntrpMap[b] || 2.5, ntrpMap[c] || 2.5, ntrpMap[d] || 2.5];
@@ -63,26 +74,43 @@ const Schedule = {
       { t1: [a, d], t2: [b, c], diff: Math.abs((n[0] + n[3]) - (n[1] + n[2])) },
     ];
 
-    pairings.sort((x, y) => x.diff - y.diff);
-    const bestDiff = pairings[0].diff;
-    const best = pairings.filter(p => p.diff === bestDiff);
+    // 중복 팀 페널티 (중복 회피 우선, NTRP는 보조)
+    pairings.forEach(p => {
+      const dup1 = usedTeams.get(this.teamKey(p.t1[0], p.t1[1])) || 0;
+      const dup2 = usedTeams.get(this.teamKey(p.t2[0], p.t2[1])) || 0;
+      p.score = (dup1 + dup2) * 100 + p.diff;
+    });
+
+    pairings.sort((x, y) => x.score - y.score);
+    const bestScore = pairings[0].score;
+    const best = pairings.filter(p => p.score === bestScore);
     const chosen = best[Math.floor(Math.random() * best.length)];
     return [chosen.t1, chosen.t2];
   },
 
-  // XD(혼합복식)용 NTRP 균형 페어링: 각 팀 = 남1+여1
-  balancedPairXD(males, females, ntrpMap) {
+  // XD(혼합복식)용 NTRP 균형 + 중복 최소화 페어링
+  balancedPairXD(males, females, ntrpMap, usedTeams) {
     const [m1, m2] = males;
     const [f1, f2] = females;
     const nm1 = ntrpMap[m1] || 2.5, nm2 = ntrpMap[m2] || 2.5;
     const nf1 = ntrpMap[f1] || 2.5, nf2 = ntrpMap[f2] || 2.5;
 
-    const diff1 = Math.abs((nm1 + nf1) - (nm2 + nf2));
-    const diff2 = Math.abs((nm1 + nf2) - (nm2 + nf1));
+    const pairings = [
+      { t1: [m1, f1], t2: [m2, f2], diff: Math.abs((nm1 + nf1) - (nm2 + nf2)) },
+      { t1: [m1, f2], t2: [m2, f1], diff: Math.abs((nm1 + nf2) - (nm2 + nf1)) },
+    ];
 
-    if (diff1 < diff2) return [[m1, f1], [m2, f2]];
-    if (diff2 < diff1) return [[m1, f2], [m2, f1]];
-    return Math.random() < 0.5 ? [[m1, f1], [m2, f2]] : [[m1, f2], [m2, f1]];
+    pairings.forEach(p => {
+      const dup1 = usedTeams.get(this.teamKey(p.t1[0], p.t1[1])) || 0;
+      const dup2 = usedTeams.get(this.teamKey(p.t2[0], p.t2[1])) || 0;
+      p.score = (dup1 + dup2) * 100 + p.diff;
+    });
+
+    pairings.sort((x, y) => x.score - y.score);
+    const bestScore = pairings[0].score;
+    const best = pairings.filter(p => p.score === bestScore);
+    const chosen = best[Math.floor(Math.random() * best.length)];
+    return [chosen.t1, chosen.t2];
   },
 
   // 게임 수 기준 정렬 (동점자는 셔플)
@@ -121,7 +149,7 @@ const Schedule = {
   },
 
   // 한 타임슬롯의 매치 생성 (플랜 기반)
-  generateSlotMatches(males, females, courts, gameCounts, allowMixed) {
+  generateSlotMatches(males, females, courts, gameCounts, allowMixed, usedTeams) {
     // 코트를 최대한 채우는 유효한 플랜 찾기
     let validPlans = [];
     for (let n = courts; n >= 1; n--) {
@@ -160,7 +188,7 @@ const Schedule = {
           idx = availF.indexOf(p);
           if (idx >= 0) availF.splice(idx, 1);
         });
-        [team1, team2] = this.balancedPair(picked, ntrpMap);
+        [team1, team2] = this.balancedPair(picked, ntrpMap, usedTeams);
         picked.forEach(p => gameCounts[p]++);
 
         // 실제 성별 구성에 따라 표시 타입 결정
@@ -170,17 +198,21 @@ const Schedule = {
       } else if (gameType === 'XD') {
         const mPicked = availM.splice(0, 2);
         const fPicked = availF.splice(0, 2);
-        [team1, team2] = this.balancedPairXD(mPicked, fPicked, ntrpMap);
+        [team1, team2] = this.balancedPairXD(mPicked, fPicked, ntrpMap, usedTeams);
         [...mPicked, ...fPicked].forEach(p => gameCounts[p]++);
       } else if (gameType === 'MD') {
         const picked = availM.splice(0, 4);
-        [team1, team2] = this.balancedPair(picked, ntrpMap);
+        [team1, team2] = this.balancedPair(picked, ntrpMap, usedTeams);
         picked.forEach(p => gameCounts[p]++);
       } else {
         const picked = availF.splice(0, 4);
-        [team1, team2] = this.balancedPair(picked, ntrpMap);
+        [team1, team2] = this.balancedPair(picked, ntrpMap, usedTeams);
         picked.forEach(p => gameCounts[p]++);
       }
+
+      // 사용된 팀 기록
+      this.recordTeam(usedTeams, team1);
+      this.recordTeam(usedTeams, team2);
 
       matches.push({
         id: Storage.generateId(),
@@ -202,9 +234,10 @@ const Schedule = {
     const slots = this.calculateTimeSlots(startTime, endTime);
     const gameCounts = {};
     [...males, ...females].forEach(p => { gameCounts[p] = 0; });
+    const usedTeams = new Map(); // 팀키 → 횟수
 
     const timeSlots = slots.map(time => {
-      const matches = this.generateSlotMatches(males, females, courts, gameCounts, allowMixed);
+      const matches = this.generateSlotMatches(males, females, courts, gameCounts, allowMixed, usedTeams);
       return { time, matches };
     });
 
