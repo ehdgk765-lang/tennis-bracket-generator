@@ -236,3 +236,230 @@ header {
     padding-right: 4px !important;
   }
 }
+
+/* ─── Dark Mode ─── */
+html.dark {
+  color-scheme: dark;
+}
+
+html.dark body {
+  background-color: #0f172a !important;
+  color: #e2e8f0 !important;
+}
+
+/* 헤더 */
+html.dark header {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+/* 탭 */
+html.dark .tab-active {
+  color: #4ade80 !important;
+  border-bottom-color: #4ade80 !important;
+}
+html.dark [data-tab] {
+  color: #94a3b8;
+}
+html.dark [data-tab]:hover {
+  color: #cbd5e1;
+}
+
+/* 배경 오버라이드 */
+html.dark .bg-white {
+  background-color: #1e293b !important;
+}
+html.dark .bg-gray-50 {
+  background-color: #0f172a !important;
+}
+html.dark .bg-gray-100 {
+  background-color: #1e293b !important;
+}
+html.dark .bg-gray-50\/50 {
+  background-color: rgba(30, 41, 59, 0.5) !important;
+}
+
+/* 텍스트 오버라이드 */
+html.dark .text-gray-800 {
+  color: #e2e8f0 !important;
+}
+html.dark .text-gray-700 {
+  color: #cbd5e1 !important;
+}
+html.dark .text-gray-600 {
+  color: #94a3b8 !important;
+}
+html.dark .text-gray-500 {
+  color: #64748b !important;
+}
+html.dark .text-gray-400 {
+  color: #475569 !important;
+}
+html.dark .text-gray-300 {
+  color: #475569 !important;
+}
+html.dark .text-green-700 {
+  color: #4ade80 !important;
+}
+
+/* 테두리 오버라이드 */
+html.dark .border-gray-200 {
+  border-color: #334155 !important;
+}
+html.dark .border-gray-100 {
+  border-color: #1e293b !important;
+}
+html.dark .border-gray-50 {
+  border-color: #1e293b !important;
+}
+html.dark .border-t {
+  border-color: #334155 !important;
+}
+html.dark .divide-y > :not([hidden]) ~ :not([hidden]) {
+  border-color: #1e293b !important;
+}
+html.dark .divide-gray-50 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #1e293b !important;
+}
+
+/* 폼 요소 */
+html.dark input[type="text"],
+html.dark input[type="number"],
+html.dark input[type="email"],
+html.dark input[type="password"],
+html.dark select,
+html.dark textarea {
+  background-color: #0f172a !important;
+  border-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+html.dark input[type="text"]::placeholder,
+html.dark input[type="email"]::placeholder,
+html.dark input[type="password"]::placeholder,
+html.dark textarea::placeholder {
+  color: #475569 !important;
+}
+html.dark input[type="text"]:focus,
+html.dark input[type="email"]:focus,
+html.dark input[type="password"]:focus,
+html.dark select:focus {
+  border-color: #22c55e !important;
+}
+
+/* 로그인 페이지 */
+html.dark #auth-container {
+  background-color: #0f172a !important;
+}
+
+/* 카드 호버 */
+html.dark .hover\:bg-gray-50:hover {
+  background-color: #334155 !important;
+}
+html.dark .hover\:shadow-md:hover {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4) !important;
+}
+html.dark .hover\:border-green-300:hover {
+  border-color: #4ade80 !important;
+}
+
+/* 라운드/배지 - 색상 톤 다운 */
+html.dark .bg-green-50 {
+  background-color: rgba(34, 197, 94, 0.1) !important;
+}
+html.dark .bg-green-100 {
+  background-color: rgba(34, 197, 94, 0.15) !important;
+}
+html.dark .bg-yellow-50 {
+  background-color: rgba(234, 179, 8, 0.1) !important;
+}
+html.dark .bg-yellow-100 {
+  background-color: rgba(234, 179, 8, 0.15) !important;
+}
+html.dark .bg-blue-100 {
+  background-color: rgba(59, 130, 246, 0.15) !important;
+}
+html.dark .bg-pink-100 {
+  background-color: rgba(236, 72, 153, 0.15) !important;
+}
+html.dark .bg-purple-100 {
+  background-color: rgba(168, 85, 247, 0.15) !important;
+}
+html.dark .bg-orange-100 {
+  background-color: rgba(249, 115, 22, 0.15) !important;
+}
+html.dark .bg-red-50 {
+  background-color: rgba(239, 68, 68, 0.1) !important;
+}
+
+/* 포맷 선택 라디오 (다크) */
+html.dark .format-option input:checked + div {
+  border-color: #22c55e;
+  background-color: rgba(34, 197, 94, 0.1);
+}
+html.dark .peer:checked ~ .peer-checked\:border-green-500 {
+  border-color: #22c55e !important;
+}
+html.dark .peer:checked ~ .peer-checked\:bg-green-50 {
+  background-color: rgba(34, 197, 94, 0.1) !important;
+}
+
+/* 스코어 모달 */
+html.dark #score-modal > div {
+  background-color: #1e293b !important;
+}
+
+/* 대진표 매치 카드 */
+html.dark .schedule-match-card {
+  background-color: #1e293b !important;
+}
+html.dark .border-green-200 {
+  border-color: #166534 !important;
+}
+
+/* 선수 교환 선택 */
+html.dark .swap-player:hover {
+  background-color: rgba(234, 179, 8, 0.15) !important;
+}
+
+/* 브래킷 스크롤 힌트 */
+html.dark .bracket-scroll-hint::after {
+  background: linear-gradient(to right, transparent, rgba(15, 23, 42, 0.9));
+}
+
+/* 스크롤바 */
+html.dark ::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* 테마 토글 버튼 */
+#theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  background: transparent;
+  transition: background-color 0.2s;
+}
+#theme-toggle:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+html.dark #theme-toggle:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+#theme-toggle svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* 프리뷰 영역 */
+html.dark #preview-info {
+  background-color: #1e293b !important;
+  color: #94a3b8 !important;
+}

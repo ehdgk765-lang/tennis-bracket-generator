@@ -33,6 +33,15 @@ const Players = {
               </button>
             </div>
           </div>
+          <!-- 엑셀 업로드 -->
+          <div class="px-4 py-2 border-b border-gray-100 flex items-center gap-2">
+            <input type="file" id="excel-upload" accept=".xlsx,.xls,.csv" class="hidden">
+            <button id="excel-upload-btn"
+              class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 border border-dashed border-gray-300 rounded-xl text-sm text-gray-500 hover:border-green-400 hover:text-green-600 hover:bg-green-50/50 transition cursor-pointer">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+              엑셀 파일 업로드 (이름, 성별, NTRP)
+            </button>
+          </div>
           <!-- 헤더 -->
           <div class="px-4 py-3 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
             <span class="font-semibold text-gray-700 text-sm">등록 선수</span>
@@ -125,7 +134,80 @@ const Players = {
       };
     });
 
-    input.focus();
+    // 엑셀 업로드
+    const excelBtn = container.querySelector('#excel-upload-btn');
+    const excelInput = container.querySelector('#excel-upload');
+
+    excelBtn.onclick = () => excelInput.click();
+    excelInput.onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      this.importExcel(file, container);
+      excelInput.value = '';
+    };
+
+  },
+
+  importExcel(file, container) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const wb = XLSX.read(e.target.result, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
+        const players = Storage.getPlayers();
+        const existingNames = new Set(players.map(p => p.name));
+        let added = 0, skipped = 0, errors = [];
+
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i];
+          if (!row || row.length < 2) continue;
+
+          const name = String(row[0] || '').trim();
+          if (!name) continue;
+
+          // 헤더 행 건너뛰기
+          if (name === '이름' || name === 'name') continue;
+
+          const genderRaw = String(row[1] || '').trim();
+          let gender;
+          if (genderRaw === '남' || genderRaw === 'M' || genderRaw === 'm' || genderRaw === '남자') {
+            gender = 'M';
+          } else if (genderRaw === '여' || genderRaw === 'F' || genderRaw === 'f' || genderRaw === '여자') {
+            gender = 'F';
+          } else {
+            errors.push(`${i + 1}행: "${name}" 성별 인식 불가 (${genderRaw})`);
+            continue;
+          }
+
+          const ntrpRaw = parseFloat(row[2]);
+          const ntrp = (!isNaN(ntrpRaw) && ntrpRaw >= 1.0 && ntrpRaw <= 7.0) ? ntrpRaw : 2.5;
+
+          if (existingNames.has(name)) {
+            skipped++;
+            continue;
+          }
+
+          players.push({ id: Storage.generateId(), name, gender, ntrp });
+          existingNames.add(name);
+          added++;
+        }
+
+        Storage.savePlayers(players);
+
+        let msg = `${added}명 추가 완료`;
+        if (skipped > 0) msg += `, ${skipped}명 중복 건너뜀`;
+        if (errors.length > 0) msg += `\n\n오류:\n${errors.slice(0, 5).join('\n')}`;
+        alert(msg);
+
+        this.render(container);
+      } catch (err) {
+        console.error('엑셀 파싱 오류:', err);
+        alert('파일을 읽을 수 없습니다. 엑셀(.xlsx) 또는 CSV 파일인지 확인해주세요.');
+      }
+    };
+    reader.readAsArrayBuffer(file);
   },
 
   escapeHtml(text) {

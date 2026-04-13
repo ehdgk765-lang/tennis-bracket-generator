@@ -837,5 +837,4 @@ const App = {
   },
 };
 
-// 앱 시작
-document.addEventListener('DOMContentLoaded', () => App.init());
+// App.init()은 Auth.init()에서 로그인 확인 후 호출됨
