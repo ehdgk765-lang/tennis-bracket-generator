@@ -526,7 +526,6 @@ const Schedule = {
 
     try {
       const { jsPDF } = window.jspdf;
-      const captureOpts = { scale: 2, useCORS: true, backgroundColor: '#ffffff', scrollY: -window.scrollY };
 
       // PDF에서 숨길 요소 (기록 탭에서는 통계 포함)
       const hideSelector = tournament.status === 'completed'
@@ -535,73 +534,36 @@ const Schedule = {
       const hideEls = container.querySelectorAll(hideSelector);
       hideEls.forEach(el => el.style.display = 'none');
 
-      // html2canvas flex 수직정렬 보정용 임시 스타일
-      const pdfFixStyle = document.createElement('style');
-      pdfFixStyle.textContent = `
-        .schedule-slot .rounded-full {
-          display: inline-block !important;
-          height: 24px !important;
-          line-height: 24px !important;
-          padding: 0 12px !important;
-        }
-        .schedule-match-card .rounded-full {
-          display: inline-block !important;
-          height: 20px !important;
-          line-height: 20px !important;
-          padding: 0 8px !important;
-        }
-        .schedule-match-card > div:first-child {
-          display: flex !important;
-          height: 24px !important;
-          line-height: 24px !important;
-        }
-        .schedule-match-card > div:first-child > span {
-          height: 20px !important;
-          line-height: 20px !important;
-          display: inline-block !important;
-          vertical-align: middle !important;
-        }
-        .schedule-match-card .rounded-lg {
-          display: block !important;
-          padding: 10px 8px !important;
-          line-height: 1.6 !important;
-          overflow: hidden !important;
-        }
-        .schedule-match-card .rounded-lg > .flex-shrink-0 {
-          float: right !important;
-          line-height: 1.6 !important;
-        }
-        .schedule-match-card .rounded-lg > .flex-1 {
-          display: block !important;
-          line-height: 1.6 !important;
-        }
-        .swap-player {
-          display: inline !important;
-          line-height: 1.6 !important;
-        }
-      `;
-      document.head.appendChild(pdfFixStyle);
-
-      // 캡처 시 고정 너비 적용 (좁게 → PDF에서 글씨가 크게 보임)
-      const slotCaptureW = '450px';
+      // ── html2canvas + table HTML: 레이아웃 정확, 비대칭 패딩으로 텍스트 위치 보정 ──
+      const captureOpts = { scale: 2, useCORS: true, backgroundColor: '#ffffff', scrollY: -window.scrollY };
       const headerCaptureW = '700px';
 
-      // 헤더 캡처
+      // 헤더 캡처 (화면 DOM)
       const headerEl = container.querySelector('#schedule-header');
       const origHeaderW = headerEl.style.width;
       headerEl.style.width = headerCaptureW;
       const headerCanvas = await html2canvas(headerEl, captureOpts);
       headerEl.style.width = origHeaderW;
 
-      // 각 타임슬롯 개별 캡처 (좁은 너비로 캡처)
-      const slotEls = container.querySelectorAll('.schedule-slot');
-      const slotCanvases = [];
-      for (const el of slotEls) {
-        const origW = el.style.width;
-        el.style.width = slotCaptureW;
-        slotCanvases.push(await html2canvas(el, captureOpts));
-        el.style.width = origW;
+      // PDF 전용 table HTML로 슬롯 캡처 (html2canvas flex 버그 우회)
+      const pdfBox = document.createElement('div');
+      pdfBox.style.cssText = 'position:fixed;left:-9999px;top:0;';
+      document.body.appendChild(pdfBox);
+
+      const slotDivs = [];
+      for (const slot of tournament.timeSlots) {
+        const d = document.createElement('div');
+        d.innerHTML = this._renderPdfSlot(slot);
+        pdfBox.appendChild(d);
+        slotDivs.push(d);
       }
+      await new Promise(r => requestAnimationFrame(r));
+
+      const slotCanvases = [];
+      for (const d of slotDivs) {
+        slotCanvases.push(await html2canvas(d, { ...captureOpts, scrollY: 0 }));
+      }
+      document.body.removeChild(pdfBox);
 
       // 통계 테이블 캡처 (기록 탭일 때만)
       let statsCanvas = null;
@@ -613,8 +575,7 @@ const Schedule = {
         statsEl.style.width = origStatsW;
       }
 
-      // 캡처용 임시 스타일 제거 + 숨긴 요소 복원
-      pdfFixStyle.remove();
+      // 숨긴 요소 복원
       hideEls.forEach(el => el.style.display = '');
 
       // PDF 생성 (2열, 페이지에 들어가는 만큼 채움)
@@ -729,6 +690,79 @@ const Schedule = {
           </div>
         </div>
         ${!hasScore ? '<p class="text-xs text-gray-400 text-center mt-1.5">탭하여 스코어 입력</p>' : ''}
+      </div>`;
+  },
+
+  // ── PDF 전용 table HTML (html2canvas flex 버그 우회) ──
+  // 핵심: html2canvas는 텍스트를 셀 하단에 렌더링하므로, padding-top을 줄이고 padding-bottom을 늘려서 시각적 가운데로 보정
+
+  _renderPdfSlot(slot) {
+    const n = slot.matches.length;
+    const cards = slot.matches.map(m =>
+      `<td style="width:${Math.floor(100/n)}%;vertical-align:top;padding:0 3px;">${this._renderPdfCard(m)}</td>`
+    ).join('');
+    // ── [패딩 조정] 시간 뱃지 (20:00): padding: 상 좌우 하 좌우 ──
+    const timePad = 'padding:0 12px 12px 12px';
+    return `
+      <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;width:450px;">
+        <div style="margin-bottom:8px;">
+          <span style="display:inline-block;font-size:13px;font-weight:700;color:#374151;background:#f3f4f6;${timePad};border-radius:999px;line-height:1;">${slot.time}</span>
+        </div>
+        <table style="width:100%;border-collapse:separate;border-spacing:4px 0;"><tr>${cards}</tr></table>
+      </div>`;
+  },
+
+  _renderPdfCard(match) {
+    const cfg = SCHEDULE_GAME_TYPES[match.gameType];
+    const hasScore = !!match.winner;
+    const isWin1 = match.winner === match.player1;
+    const isWin2 = match.winner === match.player2;
+    const bMap = {
+      XD:{bg:'#f3e8ff',c:'#7e22ce'}, MD:{bg:'#dbeafe',c:'#1d4ed8'},
+      WD:{bg:'#fce7f3',c:'#be185d'}, FD:{bg:'#ffedd5',c:'#c2410c'},
+    };
+    const b = bMap[match.gameType] || {bg:'#f3f4f6',c:'#374151'};
+    const border = hasScore ? '#bbf7d0' : '#e5e7eb';
+    const allPlayers = Storage.getPlayers();
+
+    // ── [패딩 조정] 선수이름 행: padding: 상 우 하 좌 ──
+    const teamPad = 'padding:6px 8px 14px 8px';
+    const scorePad = 'padding:6px 6px 14px 6px';
+    // ── [패딩 조정] 게임타입 뱃지 (혼합복식): padding: 상 우 하 좌 ──
+    const badgePad = 'padding:0 8px 8px 8px';
+    // ── [패딩 조정] 코트번호 (코트 1): padding: 상 우 하 좌 ──
+    const courtPad = 'padding:0 0 7px 0';
+
+    const teamRow = (team, isWin, score) => {
+      const bg = isWin ? '#f0fdf4' : '#f9fafb';
+      const tc = isWin ? '#15803d' : '#1f2937';
+      const sc = isWin ? '#16a34a' : '#6b7280';
+      const names = team.split(' / ').map(name => {
+        const p = allPlayers.find(x => x.name === name);
+        const ntrp = (p?.ntrp || 2.5).toFixed(1);
+        return `${Results.escapeHtml(name)}<span style="color:#ca8a04;font-size:10px;">${ntrp}</span>`;
+      }).join(' <span style="color:#d1d5db;">/</span> ');
+      return `<tr>
+        <td style="background:${bg};border-radius:8px;${teamPad};font-size:12px;font-weight:500;color:${tc};line-height:1;">
+          ${isWin ? '🏆 ' : ''}${names}
+        </td>
+        ${hasScore ? `<td style="background:${bg};${scorePad};text-align:right;font-size:12px;font-weight:700;color:${sc};white-space:nowrap;line-height:1;">${score}</td>` : ''}
+      </tr>`;
+    };
+
+    return `
+      <div style="border:1px solid ${border};border-radius:12px;padding:10px;background:#fff;margin-bottom:4px;">
+        <table style="width:100%;border-collapse:collapse;margin-bottom:6px;">
+          <tr>
+            <td style="line-height:1;"><span style="display:inline-block;font-size:11px;${badgePad};border-radius:999px;font-weight:500;background:${b.bg};color:${b.c};line-height:1;">${cfg.label}</span></td>
+            <td style="text-align:right;font-size:11px;color:#9ca3af;line-height:1;${courtPad};">코트 ${match.court}</td>
+          </tr>
+        </table>
+        <table style="width:100%;border-collapse:collapse;">
+          ${teamRow(match.player1, isWin1, hasScore ? match.scores[0][0] : null)}
+          <tr><td colspan="2" style="text-align:center;font-size:11px;color:#d1d5db;padding:2px 0;">vs</td></tr>
+          ${teamRow(match.player2, isWin2, hasScore ? match.scores[0][1] : null)}
+        </table>
       </div>`;
   },
 };
