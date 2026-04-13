@@ -318,7 +318,7 @@ const Schedule = {
                 <div class="flex-1 border-t border-gray-200"></div>
               </div>
               <div class="grid gap-2 schedule-grid" style="grid-template-columns: repeat(${tournament.courts}, 1fr)">
-                ${slot.matches.map(match => this.renderMatchCard(match)).join('')}
+                ${slot.matches.map((match, mi) => this.renderMatchCard(match, si, mi)).join('')}
               </div>
             </div>
           `).join('')}
@@ -382,29 +382,138 @@ const Schedule = {
       };
     }
 
-    // 매치 카드 클릭 → 스코어 입력
-    container.querySelectorAll('.schedule-match-card').forEach(card => {
-      card.onclick = () => {
-        const matchId = card.dataset.matchId;
-        const match = allMatches.find(m => m.id === matchId);
-        if (!match) return;
+    // ─── 선수 탭-교환 + 매치 카드 드래그 ───
+    const cards = container.querySelectorAll('.schedule-match-card');
+    let selectedPlayer = null;
 
+    // 선수 이름 탭 → 선택/교환
+    container.querySelectorAll('.swap-player').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation(); // 카드 클릭(스코어) 방지
+
+        const data = {
+          slotIdx: +el.dataset.slotIdx, matchIdx: +el.dataset.matchIdx,
+          team: +el.dataset.team, pos: +el.dataset.pos, name: el.dataset.name
+        };
+
+        if (!selectedPlayer) {
+          // 첫 번째 선수 선택
+          selectedPlayer = { el, ...data };
+          el.classList.add('bg-green-200', 'ring-2', 'ring-green-500', 'rounded');
+        } else if (selectedPlayer.slotIdx === data.slotIdx && selectedPlayer.matchIdx === data.matchIdx
+          && selectedPlayer.team === data.team && selectedPlayer.pos === data.pos) {
+          // 같은 선수 재탭 → 선택 해제
+          selectedPlayer.el.classList.remove('bg-green-200', 'ring-2', 'ring-green-500', 'rounded');
+          selectedPlayer = null;
+        } else {
+          // 두 번째 선수 탭 → 교환
+          const src = selectedPlayer, tgt = data;
+          const srcMatch = tournament.timeSlots[src.slotIdx].matches[src.matchIdx];
+          const tgtMatch = tournament.timeSlots[tgt.slotIdx].matches[tgt.matchIdx];
+          const srcKey = src.team === 1 ? 'player1' : 'player2';
+          const tgtKey = tgt.team === 1 ? 'player1' : 'player2';
+          const sameMatch = src.slotIdx === tgt.slotIdx && src.matchIdx === tgt.matchIdx;
+
+          const clearSel = () => {
+            selectedPlayer.el.classList.remove('bg-green-200', 'ring-2', 'ring-green-500', 'rounded');
+            selectedPlayer = null;
+          };
+
+          if (sameMatch && srcKey === tgtKey) {
+            // 같은 팀 내 순서 변경 - 중복 불가
+            const team = srcMatch[srcKey].split(' / ');
+            [team[src.pos], team[tgt.pos]] = [team[tgt.pos], team[src.pos]];
+            srcMatch[srcKey] = team.join(' / ');
+          } else if (sameMatch) {
+            // 같은 매치, 다른 팀 간 교환
+            const t1 = srcMatch[srcKey].split(' / ');
+            const t2 = srcMatch[tgtKey].split(' / ');
+            [t1[src.pos], t2[tgt.pos]] = [t2[tgt.pos], t1[src.pos]];
+            const all = [...t1, ...t2];
+            if (new Set(all).size !== all.length) {
+              alert('같은 선수가 동일 경기에 중복됩니다.');
+              clearSel();
+              return;
+            }
+            srcMatch[srcKey] = t1.join(' / ');
+            srcMatch[tgtKey] = t2.join(' / ');
+          } else {
+            // 다른 매치 간 교환
+            const srcTeam = srcMatch[srcKey].split(' / ');
+            const tgtTeam = tgtMatch[tgtKey].split(' / ');
+            [srcTeam[src.pos], tgtTeam[tgt.pos]] = [tgtTeam[tgt.pos], srcTeam[src.pos]];
+
+            const srcOther = srcMatch[srcKey === 'player1' ? 'player2' : 'player1'].split(' / ');
+            const tgtOther = tgtMatch[tgtKey === 'player1' ? 'player2' : 'player1'].split(' / ');
+
+            if (new Set([...srcTeam, ...srcOther]).size !== srcTeam.length + srcOther.length
+              || new Set([...tgtTeam, ...tgtOther]).size !== tgtTeam.length + tgtOther.length) {
+              alert('같은 선수가 동일 경기에 중복됩니다.');
+              clearSel();
+              return;
+            }
+            srcMatch[srcKey] = srcTeam.join(' / ');
+            tgtMatch[tgtKey] = tgtTeam.join(' / ');
+          }
+
+          Storage.updateTournament(tournament);
+          this.render(container, tournament);
+        }
+      });
+    });
+
+    // 카드 빈 영역 클릭 → 스코어 입력 (선수 선택 중이면 해제)
+    cards.forEach(card => {
+      card.addEventListener('click', () => {
+        if (selectedPlayer) {
+          selectedPlayer.el.classList.remove('bg-green-200', 'ring-2', 'ring-green-500', 'rounded');
+          selectedPlayer = null;
+          return;
+        }
+        const match = allMatches.find(m => m.id === card.dataset.matchId);
+        if (!match) return;
         Results.showScoreModal(match, { setCount: 1 }, (result) => {
           match.scores = result.scores;
           match.winner = result.winner;
           Storage.updateTournament(tournament);
-
-          // 전체 완료 시 status 변경
           const allDone = this.getAllMatches(tournament).every(m => m.winner);
           if (allDone) {
             tournament.status = 'completed';
             tournament.completedAt = new Date().toISOString();
             Storage.updateTournament(tournament);
           }
-
           this.render(container, tournament);
         });
-      };
+      });
+    });
+
+    // 데스크톱: HTML5 Drag and Drop (매치 카드 위치 교환)
+    cards.forEach(card => {
+      card.addEventListener('dragstart', (e) => {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', `${card.dataset.slotIdx},${card.dataset.matchIdx}`);
+        requestAnimationFrame(() => card.style.opacity = '0.4');
+      });
+      card.addEventListener('dragend', () => { card.style.opacity = ''; });
+      card.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        card.classList.add('ring-2', 'ring-green-500');
+      });
+      card.addEventListener('dragleave', () => card.classList.remove('ring-2', 'ring-green-500'));
+      card.addEventListener('drop', (e) => {
+        e.preventDefault();
+        card.classList.remove('ring-2', 'ring-green-500');
+        const [si, mi] = e.dataTransfer.getData('text/plain').split(',').map(Number);
+        const tSI = +card.dataset.slotIdx, tMI = +card.dataset.matchIdx;
+        if (si === tSI && mi === tMI) return;
+        const srcSlot = tournament.timeSlots[si], tgtSlot = tournament.timeSlots[tSI];
+        [srcSlot.matches[mi], tgtSlot.matches[tMI]] = [tgtSlot.matches[tMI], srcSlot.matches[mi]];
+        srcSlot.matches.forEach((m, i) => m.court = i + 1);
+        if (si !== tSI) tgtSlot.matches.forEach((m, i) => m.court = i + 1);
+        Storage.updateTournament(tournament);
+        this.render(container, tournament);
+      });
     });
   },
 
@@ -528,18 +637,30 @@ const Schedule = {
     }
   },
 
+  // 선수 이름을 개별 탭 가능한 span으로 렌더링
+  renderSwapPlayer(name, slotIdx, matchIdx, team, pos) {
+    const allPlayers = Storage.getPlayers();
+    const pd = allPlayers.find(p => p.name === name);
+    const ntrp = (pd?.ntrp || 2.5).toFixed(1);
+    return `<span class="swap-player cursor-pointer hover:bg-yellow-100 rounded px-0.5 transition inline-flex items-center gap-0.5"
+      data-slot-idx="${slotIdx}" data-match-idx="${matchIdx}" data-team="${team}" data-pos="${pos}"
+      data-name="${Results.escapeHtml(name)}">${Results.escapeHtml(name)}<span class="text-yellow-600 text-xs">${ntrp}</span></span>`;
+  },
+
   // 매치 카드 HTML
-  renderMatchCard(match) {
+  renderMatchCard(match, slotIdx, matchIdx) {
     const cfg = SCHEDULE_GAME_TYPES[match.gameType];
     const hasScore = !!match.winner;
-    const t1Html = Results.formatTeamHtml(match.player1);
-    const t2Html = Results.formatTeamHtml(match.player2);
+    const t1Names = match.player1.split(' / ');
+    const t2Names = match.player2.split(' / ');
+    const t1Html = t1Names.map((n, p) => this.renderSwapPlayer(n, slotIdx, matchIdx, 1, p)).join(' <span class="text-gray-300">/</span> ');
+    const t2Html = t2Names.map((n, p) => this.renderSwapPlayer(n, slotIdx, matchIdx, 2, p)).join(' <span class="text-gray-300">/</span> ');
     const isWin1 = match.winner === match.player1;
     const isWin2 = match.winner === match.player2;
 
     return `
       <div class="schedule-match-card bg-white border ${hasScore ? 'border-green-200' : 'border-gray-200'} rounded-xl p-3 cursor-pointer hover:shadow-md transition"
-           data-match-id="${match.id}">
+           draggable="true" data-match-id="${match.id}" data-slot-idx="${slotIdx}" data-match-idx="${matchIdx}">
         <div class="flex items-center justify-between mb-2">
           <span class="text-xs px-2 py-0.5 rounded-full font-medium ${cfg.badgeClass}">${cfg.label}</span>
           <span class="text-xs text-gray-400">코트 ${match.court}</span>
