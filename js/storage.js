@@ -75,12 +75,20 @@ const Storage = {
 
   // ─── Firestore 동기화 ───
 
-  // localStorage → Firestore (비동기, fire-and-forget)
+  _unsubPlayers: null,
+  _unsubTournaments: null,
+  _skipNextPlayerSync: false,
+  _skipNextTournamentSync: false,
+
+  // localStorage → Firestore (JSON 문자열로 직렬화하여 저장)
   syncToFirestore(docName, data) {
     const user = fbAuth.currentUser;
     if (!user) return;
+    // 내가 쓴 변경은 onSnapshot에서 무시하도록 플래그 설정
+    if (docName === 'players') this._skipNextPlayerSync = true;
+    if (docName === 'tournaments') this._skipNextTournamentSync = true;
     fbDb.collection('users').doc(user.uid).collection('data').doc(docName)
-      .set({ items: data || [] })
+      .set({ json: JSON.stringify(data || []) })
       .catch(err => console.error('Firestore sync error:', err));
   },
 
@@ -96,21 +104,93 @@ const Storage = {
       ]);
 
       if (pDoc.exists) {
-        localStorage.setItem(this.KEYS.PLAYERS, JSON.stringify(pDoc.data().items));
+        const d = pDoc.data();
+        const items = d.json ? JSON.parse(d.json) : (d.items || []);
+        localStorage.setItem(this.KEYS.PLAYERS, JSON.stringify(items));
       } else {
-        // 첫 로그인: 기존 로컬 데이터가 있으면 Firestore로 업로드
         const local = this.getPlayers();
         if (local.length > 0) this.syncToFirestore('players', local);
       }
 
       if (tDoc.exists) {
-        localStorage.setItem(this.KEYS.TOURNAMENTS, JSON.stringify(tDoc.data().items));
+        const d = tDoc.data();
+        const items = d.json ? JSON.parse(d.json) : (d.items || []);
+        localStorage.setItem(this.KEYS.TOURNAMENTS, JSON.stringify(items));
       } else {
         const local = this.getTournaments();
         if (local.length > 0) this.syncToFirestore('tournaments', local);
       }
     } catch (err) {
       console.error('Firestore load error:', err);
+    }
+  },
+
+  // ─── 실시간 동기화 (onSnapshot) ───
+
+  startRealtimeSync() {
+    const user = fbAuth.currentUser;
+    if (!user) return;
+    const base = fbDb.collection('users').doc(user.uid).collection('data');
+
+    // 선수 데이터 실시간 리스너
+    this._unsubPlayers = base.doc('players').onSnapshot((doc) => {
+      if (this._skipNextPlayerSync) {
+        this._skipNextPlayerSync = false;
+        return;
+      }
+      if (!doc.exists) return;
+      const d = doc.data();
+      const items = d.json ? JSON.parse(d.json) : (d.items || []);
+      const current = localStorage.getItem(this.KEYS.PLAYERS);
+      const newJson = JSON.stringify(items);
+      if (current !== newJson) {
+        localStorage.setItem(this.KEYS.PLAYERS, newJson);
+        console.log('실시간 동기화: 선수 데이터 업데이트');
+        this._onRemoteChange();
+      }
+    }, (err) => {
+      console.error('Players realtime sync error:', err);
+    });
+
+    // 대회 데이터 실시간 리스너
+    this._unsubTournaments = base.doc('tournaments').onSnapshot((doc) => {
+      if (this._skipNextTournamentSync) {
+        this._skipNextTournamentSync = false;
+        return;
+      }
+      if (!doc.exists) return;
+      const d = doc.data();
+      const items = d.json ? JSON.parse(d.json) : (d.items || []);
+      const current = localStorage.getItem(this.KEYS.TOURNAMENTS);
+      const newJson = JSON.stringify(items);
+      if (current !== newJson) {
+        localStorage.setItem(this.KEYS.TOURNAMENTS, newJson);
+        console.log('실시간 동기화: 대회 데이터 업데이트');
+        this._onRemoteChange();
+      }
+    }, (err) => {
+      console.error('Tournaments realtime sync error:', err);
+    });
+
+    console.log('실시간 동기화 시작');
+  },
+
+  stopRealtimeSync() {
+    if (this._unsubPlayers) {
+      this._unsubPlayers();
+      this._unsubPlayers = null;
+    }
+    if (this._unsubTournaments) {
+      this._unsubTournaments();
+      this._unsubTournaments = null;
+    }
+    console.log('실시간 동기화 중지');
+  },
+
+  // 원격 변경 시 UI 갱신
+  _onRemoteChange() {
+    if (typeof App !== 'undefined' && App.currentTab) {
+      App.navigate(App.currentTab);
     }
   },
 };

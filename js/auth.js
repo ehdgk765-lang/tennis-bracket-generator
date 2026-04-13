@@ -8,12 +8,23 @@ const Auth = {
       const appEl = document.getElementById('app-container');
 
       if (user) {
+        // 다른 계정으로 전환된 경우 이전 데이터 정리
+        const lastUid = localStorage.getItem('tennis_last_uid');
+        if (lastUid && lastUid !== user.uid) {
+          localStorage.removeItem(Storage.KEYS.PLAYERS);
+          localStorage.removeItem(Storage.KEYS.TOURNAMENTS);
+        }
+        localStorage.setItem('tennis_last_uid', user.uid);
+
         // Firestore → localStorage 동기화 (실패해도 앱은 표시)
         try {
           await Storage.loadFromFirestore();
         } catch (e) {
           console.error('Firestore 로드 실패 (오프라인 모드):', e);
         }
+        // 실시간 동기화 시작
+        Storage.startRealtimeSync();
+
         authEl.style.display = 'none';
         appEl.style.display = '';
         if (!this.initialized) {
@@ -23,15 +34,16 @@ const Auth = {
           App.navigate(App.currentTab);
         }
       } else {
-        // 로그아웃 시 로컬 데이터 정리
-        localStorage.removeItem(Storage.KEYS.PLAYERS);
-        localStorage.removeItem(Storage.KEYS.TOURNAMENTS);
+        // 실시간 동기화 중지
+        Storage.stopRealtimeSync();
+        // 로그인 페이지 표시 (localStorage는 건드리지 않음 - logout에서 정리)
         authEl.style.display = '';
         appEl.style.display = 'none';
         this.initialized = false;
         this.renderLogin();
       }
     });
+
   },
 
   renderLogin() {
@@ -128,6 +140,9 @@ const Auth = {
 
   logout() {
     if (confirm('로그아웃 하시겠습니까?')) {
+      localStorage.removeItem(Storage.KEYS.PLAYERS);
+      localStorage.removeItem(Storage.KEYS.TOURNAMENTS);
+      localStorage.removeItem('tennis_last_uid');
       fbAuth.signOut();
     }
   }

@@ -535,6 +535,53 @@ const Schedule = {
       const hideEls = container.querySelectorAll(hideSelector);
       hideEls.forEach(el => el.style.display = 'none');
 
+      // html2canvas flex 수직정렬 보정용 임시 스타일
+      const pdfFixStyle = document.createElement('style');
+      pdfFixStyle.textContent = `
+        .schedule-slot .rounded-full {
+          display: inline-block !important;
+          height: 24px !important;
+          line-height: 24px !important;
+          padding: 0 12px !important;
+        }
+        .schedule-match-card .rounded-full {
+          display: inline-block !important;
+          height: 20px !important;
+          line-height: 20px !important;
+          padding: 0 8px !important;
+        }
+        .schedule-match-card > div:first-child {
+          display: flex !important;
+          height: 24px !important;
+          line-height: 24px !important;
+        }
+        .schedule-match-card > div:first-child > span {
+          height: 20px !important;
+          line-height: 20px !important;
+          display: inline-block !important;
+          vertical-align: middle !important;
+        }
+        .schedule-match-card .rounded-lg {
+          display: block !important;
+          padding: 10px 8px !important;
+          line-height: 1.6 !important;
+          overflow: hidden !important;
+        }
+        .schedule-match-card .rounded-lg > .flex-shrink-0 {
+          float: right !important;
+          line-height: 1.6 !important;
+        }
+        .schedule-match-card .rounded-lg > .flex-1 {
+          display: block !important;
+          line-height: 1.6 !important;
+        }
+        .swap-player {
+          display: inline !important;
+          line-height: 1.6 !important;
+        }
+      `;
+      document.head.appendChild(pdfFixStyle);
+
       // 캡처 시 고정 너비 적용 (좁게 → PDF에서 글씨가 크게 보임)
       const slotCaptureW = '450px';
       const headerCaptureW = '700px';
@@ -566,7 +613,8 @@ const Schedule = {
         statsEl.style.width = origStatsW;
       }
 
-      // 숨긴 요소 복원
+      // 캡처용 임시 스타일 제거 + 숨긴 요소 복원
+      pdfFixStyle.remove();
       hideEls.forEach(el => el.style.display = '');
 
       // PDF 생성 (2열, 페이지에 들어가는 만큼 채움)
