@@ -77,16 +77,11 @@ const Storage = {
 
   _unsubPlayers: null,
   _unsubTournaments: null,
-  _skipNextPlayerSync: false,
-  _skipNextTournamentSync: false,
 
   // localStorage → Firestore (JSON 문자열로 직렬화하여 저장)
   syncToFirestore(docName, data) {
     const user = fbAuth.currentUser;
     if (!user) return;
-    // 내가 쓴 변경은 onSnapshot에서 무시하도록 플래그 설정
-    if (docName === 'players') this._skipNextPlayerSync = true;
-    if (docName === 'tournaments') this._skipNextTournamentSync = true;
     fbDb.collection('users').doc(user.uid).collection('data').doc(docName)
       .set({ json: JSON.stringify(data || []) })
       .catch(err => console.error('Firestore sync error:', err));
@@ -134,10 +129,8 @@ const Storage = {
 
     // 선수 데이터 실시간 리스너
     this._unsubPlayers = base.doc('players').onSnapshot((doc) => {
-      if (this._skipNextPlayerSync) {
-        this._skipNextPlayerSync = false;
-        return;
-      }
+      // 내가 쓴 변경이 서버 반영 전이면 무시 (localStorage에 이미 있음)
+      if (doc.metadata.hasPendingWrites) return;
       if (!doc.exists) return;
       const d = doc.data();
       const items = d.json ? JSON.parse(d.json) : (d.items || []);
@@ -154,10 +147,7 @@ const Storage = {
 
     // 대회 데이터 실시간 리스너
     this._unsubTournaments = base.doc('tournaments').onSnapshot((doc) => {
-      if (this._skipNextTournamentSync) {
-        this._skipNextTournamentSync = false;
-        return;
-      }
+      if (doc.metadata.hasPendingWrites) return;
       if (!doc.exists) return;
       const d = doc.data();
       const items = d.json ? JSON.parse(d.json) : (d.items || []);
