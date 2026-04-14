@@ -10,8 +10,8 @@ const GAME_TYPES = {
 const App = {
   currentTab: 'players',
   currentTournamentId: null,
-  _createSubTab: 'auto',
-  _scheduleSubTab: 'time-court',
+  _createSubTab: 'custom-bracket',
+  _scheduleSubTab: 'custom-schedule',
 
   init() {
     this.bindTabs();

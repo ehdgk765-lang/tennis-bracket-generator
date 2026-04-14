@@ -63,9 +63,7 @@ const Auth = {
         <!-- 로고 영역 -->
         <div class="text-center mb-8">
           <div class="relative inline-block mb-4">
-            <div class="auth-logo-bg w-28 h-28 rounded-3xl flex items-center justify-center mx-auto">
-              <img src="css/tennis-smile-2.png" alt="Tennis" class="w-24 h-24 mix-blend-multiply">
-            </div>
+            <div class="auth-logo-bg w-28 h-28 rounded-3xl mx-auto" role="img" aria-label="Tennis"></div>
           </div>
           <h1 class="text-2xl font-extrabold bg-gradient-to-r from-green-600 to-emerald-500 bg-clip-text text-transparent">Happy Tennis Life</h1>
           <p class="text-sm text-gray-400 mt-1">테니스를 더 즐겁게</p>
@@ -118,6 +116,8 @@ const Auth = {
     updateAuthThemeIcons(document.documentElement.classList.contains('dark'));
 
     authThemeToggle.onclick = () => {
+      // 기기 다크모드 시 라이트 전환 방지 (삼성 인터넷 어둡게 보기 배경색 통일)
+      if (window.matchMedia('(prefers-color-scheme: dark)').matches) return;
       const isDark = document.documentElement.classList.toggle('dark');
       localStorage.setItem('theme', isDark ? 'dark' : 'light');
       updateAuthThemeIcons(isDark);

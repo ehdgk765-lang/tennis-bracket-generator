@@ -44,8 +44,19 @@ const Players = {
           </div>
           <!-- 헤더 -->
           <div class="px-4 py-3 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-            <span class="font-semibold text-gray-700 text-sm">등록 선수</span>
-            <span class="text-xs text-gray-500">남 ${males.length} · 여 ${females.length} · 총 ${players.length}명</span>
+            <div class="flex items-center gap-2">
+              ${players.length > 0 ? `
+                <input type="checkbox" id="select-all-players" class="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500 cursor-pointer">
+              ` : ''}
+              <span class="font-semibold text-gray-700 text-sm">등록 선수</span>
+              <span id="selected-player-count" class="text-xs text-green-600 font-medium hidden"></span>
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="delete-selected-btn" class="hidden text-xs px-2.5 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 active:scale-95 transition-all font-medium">
+                삭제
+              </button>
+              <span class="text-xs text-gray-500">남 ${males.length} · 여 ${females.length} · 총 ${players.length}명</span>
+            </div>
           </div>
           <!-- 선수 목록 -->
           <div id="player-list" class="divide-y divide-gray-50">
@@ -54,6 +65,7 @@ const Players = {
               : players.map((p, i) => `
                 <div class="flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition">
                   <div class="flex items-center gap-3 min-w-0">
+                    <input type="checkbox" class="player-select-cb w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500 cursor-pointer flex-shrink-0" data-id="${p.id}">
                     <span class="w-7 h-7 bg-green-100 text-green-700 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">${i + 1}</span>
                     <span class="text-gray-800 font-medium truncate">${this.escapeHtml(p.name)}</span>
                     <button class="gender-toggle-btn text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0 cursor-pointer active:scale-95 transition ${p.gender === 'M' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}"
@@ -133,6 +145,53 @@ const Players = {
         this.render(container);
       };
     });
+
+    // 선수 선택 체크박스
+    const selectAllCb = container.querySelector('#select-all-players');
+    const playerCbs = container.querySelectorAll('.player-select-cb');
+    const deleteSelectedBtn = container.querySelector('#delete-selected-btn');
+    const selectedCountEl = container.querySelector('#selected-player-count');
+
+    const updateSelectionUI = () => {
+      const checked = container.querySelectorAll('.player-select-cb:checked');
+      const count = checked.length;
+      const total = playerCbs.length;
+
+      if (count > 0) {
+        deleteSelectedBtn.classList.remove('hidden');
+        selectedCountEl.classList.remove('hidden');
+        selectedCountEl.textContent = `${count}명 선택`;
+      } else {
+        deleteSelectedBtn.classList.add('hidden');
+        selectedCountEl.classList.add('hidden');
+      }
+
+      if (selectAllCb) {
+        selectAllCb.checked = total > 0 && count === total;
+        selectAllCb.indeterminate = count > 0 && count < total;
+      }
+    };
+
+    if (selectAllCb) {
+      selectAllCb.onchange = () => {
+        const isChecked = selectAllCb.checked;
+        playerCbs.forEach(cb => { cb.checked = isChecked; });
+        updateSelectionUI();
+      };
+    }
+
+    playerCbs.forEach(cb => { cb.onchange = updateSelectionUI; });
+
+    if (deleteSelectedBtn) {
+      deleteSelectedBtn.onclick = () => {
+        const checkedIds = Array.from(container.querySelectorAll('.player-select-cb:checked')).map(cb => cb.dataset.id);
+        if (checkedIds.length === 0) return;
+        if (!confirm(`선택한 ${checkedIds.length}명의 선수를 삭제하시겠습니까?`)) return;
+        const players = Storage.getPlayers().filter(p => !checkedIds.includes(p.id));
+        Storage.savePlayers(players);
+        this.render(container);
+      };
+    }
 
     // 엑셀 업로드
     const excelBtn = container.querySelector('#excel-upload-btn');
