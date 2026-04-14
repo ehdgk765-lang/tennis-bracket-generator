@@ -407,6 +407,75 @@ html.dark .peer:checked ~ .peer-checked\:bg-green-50 {
 html.dark #score-modal > div {
   background-color: #1e293b !important;
 }
+html.dark #score-modal h3 {
+  color: #e2e8f0;
+}
+/* 팀1 표시 (초록) */
+html.dark #score-modal .bg-green-50 {
+  background-color: rgba(22, 163, 74, 0.15) !important;
+}
+html.dark #score-modal .text-green-700 {
+  color: #4ade80 !important;
+}
+html.dark #score-modal .text-green-600 {
+  color: #4ade80 !important;
+}
+/* 팀2 표시 (파랑) */
+html.dark #score-modal .bg-blue-50 {
+  background-color: rgba(37, 99, 235, 0.15) !important;
+}
+html.dark #score-modal .text-blue-700 {
+  color: #60a5fa !important;
+}
+html.dark #score-modal .text-blue-600 {
+  color: #60a5fa !important;
+}
+/* 스코어 입력란 - 팀1 (초록) */
+html.dark #score-modal input[data-player="0"] {
+  background-color: rgba(22, 163, 74, 0.12) !important;
+  border-color: #166534 !important;
+  color: #4ade80 !important;
+}
+html.dark #score-modal input[data-player="0"]:focus {
+  border-color: #22c55e !important;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.3) !important;
+}
+/* 스코어 입력란 - 팀2 (파랑) */
+html.dark #score-modal input[data-player="1"] {
+  background-color: rgba(37, 99, 235, 0.12) !important;
+  border-color: #1e40af !important;
+  color: #60a5fa !important;
+}
+html.dark #score-modal input[data-player="1"]:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3) !important;
+}
+/* 세트 라벨, vs, 콜론 */
+html.dark #score-modal .text-gray-500 {
+  color: #94a3b8 !important;
+}
+html.dark #score-modal .text-gray-400 {
+  color: #64748b !important;
+}
+html.dark #score-modal .text-gray-300 {
+  color: #475569 !important;
+}
+/* 버튼 */
+html.dark #score-modal #score-cancel {
+  background-color: #334155 !important;
+  color: #94a3b8 !important;
+}
+html.dark #score-modal #score-cancel:hover {
+  background-color: #475569 !important;
+}
+/* 드래그 핸들 */
+html.dark #score-modal .bg-gray-300 {
+  background-color: #475569 !important;
+}
+/* NTRP 뱃지 */
+html.dark #score-modal .text-yellow-600 {
+  color: #fbbf24 !important;
+}
 
 /* 대진표 매치 카드 */
 html.dark .schedule-match-card {

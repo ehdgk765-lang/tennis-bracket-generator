@@ -17,17 +17,27 @@ const Results = {
     const t1Html = this.formatTeamHtml(player1Name);
     const t2Html = this.formatTeamHtml(player2Name);
 
-    let setsHTML = '';
+    // 팀 이름 축약 (첫 번째 선수 성만 표시)
+    const t1Short = player1Name.split(' / ')[0].slice(0, 3);
+    const t2Short = player2Name.split(' / ')[0].slice(0, 3);
+
+    let setsHTML = `
+      <div class="flex items-center gap-2 justify-center mb-1">
+        <span class="w-16"></span>
+        <span class="w-14 text-center text-xs font-bold text-green-600">${this.escapeHtml(t1Short)}</span>
+        <span class="w-3"></span>
+        <span class="w-14 text-center text-xs font-bold text-blue-600">${this.escapeHtml(t2Short)}</span>
+      </div>`;
     for (let i = 0; i < setCount; i++) {
       const s1 = match.scores ? (match.scores[i]?.[0] ?? '') : '';
       const s2 = match.scores ? (match.scores[i]?.[1] ?? '') : '';
       setsHTML += `
         <div class="flex items-center gap-2 justify-center">
           <span class="text-sm text-gray-500 w-16">세트 ${i + 1}</span>
-          <input type="number" min="0" max="7" class="score-input w-14 h-10 text-center border border-gray-300 rounded-lg text-lg font-bold focus:ring-2 focus:ring-green-500 focus:border-green-500"
+          <input type="number" min="0" max="7" class="score-input w-14 h-10 text-center border-2 border-green-300 bg-green-50 rounded-lg text-lg font-bold text-green-700 focus:ring-2 focus:ring-green-500 focus:border-green-500"
             data-set="${i}" data-player="0" value="${s1}" placeholder="0">
           <span class="text-gray-400 font-bold">:</span>
-          <input type="number" min="0" max="7" class="score-input w-14 h-10 text-center border border-gray-300 rounded-lg text-lg font-bold focus:ring-2 focus:ring-green-500 focus:border-green-500"
+          <input type="number" min="0" max="7" class="score-input w-14 h-10 text-center border-2 border-blue-300 bg-blue-50 rounded-lg text-lg font-bold text-blue-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             data-set="${i}" data-player="1" value="${s2}" placeholder="0">
         </div>`;
     }

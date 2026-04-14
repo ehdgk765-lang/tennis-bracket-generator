@@ -289,17 +289,38 @@ const Schedule = {
     const playerStats = this.calcPlayerStats(tournament);
     const isComplete = totalMatches > 0 && totalMatches === completedMatches;
 
+    // 동적 인원 계산 (매치 데이터 기반)
+    const allPlayersData = Storage.getPlayers();
+    const uniqueNames = new Set();
+    allMatches.forEach(m => {
+      m.player1.split(' / ').forEach(n => uniqueNames.add(n));
+      m.player2.split(' / ').forEach(n => uniqueNames.add(n));
+    });
+    let maleCount = 0, femaleCount = 0, unknownCount = 0;
+    uniqueNames.forEach(name => {
+      const pd = allPlayersData.find(p => p.name === name);
+      if (pd?.gender === 'M') maleCount++;
+      else if (pd?.gender === 'F') femaleCount++;
+      else unknownCount++;
+    });
+    const playerInfo = unknownCount > 0
+      ? `${uniqueNames.size}명 (남${maleCount} 여${femaleCount} 기타${unknownCount})`
+      : `남${maleCount} 여${femaleCount}`;
+    const maxCourts = Math.max(tournament.courts, ...tournament.timeSlots.map(s => s.matches.length));
+
     container.innerHTML = `
       <div>
-        <div id="schedule-header" class="flex items-center justify-between mb-4 pb-1">
-          <div>
-            <h3 id="schedule-title" class="text-xl font-bold text-gray-800 cursor-pointer hover:text-green-700 transition" title="클릭하여 이름 수정">${Results.escapeHtml(tournament.name)} <svg class="w-3.5 h-3.5 inline-block text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></h3>
-            <p class="text-sm text-gray-500 mt-1">
-              ${tournament.startTime} ~ ${tournament.endTime} · 코트 ${tournament.courts}면 ·
-              남${tournament.males.length} 여${tournament.females.length}
-            </p>
+        <div id="schedule-header" class="mb-4 pb-1">
+          <div class="flex items-start justify-between gap-2">
+            <h3 id="schedule-title" class="text-xl font-bold text-gray-800 cursor-pointer hover:text-green-700 transition flex-1 min-w-0" title="클릭하여 이름 수정">${Results.escapeHtml(tournament.name)} <svg class="w-3.5 h-3.5 inline-block text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></h3>
+            <span class="text-sm font-medium whitespace-nowrap flex-shrink-0 ${isComplete ? 'text-green-600' : 'text-orange-600'}">
+              ${completedMatches}/${totalMatches} 완료
+            </span>
           </div>
-          <div class="flex items-center gap-2">
+          <p class="text-sm text-gray-500 mt-1">
+            ${tournament.startTime} ~ ${tournament.endTime} · 코트 ${maxCourts}면 · ${playerInfo}
+          </p>
+          <div class="flex items-center gap-2 mt-3">
             <button id="add-match-btn" class="text-sm px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 transition font-medium flex items-center gap-1">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
               대진 추가
@@ -308,9 +329,6 @@ const Schedule = {
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
               PDF
             </button>
-            <span class="text-sm font-medium ${isComplete ? 'text-green-600' : 'text-orange-600'}">
-              ${completedMatches}/${totalMatches} 완료
-            </span>
           </div>
         </div>
 
