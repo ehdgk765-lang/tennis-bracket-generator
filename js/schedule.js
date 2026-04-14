@@ -266,7 +266,8 @@ const Schedule = {
         const t1 = m.player1.split(' / ');
         const t2 = m.player2.split(' / ');
         [...t1, ...t2].forEach(p => {
-          if (stats[p]) stats[p].games++;
+          if (!stats[p]) stats[p] = { name: p, games: 0, wins: 0, losses: 0 };
+          stats[p].games++;
         });
         if (m.winner) {
           const winners = m.winner.split(' / ');
@@ -299,6 +300,10 @@ const Schedule = {
             </p>
           </div>
           <div class="flex items-center gap-2">
+            <button id="add-match-btn" class="text-sm px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 transition font-medium flex items-center gap-1">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              대진 추가
+            </button>
             <button id="pdf-download-btn" class="text-sm px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 transition font-medium flex items-center gap-1">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
               PDF
@@ -318,7 +323,9 @@ const Schedule = {
                 <div class="flex-1 border-t border-gray-200"></div>
               </div>
               <div class="grid gap-2 schedule-grid" style="grid-template-columns: repeat(${tournament.courts}, 1fr)">
-                ${slot.matches.map((match, mi) => this.renderMatchCard(match, si, mi)).join('')}
+                ${slot.matches.length > 0
+                  ? slot.matches.map((match, mi) => this.renderMatchCard(match, si, mi)).join('')
+                  : `<div class="col-span-full text-center py-3 text-sm text-gray-300 italic border border-dashed border-gray-200 rounded-xl">대진 없음</div>`}
               </div>
             </div>
           `).join('')}
@@ -367,6 +374,12 @@ const Schedule = {
     const pdfBtn = container.querySelector('#pdf-download-btn');
     if (pdfBtn) {
       pdfBtn.onclick = () => this.exportPDF(container, tournament);
+    }
+
+    // 대진 추가
+    const addMatchBtn = container.querySelector('#add-match-btn');
+    if (addMatchBtn) {
+      addMatchBtn.onclick = () => this.showAddMatchModal(container, tournament);
     }
 
     // 대진표 이름 수정
@@ -484,6 +497,33 @@ const Schedule = {
           }
           this.render(container, tournament);
         });
+      });
+    });
+
+    // 대진 삭제 (X 버튼)
+    container.querySelectorAll('.delete-match-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const si = +btn.dataset.slotIdx;
+        const mi = +btn.dataset.matchIdx;
+        const match = tournament.timeSlots[si]?.matches[mi];
+        if (!match) return;
+        const label = `${match.player1} vs ${match.player2}`;
+        if (!confirm(`이 대진을 삭제하시겠습니까?\n${label}`)) return;
+        tournament.timeSlots[si].matches.splice(mi, 1);
+        tournament.timeSlots[si].matches.forEach((m, i) => m.court = i + 1);
+        Storage.updateTournament(tournament);
+        this.render(container, tournament);
+      });
+    });
+
+    // 경기 종류 변경 (뱃지 클릭)
+    container.querySelectorAll('.change-gametype-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const match = allMatches.find(m => m.id === btn.dataset.matchId);
+        if (!match) return;
+        this.showChangeGameTypeModal(container, tournament, match);
       });
     });
 
@@ -668,10 +708,13 @@ const Schedule = {
     const isWin2 = match.winner === match.player2;
 
     return `
-      <div class="schedule-match-card bg-white border ${hasScore ? 'border-green-200' : 'border-gray-200'} rounded-xl p-3 cursor-pointer hover:shadow-md transition"
+      <div class="schedule-match-card relative bg-white border ${hasScore ? 'border-green-200' : 'border-gray-200'} rounded-xl p-3 cursor-pointer hover:shadow-md transition"
            draggable="true" data-match-id="${match.id}" data-slot-idx="${slotIdx}" data-match-idx="${matchIdx}">
-        <div class="flex items-center justify-between mb-2">
-          <span class="text-xs px-2 py-0.5 rounded-full font-medium ${cfg.badgeClass}">${cfg.label}</span>
+        <button type="button" class="delete-match-btn absolute top-1.5 right-1.5 w-6 h-6 flex items-center justify-center rounded-full text-gray-300 hover:bg-red-50 hover:text-red-500 transition" data-slot-idx="${slotIdx}" data-match-idx="${matchIdx}">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+        <div class="flex items-center justify-between mb-2 pr-5">
+          <span class="change-gametype-btn text-xs px-2 py-0.5 rounded-full font-medium ${cfg.badgeClass} cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-green-400 transition" data-match-id="${match.id}">${cfg.label}</span>
           <span class="text-xs text-gray-400">코트 ${match.court}</span>
         </div>
         <div class="space-y-0.5">
@@ -764,5 +807,281 @@ const Schedule = {
           ${teamRow(match.player2, isWin2, hasScore ? match.scores[0][1] : null)}
         </table>
       </div>`;
+  },
+
+  // 커스텀 대진 추가 모달
+  showAddMatchModal(container, tournament) {
+    const existing = document.querySelector('.add-match-modal');
+    if (existing) existing.remove();
+
+    const allPlayers = Storage.getPlayers();
+    const selected = { t1p1: null, t1p2: null, t2p1: null, t2p2: null };
+
+    const timeSlotOptions = tournament.timeSlots.map((s, i) =>
+      `<option value="${i}">${s.time}</option>`
+    ).join('');
+
+    const modal = document.createElement('div');
+    modal.className = 'add-match-modal fixed inset-0 z-50 flex items-end sm:items-center justify-center';
+    modal.style.backgroundColor = 'rgba(0,0,0,0.5)';
+
+    const renderModal = () => {
+      const playerSlot = (key, label) => {
+        const name = selected[key];
+        const pd = name ? allPlayers.find(p => p.name === name) : null;
+        if (name) {
+          return `<div class="am-player-slot flex items-center justify-between px-3 py-2.5 border border-gray-200 rounded-xl cursor-pointer hover:bg-green-50 transition" data-key="${key}">
+            <div class="flex items-center gap-2">
+              <span class="text-sm text-gray-800 font-medium">${Results.escapeHtml(name)}</span>
+              ${pd ? `<span class="text-xs px-1.5 py-0.5 rounded font-medium ${pd.gender === 'M' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}">${pd.gender === 'M' ? '남' : '여'}</span>
+              <span class="text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">${(pd.ntrp || 2.5).toFixed(1)}</span>` : ''}
+            </div>
+            <button type="button" class="am-remove-player text-red-400 hover:text-red-600 text-xs" data-key="${key}">✕</button>
+          </div>`;
+        }
+        return `<div class="am-player-slot flex items-center px-3 py-2.5 border border-dashed border-gray-300 rounded-xl cursor-pointer hover:bg-green-50 transition" data-key="${key}">
+          <span class="text-sm text-gray-300 italic">${label}</span>
+        </div>`;
+      };
+
+      return `
+        <div class="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl max-w-md w-full p-5 max-h-[85vh] overflow-y-auto">
+          <div class="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-3 sm:hidden"></div>
+          <h3 class="text-lg font-bold text-center mb-4">대진 추가</h3>
+          <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-gray-600 mb-1">시간대</label>
+                <select id="am-slot" class="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-green-500">
+                  ${timeSlotOptions}
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-gray-600 mb-1">경기 종류</label>
+                <div class="flex gap-1.5 flex-wrap">
+                  ${Object.entries(SCHEDULE_GAME_TYPES).map(([key, cfg]) =>
+                    `<label class="cursor-pointer">
+                      <input type="radio" name="am-gametype" value="${key}" ${key === 'XD' ? 'checked' : ''} class="sr-only peer">
+                      <div class="px-2.5 py-1.5 rounded-lg text-xs font-medium border-2 border-gray-200 peer-checked:border-green-500 peer-checked:bg-green-50 transition">${cfg.icon} ${cfg.label}</div>
+                    </label>`
+                  ).join('')}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-1">코트 번호</label>
+              <div class="flex gap-2">
+                ${Array.from({length: tournament.courts}, (_, i) => `
+                  <label class="flex-1 cursor-pointer">
+                    <input type="radio" name="am-court" value="${i + 1}" ${i === 0 ? 'checked' : ''} class="sr-only peer">
+                    <div class="border-2 border-gray-200 rounded-xl py-2 text-center peer-checked:border-green-500 peer-checked:bg-green-50 transition text-sm font-medium">${i + 1}번</div>
+                  </label>
+                `).join('')}
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-2">팀 1</label>
+              <div class="space-y-2">
+                ${playerSlot('t1p1', '선수 1 선택...')}
+                ${playerSlot('t1p2', '선수 2 선택...')}
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-2">팀 2</label>
+              <div class="space-y-2">
+                ${playerSlot('t2p1', '선수 1 선택...')}
+                ${playerSlot('t2p2', '선수 2 선택...')}
+              </div>
+            </div>
+
+            <div class="flex gap-3 pt-2">
+              <button type="button" class="flex-1 py-2.5 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition am-cancel">취소</button>
+              <button type="button" class="flex-1 py-2.5 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 transition am-submit">추가</button>
+            </div>
+          </div>
+        </div>`;
+    };
+
+    const refreshModal = () => {
+      modal.innerHTML = renderModal();
+      bindModalEvents();
+    };
+
+    const bindModalEvents = () => {
+      modal.querySelector('.am-cancel').onclick = () => modal.remove();
+
+      modal.querySelector('.am-submit').onclick = () => {
+        const { t1p1, t1p2, t2p1, t2p2 } = selected;
+        if (!t1p1 || !t1p2 || !t2p1 || !t2p2) {
+          alert('모든 선수를 선택해주세요.');
+          return;
+        }
+        const names = [t1p1, t1p2, t2p1, t2p2];
+        if (new Set(names).size !== 4) {
+          alert('중복된 선수가 있습니다.');
+          return;
+        }
+        const slotIdx = parseInt(modal.querySelector('#am-slot').value);
+        const gameType = modal.querySelector('input[name="am-gametype"]:checked').value;
+        const court = parseInt(modal.querySelector('input[name="am-court"]:checked').value);
+
+        tournament.timeSlots[slotIdx].matches.push({
+          id: Storage.generateId(),
+          court,
+          gameType,
+          player1: `${t1p1} / ${t1p2}`,
+          player2: `${t2p1} / ${t2p2}`,
+          scores: null,
+          winner: null,
+        });
+        Storage.updateTournament(tournament);
+        modal.remove();
+        this.render(container, tournament);
+      };
+
+      // Player slot click → open picker
+      modal.querySelectorAll('.am-player-slot').forEach(slot => {
+        slot.onclick = (e) => {
+          if (e.target.closest('.am-remove-player')) return;
+          this._showPlayerPickerForSlot(modal, allPlayers, selected, slot.dataset.key, refreshModal);
+        };
+      });
+
+      // Remove player
+      modal.querySelectorAll('.am-remove-player').forEach(btn => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          selected[btn.dataset.key] = null;
+          refreshModal();
+        };
+      });
+    };
+
+    modal.innerHTML = renderModal();
+    document.body.appendChild(modal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+    bindModalEvents();
+  },
+
+  // 선수 선택 피커 (대진 추가용)
+  _showPlayerPickerForSlot(parentModal, allPlayers, selected, slotKey, onDone) {
+    const existing = document.querySelector('.am-player-picker');
+    if (existing) existing.remove();
+
+    const usedNames = new Set(Object.values(selected).filter(Boolean));
+
+    const picker = document.createElement('div');
+    picker.className = 'am-player-picker fixed inset-0 z-[60] flex items-end sm:items-center justify-center';
+    picker.style.backgroundColor = 'rgba(0,0,0,0.5)';
+    picker.innerHTML = `
+      <div class="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl max-w-sm w-full p-4 max-h-[70vh] flex flex-col">
+        <div class="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-3 sm:hidden"></div>
+        <h3 class="text-lg font-bold text-center mb-3">선수 선택</h3>
+        <div class="mb-3">
+          <div class="flex gap-2">
+            <input type="text" id="amp-search" placeholder="이름 검색 또는 직접 입력..."
+              class="flex-1 px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500">
+            <button type="button" id="amp-custom-add"
+              class="px-4 py-2 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 transition whitespace-nowrap">추가</button>
+          </div>
+        </div>
+        ${allPlayers.length > 0 ? `
+          <div class="text-xs text-gray-400 mb-2">등록된 선수</div>
+          <div class="overflow-y-auto flex-1 divide-y divide-gray-50">
+            ${allPlayers.map(p => {
+              const isUsed = usedNames.has(p.name);
+              return `
+                <div class="amp-option flex items-center px-3 py-2.5 ${isUsed ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-green-50'} transition"
+                  data-name="${Results.escapeHtml(p.name)}" data-used="${isUsed}">
+                  <span class="text-sm text-gray-800">${Results.escapeHtml(p.name)}</span>
+                  <span class="ml-2 text-xs px-1.5 py-0.5 rounded font-medium ${p.gender === 'M' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}">${p.gender === 'M' ? '남' : '여'}</span>
+                  <span class="ml-1 text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">${(p.ntrp || 2.5).toFixed(1)}</span>
+                  ${isUsed ? '<span class="ml-auto text-xs text-gray-400">선택됨</span>' : ''}
+                </div>`;
+            }).join('')}
+          </div>
+        ` : '<p class="text-sm text-gray-400 text-center py-4">등록된 선수가 없습니다.</p>'}
+        <button type="button" class="mt-3 w-full py-2 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition amp-cancel">취소</button>
+      </div>`;
+
+    document.body.appendChild(picker);
+    picker.addEventListener('click', (e) => { if (e.target === picker) picker.remove(); });
+    picker.querySelector('.amp-cancel').onclick = () => picker.remove();
+
+    const searchInput = picker.querySelector('#amp-search');
+    searchInput.focus();
+
+    searchInput.oninput = () => {
+      const q = searchInput.value.trim().toLowerCase();
+      picker.querySelectorAll('.amp-option').forEach(opt => {
+        opt.style.display = (!q || opt.dataset.name.toLowerCase().includes(q)) ? '' : 'none';
+      });
+    };
+
+    // Direct input
+    const addCustom = () => {
+      const val = searchInput.value.trim();
+      if (!val) return;
+      if (usedNames.has(val)) { alert('이미 선택된 선수입니다.'); return; }
+      selected[slotKey] = val;
+      picker.remove();
+      onDone();
+    };
+    picker.querySelector('#amp-custom-add').onclick = addCustom;
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); addCustom(); }
+    });
+
+    // Select from list
+    picker.querySelectorAll('.amp-option').forEach(opt => {
+      opt.onclick = () => {
+        if (opt.dataset.used === 'true') return;
+        selected[slotKey] = opt.dataset.name;
+        picker.remove();
+        onDone();
+      };
+    });
+  },
+
+  // 경기 종류 변경 모달
+  showChangeGameTypeModal(container, tournament, match) {
+    const existing = document.querySelector('.change-gametype-modal');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.className = 'change-gametype-modal fixed inset-0 z-50 flex items-end sm:items-center justify-center';
+    modal.style.backgroundColor = 'rgba(0,0,0,0.5)';
+    modal.innerHTML = `
+      <div class="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl max-w-sm w-full p-5">
+        <div class="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-3 sm:hidden"></div>
+        <h3 class="text-lg font-bold text-center mb-4">경기 종류 변경</h3>
+        <div class="grid grid-cols-2 gap-2 mb-4">
+          ${Object.entries(SCHEDULE_GAME_TYPES).map(([key, cfg]) =>
+            `<button type="button" class="cgt-option px-3 py-3 rounded-xl text-sm font-medium border-2 transition
+              ${match.gameType === key ? 'border-green-500 bg-green-50' : 'border-gray-200 hover:border-gray-300'}"
+              data-type="${key}">
+              <span class="text-lg">${cfg.icon}</span>
+              <span class="ml-1">${cfg.label}</span>
+            </button>`
+          ).join('')}
+        </div>
+        <button type="button" class="w-full py-2 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition cgt-cancel">취소</button>
+      </div>`;
+
+    document.body.appendChild(modal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+    modal.querySelector('.cgt-cancel').onclick = () => modal.remove();
+
+    modal.querySelectorAll('.cgt-option').forEach(btn => {
+      btn.onclick = () => {
+        match.gameType = btn.dataset.type;
+        Storage.updateTournament(tournament);
+        modal.remove();
+        this.render(container, tournament);
+      };
+    });
   },
 };

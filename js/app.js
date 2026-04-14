@@ -10,6 +10,8 @@ const GAME_TYPES = {
 const App = {
   currentTab: 'players',
   currentTournamentId: null,
+  _createSubTab: 'auto',
+  _scheduleSubTab: 'time-court',
 
   init() {
     this.bindTabs();
@@ -66,87 +68,121 @@ const App = {
   },
 
   renderCreateForm(container) {
-    const allPlayers = Storage.getPlayers();
+    const activeSubTab = this._createSubTab || 'auto';
 
     container.innerHTML = `
       <div class="max-w-lg mx-auto">
-        <h2 class="text-2xl font-bold text-gray-800 mb-6">대회 만들기</h2>
-
-        ${allPlayers.length < 2 ? `
-          <div class="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-center">
-            <p class="text-yellow-800 font-medium mb-2">선수를 2명 이상 등록해주세요.</p>
-            <button onclick="App.navigate('players')" class="text-green-600 font-semibold hover:underline">선수 관리로 이동</button>
-          </div>` : `
-        <form id="create-form" class="space-y-5">
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">대회명</label>
-            <input type="text" id="tournament-name" required maxlength="30"
-              class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500"
-              placeholder="예: 2024년 봄 정기대회">
-          </div>
-
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">경기 종류</label>
-            <div class="grid grid-cols-3 gap-2 sm:grid-cols-5">
-              ${Object.entries(GAME_TYPES).map(([key, cfg], i) => `
-                <label class="cursor-pointer">
-                  <input type="radio" name="gameType" value="${key}" ${key === 'XD' ? 'checked' : ''} class="sr-only peer">
-                  <div class="border-2 border-gray-200 rounded-xl py-2.5 px-1 text-center peer-checked:border-green-500 peer-checked:bg-green-50 transition">
-                    <div class="text-lg">${cfg.icon}</div>
-                    <div class="text-xs font-semibold text-gray-700 mt-0.5">${cfg.label}</div>
-                  </div>
-                </label>
-              `).join('')}
-            </div>
-          </div>
-
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">대회 형식</label>
-            <div class="grid grid-cols-2 gap-3">
-              <label class="format-option relative cursor-pointer">
-                <input type="radio" name="format" value="tournament" checked class="sr-only peer">
-                <div class="border-2 border-gray-200 rounded-xl p-4 text-center peer-checked:border-green-500 peer-checked:bg-green-50 transition">
-                  <div class="text-2xl mb-1">🏆</div>
-                  <div class="font-semibold text-gray-800">토너먼트</div>
-                  <div class="text-xs text-gray-500 mt-1">싱글 엘리미네이션</div>
-                </div>
-              </label>
-              <label class="format-option relative cursor-pointer">
-                <input type="radio" name="format" value="league" class="sr-only peer">
-                <div class="border-2 border-gray-200 rounded-xl p-4 text-center peer-checked:border-green-500 peer-checked:bg-green-50 transition">
-                  <div class="text-2xl mb-1">📊</div>
-                  <div class="font-semibold text-gray-800">리그</div>
-                  <div class="text-xs text-gray-500 mt-1">라운드 로빈</div>
-                </div>
-              </label>
-            </div>
-          </div>
-
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">세트 수</label>
-            <div class="flex gap-3">
-              ${[1, 3, 5].map(n => `
-                <label class="flex-1 cursor-pointer">
-                  <input type="radio" name="setCount" value="${n}" ${n === 3 ? 'checked' : ''} class="sr-only peer">
-                  <div class="border-2 border-gray-200 rounded-xl py-2.5 text-center peer-checked:border-green-500 peer-checked:bg-green-50 transition">
-                    <span class="font-semibold text-gray-800">${n}세트</span>
-                    <div class="text-xs text-gray-500">${Math.ceil(n / 2)}세트 선승</div>
-                  </div>
-                </label>
-              `).join('')}
-            </div>
-          </div>
-
-          <div id="participants-section"></div>
-
-          <button type="submit"
-            class="w-full py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition font-semibold text-lg">
-            대회 생성
+        <h2 class="text-2xl font-bold text-gray-800 mb-4">대회 만들기</h2>
+        <div class="flex gap-2 mb-6">
+          <button data-subtab="auto"
+            class="sub-tab flex-1 px-4 py-2 rounded-full text-sm font-semibold transition
+              ${activeSubTab === 'auto' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}">
+            자동 대회
           </button>
-        </form>`}
+          <button data-subtab="custom-bracket"
+            class="sub-tab flex-1 px-4 py-2 rounded-full text-sm font-semibold transition
+              ${activeSubTab === 'custom-bracket' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}">
+            커스텀 대회
+          </button>
+        </div>
+        <div id="create-sub-content"></div>
       </div>`;
 
-    if (allPlayers.length < 2) return;
+    container.querySelectorAll('[data-subtab]').forEach(btn => {
+      btn.onclick = () => {
+        this._createSubTab = btn.dataset.subtab;
+        this.renderCreateForm(container);
+      };
+    });
+
+    const subContent = container.querySelector('#create-sub-content');
+    if (activeSubTab === 'auto') {
+      this._renderAutoCreateForm(subContent);
+    } else {
+      CustomBracket.renderBuilder(subContent);
+    }
+  },
+
+  _renderAutoCreateForm(container) {
+    const allPlayers = Storage.getPlayers();
+
+    if (allPlayers.length < 2) {
+      container.innerHTML = `
+        <div class="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-center">
+          <p class="text-yellow-800 font-medium mb-2">선수를 2명 이상 등록해주세요.</p>
+          <button onclick="App.navigate('players')" class="text-green-600 font-semibold hover:underline">선수 관리로 이동</button>
+        </div>`;
+      return;
+    }
+
+    container.innerHTML = `
+      <form id="create-form" class="space-y-5">
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">대회명</label>
+          <input type="text" id="tournament-name" required maxlength="30"
+            class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500"
+            placeholder="예: 2024년 봄 정기대회">
+        </div>
+
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">경기 종류</label>
+          <div class="grid grid-cols-3 gap-2 sm:grid-cols-5">
+            ${Object.entries(GAME_TYPES).map(([key, cfg], i) => `
+              <label class="cursor-pointer">
+                <input type="radio" name="gameType" value="${key}" ${key === 'XD' ? 'checked' : ''} class="sr-only peer">
+                <div class="border-2 border-gray-200 rounded-xl py-2.5 px-1 text-center peer-checked:border-green-500 peer-checked:bg-green-50 transition">
+                  <div class="text-lg">${cfg.icon}</div>
+                  <div class="text-xs font-semibold text-gray-700 mt-0.5">${cfg.label}</div>
+                </div>
+              </label>
+            `).join('')}
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">대회 형식</label>
+          <div class="grid grid-cols-2 gap-3">
+            <label class="format-option relative cursor-pointer">
+              <input type="radio" name="format" value="tournament" checked class="sr-only peer">
+              <div class="border-2 border-gray-200 rounded-xl p-4 text-center peer-checked:border-green-500 peer-checked:bg-green-50 transition">
+                <div class="text-2xl mb-1">🏆</div>
+                <div class="font-semibold text-gray-800">토너먼트</div>
+                <div class="text-xs text-gray-500 mt-1">싱글 엘리미네이션</div>
+              </div>
+            </label>
+            <label class="format-option relative cursor-pointer">
+              <input type="radio" name="format" value="league" class="sr-only peer">
+              <div class="border-2 border-gray-200 rounded-xl p-4 text-center peer-checked:border-green-500 peer-checked:bg-green-50 transition">
+                <div class="text-2xl mb-1">📊</div>
+                <div class="font-semibold text-gray-800">리그</div>
+                <div class="text-xs text-gray-500 mt-1">라운드 로빈</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">세트 수</label>
+          <div class="flex gap-3">
+            ${[1, 3, 5].map(n => `
+              <label class="flex-1 cursor-pointer">
+                <input type="radio" name="setCount" value="${n}" ${n === 3 ? 'checked' : ''} class="sr-only peer">
+                <div class="border-2 border-gray-200 rounded-xl py-2.5 text-center peer-checked:border-green-500 peer-checked:bg-green-50 transition">
+                  <span class="font-semibold text-gray-800">${n}세트</span>
+                  <div class="text-xs text-gray-500">${Math.ceil(n / 2)}세트 선승</div>
+                </div>
+              </label>
+            `).join('')}
+          </div>
+        </div>
+
+        <div id="participants-section"></div>
+
+        <button type="submit"
+          class="w-full py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition font-semibold text-lg">
+          대회 생성
+        </button>
+      </form>`;
 
     const gameTypeRadios = container.querySelectorAll('input[name="gameType"]');
     gameTypeRadios.forEach(r => {
@@ -418,130 +454,252 @@ const App = {
   },
 
   renderScheduleForm(container) {
+    const activeSubTab = this._scheduleSubTab || 'time-court';
+
+    container.innerHTML = `
+      <div class="max-w-lg mx-auto">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4">대진표 만들기</h2>
+        <div class="flex gap-2 mb-6">
+          <button data-subtab="time-court"
+            class="sub-tab flex-1 px-4 py-2 rounded-full text-sm font-semibold transition
+              ${activeSubTab === 'time-court' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}">
+            시간/코트 대진표
+          </button>
+          <button data-subtab="custom-schedule"
+            class="sub-tab flex-1 px-4 py-2 rounded-full text-sm font-semibold transition
+              ${activeSubTab === 'custom-schedule' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}">
+            커스텀 대진표
+          </button>
+        </div>
+        <div id="schedule-sub-content"></div>
+      </div>`;
+
+    container.querySelectorAll('[data-subtab]').forEach(btn => {
+      btn.onclick = () => {
+        this._scheduleSubTab = btn.dataset.subtab;
+        this.renderScheduleForm(container);
+      };
+    });
+
+    const subContent = container.querySelector('#schedule-sub-content');
+    if (activeSubTab === 'time-court') {
+      this._renderTimeCourtForm(subContent);
+    } else {
+      this._renderCustomScheduleForm(subContent);
+    }
+  },
+
+  _renderCustomScheduleForm(container) {
+    container.innerHTML = `
+      <p class="text-xs text-gray-400 mb-4">빈 대진표를 생성한 후, 직접 매치를 추가할 수 있습니다.</p>
+      <form id="custom-schedule-form" class="space-y-5">
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">대진표 이름</label>
+          <input type="text" id="cs-name" maxlength="30"
+            class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500"
+            placeholder="미입력 시 날짜+시간으로 자동 생성">
+        </div>
+
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">시간 설정</label>
+          <div class="flex items-center gap-2">
+            <select id="cs-start" class="flex-1 px-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white">
+              ${this.generateTimeOptions('08:00')}
+            </select>
+            <span class="text-gray-500 font-medium">~</span>
+            <select id="cs-end" class="flex-1 px-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white">
+              ${this.generateTimeOptions('10:00')}
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">코트 수</label>
+          <div class="flex gap-2">
+            ${[1, 2, 3, 4].map(n => `
+              <label class="flex-1 cursor-pointer">
+                <input type="radio" name="cs-courts" value="${n}" ${n === 2 ? 'checked' : ''} class="sr-only peer">
+                <div class="border-2 border-gray-200 rounded-xl py-2.5 text-center peer-checked:border-green-500 peer-checked:bg-green-50 transition">
+                  <span class="font-semibold text-gray-800">${n}면</span>
+                </div>
+              </label>
+            `).join('')}
+          </div>
+        </div>
+
+        <button type="submit"
+          class="w-full py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition font-semibold text-lg">
+          빈 대진표 생성
+        </button>
+      </form>`;
+
+    container.querySelector('#custom-schedule-form').onsubmit = (e) => {
+      e.preventDefault();
+
+      const startTime = container.querySelector('#cs-start').value;
+      const endTime = container.querySelector('#cs-end').value;
+      const courts = parseInt(container.querySelector('input[name="cs-courts"]:checked').value);
+
+      if (startTime >= endTime) {
+        alert('종료 시간은 시작 시간보다 뒤여야 합니다.');
+        return;
+      }
+
+      const slots = Schedule.calculateTimeSlots(startTime, endTime);
+      if (slots.length === 0) {
+        alert('시간이 부족합니다. 최소 30분 이상 설정해주세요.');
+        return;
+      }
+
+      const timeSlots = slots.map(time => ({ time, matches: [] }));
+
+      const today = new Date().toISOString().slice(0, 10);
+      const customName = container.querySelector('#cs-name').value.trim();
+      const tournament = {
+        id: Storage.generateId(),
+        name: customName || `${today} ${startTime} 대진표`,
+        format: 'schedule',
+        setCount: 1,
+        courts,
+        startTime,
+        endTime,
+        allowMixed: true,
+        males: [],
+        females: [],
+        players: [],
+        status: 'active',
+        createdAt: new Date().toISOString(),
+        completedAt: null,
+        timeSlots,
+      };
+
+      const tournaments = Storage.getTournaments();
+      tournaments.push(tournament);
+      Storage.saveTournaments(tournaments);
+
+      this.navigate('active', tournament.id);
+    };
+  },
+
+  _renderTimeCourtForm(container) {
     const allPlayers = Storage.getPlayers();
     const males = allPlayers.filter(p => p.gender === 'M');
     const females = allPlayers.filter(p => p.gender === 'F');
 
     if (allPlayers.length < 4) {
       container.innerHTML = `
-        <div class="max-w-lg mx-auto">
-          <h2 class="text-2xl font-bold text-gray-800 mb-6">대진표 만들기</h2>
-          <div class="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-center">
-            <p class="text-yellow-800 font-medium mb-2">복식 경기를 위해 최소 4명의 선수가 필요합니다.</p>
-            <p class="text-yellow-700 text-sm mb-3">현재: 남 ${males.length}명, 여 ${females.length}명</p>
-            <button onclick="App.navigate('players')" class="text-green-600 font-semibold hover:underline">선수 관리로 이동</button>
-          </div>
+        <div class="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-center">
+          <p class="text-yellow-800 font-medium mb-2">복식 경기를 위해 최소 4명의 선수가 필요합니다.</p>
+          <p class="text-yellow-700 text-sm mb-3">현재: 남 ${males.length}명, 여 ${females.length}명</p>
+          <button onclick="App.navigate('players')" class="text-green-600 font-semibold hover:underline">선수 관리로 이동</button>
         </div>`;
       return;
     }
 
     container.innerHTML = `
-      <div class="max-w-lg mx-auto">
-        <div class="flex items-center justify-between mb-6">
-          <h2 class="text-2xl font-bold text-gray-800">대진표 만들기</h2>
-          <label class="flex items-center gap-1.5 cursor-pointer">
-            <input type="checkbox" id="allow-mixed" class="w-3.5 h-3.5 text-green-600 rounded border-gray-300 focus:ring-green-500">
-            <span class="text-xs text-gray-500">섞어복식 허용</span>
-          </label>
+      <div class="flex items-center justify-end mb-4">
+        <label class="flex items-center gap-1.5 cursor-pointer">
+          <input type="checkbox" id="allow-mixed" class="w-3.5 h-3.5 text-green-600 rounded border-gray-300 focus:ring-green-500">
+          <span class="text-xs text-gray-500">섞어복식 허용</span>
+        </label>
+      </div>
+
+      <form id="schedule-form" class="space-y-5">
+        <!-- 대진표 이름 -->
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">대진표 이름</label>
+          <input type="text" id="schedule-name" maxlength="30"
+            class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500"
+            placeholder="미입력 시 날짜+시간으로 자동 생성">
         </div>
 
-        <form id="schedule-form" class="space-y-5">
-          <!-- 대진표 이름 -->
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">대진표 이름</label>
-            <input type="text" id="schedule-name" maxlength="30"
-              class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500"
-              placeholder="미입력 시 날짜+시간으로 자동 생성">
+        <!-- 시간 설정 -->
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">시간 설정</label>
+          <div class="flex items-center gap-2">
+            <select id="start-time" class="flex-1 px-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white">
+              ${this.generateTimeOptions('08:00')}
+            </select>
+            <span class="text-gray-500 font-medium">~</span>
+            <select id="end-time" class="flex-1 px-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white">
+              ${this.generateTimeOptions('10:00')}
+            </select>
           </div>
+          <p id="time-info" class="text-xs text-gray-500 mt-1"></p>
+        </div>
 
-          <!-- 시간 설정 -->
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">시간 설정</label>
-            <div class="flex items-center gap-2">
-              <select id="start-time" class="flex-1 px-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white">
-                ${this.generateTimeOptions('08:00')}
-              </select>
-              <span class="text-gray-500 font-medium">~</span>
-              <select id="end-time" class="flex-1 px-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white">
-                ${this.generateTimeOptions('10:00')}
-              </select>
-            </div>
-            <p id="time-info" class="text-xs text-gray-500 mt-1"></p>
+        <!-- 코트 수 -->
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">코트 수</label>
+          <div class="flex gap-2">
+            ${[1, 2, 3, 4].map(n => `
+              <label class="flex-1 cursor-pointer">
+                <input type="radio" name="courts" value="${n}" ${n === 2 ? 'checked' : ''} class="sr-only peer">
+                <div class="border-2 border-gray-200 rounded-xl py-2.5 text-center peer-checked:border-green-500 peer-checked:bg-green-50 transition">
+                  <span class="font-semibold text-gray-800">${n}면</span>
+                </div>
+              </label>
+            `).join('')}
           </div>
+        </div>
 
-          <!-- 코트 수 -->
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">코트 수</label>
-            <div class="flex gap-2">
-              ${[1, 2, 3, 4].map(n => `
-                <label class="flex-1 cursor-pointer">
-                  <input type="radio" name="courts" value="${n}" ${n === 2 ? 'checked' : ''} class="sr-only peer">
-                  <div class="border-2 border-gray-200 rounded-xl py-2.5 text-center peer-checked:border-green-500 peer-checked:bg-green-50 transition">
-                    <span class="font-semibold text-gray-800">${n}면</span>
-                  </div>
-                </label>
-              `).join('')}
-            </div>
+        <!-- 남자 선수 선택 -->
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">
+            남자 선수 <span id="male-count" class="text-green-600 font-normal">(0/${males.length}명 선택)</span>
+          </label>
+          ${males.length === 0 ? '<p class="text-sm text-gray-400">등록된 남자 선수가 없습니다.</p>' : `
+          <input type="text" id="sch-male-search" placeholder="이름 검색..."
+            class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm mb-2">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-sm text-gray-500">${males.length}명 중 선택</span>
+            <button type="button" id="sch-male-all-btn" class="text-sm text-green-600 font-medium hover:underline">전체 선택</button>
           </div>
+          <div class="bg-white border border-gray-200 rounded-xl max-h-40 overflow-y-auto divide-y divide-gray-50">
+            ${males.map(p => `
+              <label class="sch-male-item flex items-center px-4 py-2.5 hover:bg-gray-50 cursor-pointer transition" data-name="${Results.escapeHtml(p.name.toLowerCase())}">
+                <input type="checkbox" name="males" value="${Results.escapeHtml(p.name)}" class="male-cb w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500">
+                <span class="ml-3 text-sm text-gray-800">${Results.escapeHtml(p.name)}</span>
+                <span class="ml-2 text-xs px-1.5 py-0.5 rounded font-medium bg-blue-100 text-blue-700">남</span>
+                <span class="text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">${(p.ntrp || 2.5).toFixed(1)}</span>
+              </label>
+            `).join('')}
+          </div>`}
+        </div>
 
-          <!-- 남자 선수 선택 -->
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">
-              남자 선수 <span id="male-count" class="text-green-600 font-normal">(0/${males.length}명 선택)</span>
-            </label>
-            ${males.length === 0 ? '<p class="text-sm text-gray-400">등록된 남자 선수가 없습니다.</p>' : `
-            <input type="text" id="sch-male-search" placeholder="이름 검색..."
-              class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm mb-2">
-            <div class="flex justify-between items-center mb-2">
-              <span class="text-sm text-gray-500">${males.length}명 중 선택</span>
-              <button type="button" id="sch-male-all-btn" class="text-sm text-green-600 font-medium hover:underline">전체 선택</button>
-            </div>
-            <div class="bg-white border border-gray-200 rounded-xl max-h-40 overflow-y-auto divide-y divide-gray-50">
-              ${males.map(p => `
-                <label class="sch-male-item flex items-center px-4 py-2.5 hover:bg-gray-50 cursor-pointer transition" data-name="${Results.escapeHtml(p.name.toLowerCase())}">
-                  <input type="checkbox" name="males" value="${Results.escapeHtml(p.name)}" class="male-cb w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500">
-                  <span class="ml-3 text-sm text-gray-800">${Results.escapeHtml(p.name)}</span>
-                  <span class="ml-2 text-xs px-1.5 py-0.5 rounded font-medium bg-blue-100 text-blue-700">남</span>
-                  <span class="text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">${(p.ntrp || 2.5).toFixed(1)}</span>
-                </label>
-              `).join('')}
-            </div>`}
+        <!-- 여자 선수 선택 -->
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">
+            여자 선수 <span id="female-count" class="text-green-600 font-normal">(0/${females.length}명 선택)</span>
+          </label>
+          ${females.length === 0 ? '<p class="text-sm text-gray-400">등록된 여자 선수가 없습니다.</p>' : `
+          <input type="text" id="sch-female-search" placeholder="이름 검색..."
+            class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm mb-2">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-sm text-gray-500">${females.length}명 중 선택</span>
+            <button type="button" id="sch-female-all-btn" class="text-sm text-green-600 font-medium hover:underline">전체 선택</button>
           </div>
+          <div class="bg-white border border-gray-200 rounded-xl max-h-40 overflow-y-auto divide-y divide-gray-50">
+            ${females.map(p => `
+              <label class="sch-female-item flex items-center px-4 py-2.5 hover:bg-gray-50 cursor-pointer transition" data-name="${Results.escapeHtml(p.name.toLowerCase())}">
+                <input type="checkbox" name="females" value="${Results.escapeHtml(p.name)}" class="female-cb w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500">
+                <span class="ml-3 text-sm text-gray-800">${Results.escapeHtml(p.name)}</span>
+                <span class="ml-2 text-xs px-1.5 py-0.5 rounded font-medium bg-pink-100 text-pink-700">여</span>
+                <span class="text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">${(p.ntrp || 2.5).toFixed(1)}</span>
+              </label>
+            `).join('')}
+          </div>`}
+        </div>
 
-          <!-- 여자 선수 선택 -->
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">
-              여자 선수 <span id="female-count" class="text-green-600 font-normal">(0/${females.length}명 선택)</span>
-            </label>
-            ${females.length === 0 ? '<p class="text-sm text-gray-400">등록된 여자 선수가 없습니다.</p>' : `
-            <input type="text" id="sch-female-search" placeholder="이름 검색..."
-              class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm mb-2">
-            <div class="flex justify-between items-center mb-2">
-              <span class="text-sm text-gray-500">${females.length}명 중 선택</span>
-              <button type="button" id="sch-female-all-btn" class="text-sm text-green-600 font-medium hover:underline">전체 선택</button>
-            </div>
-            <div class="bg-white border border-gray-200 rounded-xl max-h-40 overflow-y-auto divide-y divide-gray-50">
-              ${females.map(p => `
-                <label class="sch-female-item flex items-center px-4 py-2.5 hover:bg-gray-50 cursor-pointer transition" data-name="${Results.escapeHtml(p.name.toLowerCase())}">
-                  <input type="checkbox" name="females" value="${Results.escapeHtml(p.name)}" class="female-cb w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500">
-                  <span class="ml-3 text-sm text-gray-800">${Results.escapeHtml(p.name)}</span>
-                  <span class="ml-2 text-xs px-1.5 py-0.5 rounded font-medium bg-pink-100 text-pink-700">여</span>
-                  <span class="text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">${(p.ntrp || 2.5).toFixed(1)}</span>
-                </label>
-              `).join('')}
-            </div>`}
-          </div>
+        <!-- 미리보기 정보 -->
+        <div id="preview-info" class="bg-gray-50 rounded-xl p-4 text-sm text-gray-600 hidden">
+        </div>
 
-          <!-- 미리보기 정보 -->
-          <div id="preview-info" class="bg-gray-50 rounded-xl p-4 text-sm text-gray-600 hidden">
-          </div>
-
-          <button type="submit"
-            class="w-full py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition font-semibold text-lg">
-            대진표 생성
-          </button>
-        </form>
-      </div>`;
+        <button type="submit"
+          class="w-full py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition font-semibold text-lg">
+          대진표 생성
+        </button>
+      </form>`;
 
     const updateCounts = () => {
       const maleChecked = container.querySelectorAll('.male-cb:checked').length;
@@ -555,7 +713,6 @@ const App = {
       cb.onchange = updateCounts;
     });
 
-    // 검색 & 전체선택 바인딩
     const bindScheduleList = (prefix, cbClass) => {
       const search = container.querySelector(`#sch-${prefix}-search`);
       const items = container.querySelectorAll(`.sch-${prefix}-item`);
@@ -743,9 +900,12 @@ const App = {
               const allMatches = Schedule.getAllMatches(t);
               const completed = allMatches.filter(m => m.winner).length;
               return `
-                <div class="tournament-card bg-white border border-gray-200 rounded-2xl p-4 cursor-pointer hover:shadow-md hover:border-green-300 transition"
+                <div class="tournament-card relative bg-white border border-gray-200 rounded-2xl p-4 cursor-pointer hover:shadow-md hover:border-green-300 transition"
                      data-id="${t.id}">
-                  <div class="flex items-center justify-between mb-2">
+                  <button type="button" class="delete-tournament-btn absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-full text-gray-300 hover:bg-red-50 hover:text-red-500 transition" data-id="${t.id}">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                  </button>
+                  <div class="flex items-center justify-between mb-2 pr-6">
                     <h3 class="font-bold text-gray-800">${Results.escapeHtml(t.name)}</h3>
                     <span class="text-xs px-2 py-1 rounded-full bg-orange-100 text-orange-700">대진표</span>
                   </div>
@@ -761,9 +921,12 @@ const App = {
             const isDoubles = t.gameType ? GAME_TYPES[t.gameType]?.doubles : false;
             const countLabel = isDoubles ? `${t.players.length}팀` : `${t.players.length}명`;
             return `
-              <div class="tournament-card bg-white border border-gray-200 rounded-2xl p-4 cursor-pointer hover:shadow-md hover:border-green-300 transition"
+              <div class="tournament-card relative bg-white border border-gray-200 rounded-2xl p-4 cursor-pointer hover:shadow-md hover:border-green-300 transition"
                    data-id="${t.id}">
-                <div class="flex items-center justify-between mb-2">
+                <button type="button" class="delete-tournament-btn absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-full text-gray-300 hover:bg-red-50 hover:text-red-500 transition" data-id="${t.id}">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+                <div class="flex items-center justify-between mb-2 pr-6">
                   <h3 class="font-bold text-gray-800">${Results.escapeHtml(t.name)}</h3>
                   <div class="flex items-center gap-2">
                     ${gameLabel ? `<span class="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700">${gameLabel}</span>` : ''}
@@ -783,8 +946,21 @@ const App = {
         </div>
       </div>`;
 
+    // 삭제 버튼
+    container.querySelectorAll('.delete-tournament-btn').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const name = Storage.getTournamentById(btn.dataset.id)?.name || '';
+        if (!confirm(`"${name}" 대회를 삭제하시겠습니까?`)) return;
+        Storage.deleteTournament(btn.dataset.id);
+        this.renderTournamentList(container, statusFilter);
+      };
+    });
+
+    // 카드 클릭 → 상세 보기
     container.querySelectorAll('.tournament-card').forEach(card => {
-      card.onclick = () => {
+      card.onclick = (e) => {
+        if (e.target.closest('.delete-tournament-btn')) return;
         const t = Storage.getTournamentById(card.dataset.id);
         if (t) this.renderTournamentDetail(container, t);
       };
@@ -811,19 +987,7 @@ const App = {
     wrapper.appendChild(detailContainer);
     container.innerHTML = '';
     container.appendChild(wrapper);
-
-    const actionBar = document.createElement('div');
-    actionBar.className = 'flex justify-end mb-2';
-    actionBar.innerHTML = `<button id="delete-tournament-btn" class="text-sm text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg px-3 py-1 transition">삭제</button>`;
-    detailContainer.appendChild(actionBar);
-
-    actionBar.querySelector('#delete-tournament-btn').onclick = () => {
-      if (!confirm('이 대회를 삭제하시겠습니까?')) return;
-      Storage.deleteTournament(tournament.id);
-      this.currentTournamentId = null;
-      this.navigate(tournament.status === 'completed' ? 'history' : 'active');
-    };
-
+    
     const viewContainer = document.createElement('div');
     detailContainer.appendChild(viewContainer);
 

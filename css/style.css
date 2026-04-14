@@ -463,3 +463,95 @@ html.dark #preview-info {
   background-color: #1e293b !important;
   color: #94a3b8 !important;
 }
+
+/* 서브탭 */
+html.dark .sub-tab {
+  background-color: #334155;
+  color: #94a3b8;
+}
+html.dark .sub-tab:hover {
+  background-color: #475569;
+}
+html.dark .sub-tab.bg-green-600,
+html.dark .sub-tab[class*="bg-green-600"] {
+  background-color: #16a34a !important;
+  color: white !important;
+}
+
+/* 커스텀 대진표 선수 선택 모달 */
+html.dark .cb-player-picker > div {
+  background-color: #1e293b !important;
+  color: #e2e8f0;
+}
+html.dark .cb-player-picker .cb-pick-option:hover:not(.opacity-40) {
+  background-color: #334155 !important;
+}
+html.dark .cb-player-picker input[type="text"] {
+  background-color: #334155 !important;
+  border-color: #475569 !important;
+  color: #e2e8f0 !important;
+}
+html.dark .cb-player-picker .cb-picker-cancel {
+  background-color: #334155 !important;
+  color: #94a3b8 !important;
+}
+
+/* 대진 추가 모달 */
+html.dark .add-match-modal > div {
+  background-color: #1e293b !important;
+  color: #e2e8f0;
+}
+html.dark .add-match-modal select,
+html.dark .add-match-modal input[type="text"] {
+  background-color: #334155 !important;
+  border-color: #475569 !important;
+  color: #e2e8f0 !important;
+}
+html.dark .add-match-modal .am-player-slot {
+  border-color: #475569 !important;
+}
+html.dark .add-match-modal .am-player-slot:hover {
+  background-color: #334155 !important;
+}
+html.dark .add-match-modal .am-cancel {
+  background-color: #334155 !important;
+  color: #94a3b8 !important;
+}
+html.dark .add-match-modal label div {
+  border-color: #475569;
+}
+
+/* 대진 추가 선수 피커 */
+html.dark .am-player-picker > div {
+  background-color: #1e293b !important;
+  color: #e2e8f0;
+}
+html.dark .am-player-picker .amp-option:hover:not(.opacity-40) {
+  background-color: #334155 !important;
+}
+html.dark .am-player-picker input[type="text"] {
+  background-color: #334155 !important;
+  border-color: #475569 !important;
+  color: #e2e8f0 !important;
+}
+html.dark .am-player-picker .amp-cancel {
+  background-color: #334155 !important;
+  color: #94a3b8 !important;
+}
+
+/* 경기 종류 변경 모달 */
+html.dark .change-gametype-modal > div {
+  background-color: #1e293b !important;
+  color: #e2e8f0;
+}
+html.dark .change-gametype-modal .cgt-option {
+  border-color: #475569 !important;
+  color: #e2e8f0;
+}
+html.dark .change-gametype-modal .cgt-option:hover {
+  border-color: #64748b !important;
+}
+html.dark .change-gametype-modal .cgt-cancel {
+  background-color: #334155 !important;
+  color: #94a3b8 !important;
+}

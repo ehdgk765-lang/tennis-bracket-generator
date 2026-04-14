@@ -53,7 +53,6 @@ const Auth = {
         <div class="text-center mb-8">
           <div class="text-5xl mb-3">🎾</div>
           <h1 class="text-2xl font-bold text-gray-800">Happy Tennis Life</h1>
-          <p class="text-sm text-gray-500 mt-1">로그인하여 시작하세요</p>
         </div>
         <form id="auth-form" class="space-y-4">
           <div>
