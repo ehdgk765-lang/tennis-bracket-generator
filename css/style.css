@@ -32,7 +32,8 @@ header {
 .tab-active {
   color: #16a34a !important;
   border-bottom-color: #16a34a !important;
-  font-weight: 600;
+  font-weight: 700;
+  background: linear-gradient(to top, rgba(22, 163, 74, 0.06), transparent);
 }
 
 [data-tab] {
@@ -243,31 +244,49 @@ html.dark {
 }
 
 html.dark body {
-  background-color: #0f172a !important;
+  background: linear-gradient(to bottom right, #0f172a, #1e293b, #0f172a) !important;
   color: #e2e8f0 !important;
 }
 
 /* 헤더 */
 html.dark header {
-  background-color: #1e293b !important;
-  border-color: #334155 !important;
+  background-color: rgba(15, 23, 42, 0.85) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-color: rgba(51, 65, 85, 0.5) !important;
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.3) !important;
+}
+html.dark header h1 {
+  background-image: linear-gradient(to right, #4ade80, #34d399) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  color: transparent !important;
 }
 
 /* 탭 */
 html.dark .tab-active {
   color: #4ade80 !important;
   border-bottom-color: #4ade80 !important;
+  background: linear-gradient(to top, rgba(74, 222, 128, 0.08), transparent) !important;
 }
 html.dark [data-tab] {
-  color: #94a3b8;
+  color: #64748b;
 }
 html.dark [data-tab]:hover {
-  color: #cbd5e1;
+  color: #94a3b8;
 }
 
 /* 배경 오버라이드 */
 html.dark .bg-white {
   background-color: #1e293b !important;
+}
+html.dark .bg-white\/80 {
+  background-color: rgba(30, 41, 59, 0.85) !important;
+  border-color: rgba(51, 65, 85, 0.5) !important;
+}
+html.dark .bg-white\/95 {
+  background-color: rgba(30, 41, 59, 0.95) !important;
+  border-color: rgba(51, 65, 85, 0.5) !important;
 }
 html.dark .bg-gray-50 {
   background-color: #0f172a !important;
@@ -277,6 +296,26 @@ html.dark .bg-gray-100 {
 }
 html.dark .bg-gray-50\/50 {
   background-color: rgba(30, 41, 59, 0.5) !important;
+}
+
+/* 글래스 카드 다크 모드 */
+html.dark .tournament-card {
+  background-color: rgba(30, 41, 59, 0.85) !important;
+  border-color: rgba(51, 65, 85, 0.5) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+}
+html.dark .tournament-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+  border-color: rgba(74, 222, 128, 0.3) !important;
+}
+html.dark .shadow-green-50\/30 {
+  --tw-shadow-color: transparent !important;
+}
+html.dark .shadow-green-200\/50 {
+  --tw-shadow-color: rgba(22, 163, 74, 0.15) !important;
+}
+html.dark .border-white\/60 {
+  border-color: rgba(51, 65, 85, 0.5) !important;
 }
 
 /* 텍스트 오버라이드 */
@@ -405,7 +444,8 @@ html.dark .peer:checked ~ .peer-checked\:bg-green-50 {
 
 /* 스코어 모달 */
 html.dark #score-modal > div {
-  background-color: #1e293b !important;
+  background-color: rgba(30, 41, 59, 0.97) !important;
+  border-color: rgba(51, 65, 85, 0.5) !important;
 }
 html.dark #score-modal h3 {
   color: #e2e8f0;
@@ -623,4 +663,59 @@ html.dark .change-gametype-modal .cgt-option:hover {
 html.dark .change-gametype-modal .cgt-cancel {
   background-color: #334155 !important;
   color: #94a3b8 !important;
+}
+
+/* 로고 배경 (흰 배경 이미지 blend용) */
+.auth-logo-bg,
+.header-logo-bg {
+  background: transparent;
+}
+html.dark .auth-logo-bg {
+  background: radial-gradient(circle, rgba(236, 253, 245, 0.9) 30%, transparent 70%);
+}
+html.dark .header-logo-bg {
+  background: radial-gradient(circle, rgba(236, 253, 245, 0.85) 25%, transparent 70%);
+}
+
+/* 로그인 페이지 다크 모드 */
+html.dark #auth-container {
+  background: linear-gradient(to bottom right, #0f172a, #1e293b, #0f172a) !important;
+}
+html.dark #auth-container h1 {
+  background-image: linear-gradient(to right, #4ade80, #34d399) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+}
+html.dark #auth-container p.text-gray-400,
+html.dark #auth-container .text-gray-400 {
+  color: #64748b !important;
+}
+html.dark #auth-container .bg-white\/80 {
+  background-color: rgba(30, 41, 59, 0.8) !important;
+  border-color: rgba(71, 85, 105, 0.4) !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3) !important;
+}
+html.dark #auth-container input {
+  background-color: #0f172a !important;
+  border-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+html.dark #auth-container input:focus {
+  background-color: #1e293b !important;
+}
+html.dark #auth-container label {
+  color: #94a3b8 !important;
+}
+html.dark #auth-container .shadow-green-200 {
+  --tw-shadow-color: rgba(22, 163, 74, 0.15) !important;
+}
+html.dark #auth-container .shadow-green-100\/50 {
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3) !important;
+}
+html.dark #auth-theme-toggle {
+  background-color: rgba(51, 65, 85, 0.5) !important;
+  border-color: rgba(71, 85, 105, 0.5) !important;
+}
+html.dark #auth-theme-toggle:hover {
+  background-color: rgba(71, 85, 105, 0.6) !important;
 }

@@ -11,7 +11,7 @@ const Players = {
       <div class="max-w-lg mx-auto">
         <h2 class="text-2xl font-bold text-gray-800 mb-6">선수 관리</h2>
 
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100">
+        <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm shadow-green-50/30 border border-white/60">
           <!-- 선수 추가 입력 -->
           <div class="px-4 py-3 border-b border-gray-100">
             <div class="flex gap-2 overflow-hidden">
@@ -28,7 +28,7 @@ const Players = {
                 ${NTRP_VALUES.map(v => `<option value="${v}" ${v === 2.5 ? 'selected' : ''}>${v.toFixed(1)}</option>`).join('')}
               </select>
               <button id="add-player-btn"
-                class="px-4 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 active:bg-green-800 transition font-medium whitespace-nowrap flex-shrink-0">
+                class="px-4 py-2.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl hover:from-green-600 hover:to-emerald-700 active:scale-[0.98] transition-all font-medium whitespace-nowrap flex-shrink-0 shadow-sm shadow-green-200/50">
                 추가
               </button>
             </div>

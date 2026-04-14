@@ -7,6 +7,7 @@ const Results = {
 
     const setCount = tournament.setCount || 3;
     const setsToWin = Math.ceil(setCount / 2);
+    const allowDraw = !!tournament.allowDraw;
 
     const modal = document.createElement('div');
     modal.id = 'score-modal';
@@ -18,8 +19,8 @@ const Results = {
     const t2Html = this.formatTeamHtml(player2Name);
 
     // 팀 이름 축약 (첫 번째 선수 성만 표시)
-    const t1Short = player1Name.split(' / ')[0].slice(0, 3);
-    const t2Short = player2Name.split(' / ')[0].slice(0, 3);
+    const t1Short = player1Name.split(' / ')[0].slice(0, 3) + 'Team';
+    const t2Short = player2Name.split(' / ')[0].slice(0, 3) + 'Team';
 
     let setsHTML = `
       <div class="flex items-center gap-2 justify-center mb-1">
@@ -43,7 +44,7 @@ const Results = {
     }
 
     modal.innerHTML = `
-      <div class="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl max-w-sm w-full p-5 sm:p-6 max-h-[90vh] overflow-y-auto">
+      <div class="bg-white/95 backdrop-blur-md rounded-t-2xl sm:rounded-2xl shadow-2xl shadow-green-100/30 max-w-sm w-full p-5 sm:p-6 max-h-[90vh] overflow-y-auto">
         <div class="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-3 sm:hidden"></div>
         <h3 class="text-lg font-bold text-center mb-4">스코어 입력</h3>
         <div class="space-y-1.5 mb-4">
@@ -89,7 +90,7 @@ const Results = {
         return;
       }
 
-      const result = this.determineWinner(scores, setsToWin);
+      const result = this.determineWinner(scores, setsToWin, allowDraw);
       if (!result.valid) {
         const err = modal.querySelector('#score-error');
         err.textContent = result.error;
@@ -99,7 +100,7 @@ const Results = {
 
       onSave({
         scores: scores,
-        winner: result.winner === 0 ? match.player1 : match.player2,
+        winner: result.winner === -1 ? 'draw' : (result.winner === 0 ? match.player1 : match.player2),
         winnerIndex: result.winner,
         setsWon: result.setsWon,
       });
@@ -115,7 +116,7 @@ const Results = {
   },
 
   // 승자 판정
-  determineWinner(scores, setsToWin) {
+  determineWinner(scores, setsToWin, allowDraw) {
     let p1Sets = 0;
     let p2Sets = 0;
 
@@ -124,10 +125,20 @@ const Results = {
         return { valid: false, error: '스코어는 0 이상이어야 합니다.' };
       }
       if (s1 === s2) {
-        return { valid: false, error: '같은 스코어는 입력할 수 없습니다.' };
+        if (!allowDraw) {
+          return { valid: false, error: '같은 스코어는 입력할 수 없습니다.' };
+        }
+        // 무승부 세트 - 어느 쪽도 세트 승 안 줌
+      } else if (s1 > s2) {
+        p1Sets++;
+      } else {
+        p2Sets++;
       }
-      if (s1 > s2) p1Sets++;
-      else p2Sets++;
+    }
+
+    // 무승부 허용 모드: 동점이면 무승부
+    if (allowDraw && p1Sets === p2Sets) {
+      return { valid: true, winner: -1, setsWon: [p1Sets, p2Sets] };
     }
 
     if (p1Sets < setsToWin && p2Sets < setsToWin) {

@@ -259,33 +259,47 @@ const Schedule = {
   calcPlayerStats(tournament) {
     const stats = {};
     const allPlayers = [...(tournament.males || []), ...(tournament.females || [])];
-    allPlayers.forEach(p => { stats[p] = { name: p, games: 0, wins: 0, losses: 0 }; });
+    allPlayers.forEach(p => { stats[p] = { name: p, games: 0, wins: 0, losses: 0, draws: 0, matchPoints: 0, scorePoints: 0 }; });
 
     for (const slot of tournament.timeSlots) {
       for (const m of slot.matches) {
         const t1 = m.player1.split(' / ');
         const t2 = m.player2.split(' / ');
         [...t1, ...t2].forEach(p => {
-          if (!stats[p]) stats[p] = { name: p, games: 0, wins: 0, losses: 0 };
+          if (!stats[p]) stats[p] = { name: p, games: 0, wins: 0, losses: 0, draws: 0, matchPoints: 0, scorePoints: 0 };
           stats[p].games++;
         });
-        if (m.winner) {
+        if (m.winner === 'draw') {
+          [...t1, ...t2].forEach(p => { if (stats[p]) stats[p].draws++; });
+        } else if (m.winner) {
           const winners = m.winner.split(' / ');
           const losers = m.winner === m.player1 ? t2 : t1;
           winners.forEach(p => { if (stats[p]) stats[p].wins++; });
           losers.forEach(p => { if (stats[p]) stats[p].losses++; });
         }
+        // 포인트: 각 세트 스코어 합산 (득점)
+        if (m.scores && m.scores.length > 0) {
+          let t1Pts = 0, t2Pts = 0;
+          m.scores.forEach(([s1, s2]) => { t1Pts += s1; t2Pts += s2; });
+          t1.forEach(p => { if (stats[p]) stats[p].scorePoints += t1Pts; });
+          t2.forEach(p => { if (stats[p]) stats[p].scorePoints += t2Pts; });
+        }
       }
     }
 
-    return Object.values(stats).sort((a, b) => b.wins - a.wins || a.losses - b.losses || b.games - a.games);
+    // 승점 계산: 승=3, 무=1, 패=0
+    Object.values(stats).forEach(s => {
+      s.matchPoints = s.wins * 3 + s.draws * 1;
+    });
+
+    return Object.values(stats).sort((a, b) => b.matchPoints - a.matchPoints || b.scorePoints - a.scorePoints || b.wins - a.wins || b.games - a.games);
   },
 
   // 대진표 렌더링
   render(container, tournament) {
     const allMatches = this.getAllMatches(tournament);
     const totalMatches = allMatches.length;
-    const completedMatches = allMatches.filter(m => m.winner).length;
+    const completedMatches = allMatches.filter(m => m.winner || m.scores).length;
     const playerStats = this.calcPlayerStats(tournament);
     const isComplete = totalMatches > 0 && totalMatches === completedMatches;
 
@@ -321,7 +335,7 @@ const Schedule = {
             ${tournament.startTime} ~ ${tournament.endTime} · 코트 ${maxCourts}면 · ${playerInfo}
           </p>
           <div class="flex items-center gap-2 mt-3">
-            <button id="add-match-btn" class="text-sm px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 transition font-medium flex items-center gap-1">
+            <button id="add-match-btn" class="text-sm px-3 py-1.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 active:scale-[0.98] transition-all font-medium flex items-center gap-1 shadow-sm shadow-green-200/50">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
               대진 추가
             </button>
@@ -350,7 +364,7 @@ const Schedule = {
         </div>
 
         <!-- 선수별 통계 -->
-        <div id="stats-section" class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div id="stats-section" class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm shadow-green-50/30 border border-white/60 overflow-hidden">
           <div class="px-4 py-3 bg-gray-50/50 border-b border-gray-100">
             <span class="font-semibold text-gray-700 text-sm">선수별 통계</span>
           </div>
@@ -360,13 +374,14 @@ const Schedule = {
                 <th class="text-left px-4 py-2">선수</th>
                 <th class="text-center px-2 py-2">경기</th>
                 <th class="text-center px-2 py-2">승</th>
+                <th class="text-center px-2 py-2">무</th>
                 <th class="text-center px-2 py-2">패</th>
-                <th class="text-center px-2 py-2">승률</th>
+                <th class="text-center px-2 py-2">승점</th>
+                <th class="text-center px-2 py-2">포인트</th>
               </tr>
             </thead>
             <tbody>
               ${(() => { const allPlayersData = Storage.getPlayers(); return playerStats.map(s => {
-                const winRate = s.games > 0 ? Math.round((s.wins / s.games) * 100) : 0;
                 const pd = allPlayersData.find(pl => pl.name === s.name);
                 const gender = pd?.gender;
                 const ntrp = pd?.ntrp || 2.5;
@@ -379,8 +394,10 @@ const Schedule = {
                     </td>
                     <td class="text-center px-2 py-2 text-gray-600">${s.games}</td>
                     <td class="text-center px-2 py-2 text-green-600 font-medium">${s.wins}</td>
+                    <td class="text-center px-2 py-2 text-gray-500">${s.draws}</td>
                     <td class="text-center px-2 py-2 text-red-500">${s.losses}</td>
-                    <td class="text-center px-2 py-2 text-gray-600">${s.games > 0 ? winRate + '%' : '-'}</td>
+                    <td class="text-center px-2 py-2 text-orange-600 font-bold">${s.matchPoints}</td>
+                    <td class="text-center px-2 py-2 text-purple-600 font-medium">${s.scorePoints}</td>
                   </tr>`;
               }).join(''); })()}
             </tbody>
@@ -503,11 +520,11 @@ const Schedule = {
         }
         const match = allMatches.find(m => m.id === card.dataset.matchId);
         if (!match) return;
-        Results.showScoreModal(match, { setCount: 1 }, (result) => {
+        Results.showScoreModal(match, { setCount: 1, allowDraw: true }, (result) => {
           match.scores = result.scores;
           match.winner = result.winner;
           Storage.updateTournament(tournament);
-          const allDone = this.getAllMatches(tournament).every(m => m.winner);
+          const allDone = this.getAllMatches(tournament).every(m => m.winner || m.winner === 'draw');
           if (allDone) {
             tournament.status = 'completed';
             tournament.completedAt = new Date().toISOString();
@@ -587,8 +604,8 @@ const Schedule = {
 
       // PDF에서 숨길 요소 (기록 탭에서는 통계 포함)
       const hideSelector = tournament.status === 'completed'
-        ? '#pdf-download-btn, .schedule-match-card p'
-        : '#pdf-download-btn, .schedule-match-card p, #stats-section';
+        ? '#pdf-download-btn, #add-match-btn, .schedule-match-card p, .delete-match-btn'
+        : '#pdf-download-btn, #add-match-btn, .schedule-match-card p, .delete-match-btn, #stats-section';
       const hideEls = container.querySelectorAll(hideSelector);
       hideEls.forEach(el => el.style.display = 'none');
 
@@ -717,16 +734,25 @@ const Schedule = {
   // 매치 카드 HTML
   renderMatchCard(match, slotIdx, matchIdx) {
     const cfg = SCHEDULE_GAME_TYPES[match.gameType];
-    const hasScore = !!match.winner;
+    const hasResult = !!match.winner || !!match.scores;
+    const isDraw = match.winner === 'draw';
     const t1Names = match.player1.split(' / ');
     const t2Names = match.player2.split(' / ');
     const t1Html = t1Names.map((n, p) => this.renderSwapPlayer(n, slotIdx, matchIdx, 1, p)).join(' <span class="text-gray-300">/</span> ');
     const t2Html = t2Names.map((n, p) => this.renderSwapPlayer(n, slotIdx, matchIdx, 2, p)).join(' <span class="text-gray-300">/</span> ');
-    const isWin1 = match.winner === match.player1;
-    const isWin2 = match.winner === match.player2;
+    const isWin1 = !isDraw && match.winner === match.player1;
+    const isWin2 = !isDraw && match.winner === match.player2;
+
+    const borderColor = isDraw ? 'border-yellow-200' : (hasResult ? 'border-green-200' : 'border-gray-200');
+    const t1Bg = isDraw ? 'bg-yellow-50' : (isWin1 ? 'bg-green-50' : 'bg-gray-50');
+    const t2Bg = isDraw ? 'bg-yellow-50' : (isWin2 ? 'bg-green-50' : 'bg-gray-50');
+    const t1TextClass = isDraw ? 'text-yellow-700' : (isWin1 ? 'text-green-700' : 'text-gray-800');
+    const t2TextClass = isDraw ? 'text-yellow-700' : (isWin2 ? 'text-green-700' : 'text-gray-800');
+    const s1Class = isDraw ? 'text-yellow-600' : (isWin1 ? 'text-green-600' : 'text-gray-500');
+    const s2Class = isDraw ? 'text-yellow-600' : (isWin2 ? 'text-green-600' : 'text-gray-500');
 
     return `
-      <div class="schedule-match-card relative bg-white border ${hasScore ? 'border-green-200' : 'border-gray-200'} rounded-xl p-3 cursor-pointer hover:shadow-md transition"
+      <div class="schedule-match-card relative bg-white border ${borderColor} rounded-xl p-3 cursor-pointer hover:shadow-md transition"
            draggable="true" data-match-id="${match.id}" data-slot-idx="${slotIdx}" data-match-idx="${matchIdx}">
         <button type="button" class="delete-match-btn absolute top-1.5 right-1.5 w-6 h-6 flex items-center justify-center rounded-full text-gray-300 hover:bg-red-50 hover:text-red-500 transition" data-slot-idx="${slotIdx}" data-match-idx="${matchIdx}">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -736,21 +762,21 @@ const Schedule = {
           <span class="text-xs text-gray-400">코트 ${match.court}</span>
         </div>
         <div class="space-y-0.5">
-          <div class="flex items-center justify-between ${isWin1 ? 'bg-green-50' : 'bg-gray-50'} rounded-lg px-2 py-2.5">
-            <span class="text-xs sm:text-sm font-medium ${isWin1 ? 'text-green-700' : 'text-gray-800'} flex-1" style="min-width:0">
-              ${isWin1 ? '🏆 ' : ''}${t1Html}
+          <div class="flex items-center justify-between ${t1Bg} rounded-lg px-2 py-2.5">
+            <span class="text-xs sm:text-sm font-medium ${t1TextClass} flex-1" style="min-width:0">
+              ${isWin1 ? '🏆 ' : ''}${isDraw ? '🤝 ' : ''}${t1Html}
             </span>
-            ${hasScore ? `<span class="text-xs font-bold ${isWin1 ? 'text-green-600' : 'text-gray-500'} ml-1 flex-shrink-0">${match.scores[0][0]}</span>` : ''}
+            ${hasResult && match.scores ? `<span class="text-xs font-bold ${s1Class} ml-1 flex-shrink-0">${match.scores[0][0]}</span>` : ''}
           </div>
           <div class="text-center text-xs text-gray-300 leading-tight">vs</div>
-          <div class="flex items-center justify-between ${isWin2 ? 'bg-green-50' : 'bg-gray-50'} rounded-lg px-2 py-2.5">
-            <span class="text-xs sm:text-sm font-medium ${isWin2 ? 'text-green-700' : 'text-gray-800'} flex-1" style="min-width:0">
-              ${isWin2 ? '🏆 ' : ''}${t2Html}
+          <div class="flex items-center justify-between ${t2Bg} rounded-lg px-2 py-2.5">
+            <span class="text-xs sm:text-sm font-medium ${t2TextClass} flex-1" style="min-width:0">
+              ${isWin2 ? '🏆 ' : ''}${isDraw ? '🤝 ' : ''}${t2Html}
             </span>
-            ${hasScore ? `<span class="text-xs font-bold ${isWin2 ? 'text-green-600' : 'text-gray-500'} ml-1 flex-shrink-0">${match.scores[0][1]}</span>` : ''}
+            ${hasResult && match.scores ? `<span class="text-xs font-bold ${s2Class} ml-1 flex-shrink-0">${match.scores[0][1]}</span>` : ''}
           </div>
         </div>
-        ${!hasScore ? '<p class="text-xs text-gray-400 text-center mt-1.5">탭하여 스코어 입력</p>' : ''}
+        ${!hasResult ? '<p class="text-xs text-gray-400 text-center mt-1.5">탭하여 스코어 입력</p>' : ''}
       </div>`;
   },
 

@@ -16,6 +16,7 @@
     })();
   </script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' }</script>
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -26,25 +27,28 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/3.0.3/jspdf.umd.min.js"></script>
   <link rel="stylesheet" href="css/style.css">
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-gradient-to-br from-green-50 via-emerald-50/30 to-gray-50 min-h-screen">
 
   <!-- 로그인 페이지 -->
-  <div id="auth-container" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-50">
+  <div id="auth-container" class="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
     <div class="text-center text-gray-400">로딩 중...</div>
   </div>
 
   <!-- 앱 -->
   <div id="app-container" style="display:none">
     <!-- 헤더 -->
-    <header class="bg-white border-b border-gray-200 sticky top-0 z-40">
+    <header class="bg-white/80 backdrop-blur-md border-b border-green-100/60 sticky top-0 z-40 shadow-sm shadow-green-100/30">
       <div class="max-w-4xl mx-auto px-4">
         <div class="flex items-center justify-between py-3">
-          <button id="logout-btn" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition" title="로그아웃" aria-label="로그아웃">
+          <button id="logout-btn" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-green-50 transition" title="로그아웃" aria-label="로그아웃">
             <svg class="w-[18px] h-[18px] text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
             </svg>
           </button>
-          <h1 class="text-lg font-bold text-green-700">🎾Tennis🎾</h1>
+          <h1 class="text-lg font-extrabold bg-gradient-to-r from-green-600 to-emerald-500 bg-clip-text text-transparent flex items-center gap-1.5">
+            <span class="header-logo-bg inline-flex items-center justify-center w-7 h-7 rounded-lg flex-shrink-0"><img src="css/tennis-smile-2.png" alt="" class="w-6 h-6 mix-blend-multiply"></span>
+            <span>Happy Tennis Life</span>
+          </h1>
           <button id="theme-toggle" title="테마 전환" aria-label="테마 전환">
             <svg id="icon-sun" class="text-gray-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
@@ -55,25 +59,25 @@
           </button>
         </div>
         <!-- 탭 네비게이션 -->
-        <nav class="flex -mb-px">
+        <nav class="flex -mb-px gap-0.5">
           <button data-tab="players"
-            class="flex-1 min-w-0 px-1 sm:px-3 py-3 text-xs sm:text-sm font-medium text-center border-b-2 border-transparent transition whitespace-nowrap text-gray-500 hover:text-gray-700 active:bg-gray-50">
+            class="flex-1 min-w-0 px-1 sm:px-3 py-2.5 text-xs sm:text-sm font-semibold text-center border-b-2 border-transparent transition whitespace-nowrap text-gray-400 hover:text-green-600 active:bg-green-50/50 rounded-t-lg">
             선수 관리
           </button>
           <button data-tab="create"
-            class="flex-1 min-w-0 px-1 sm:px-3 py-3 text-xs sm:text-sm font-medium text-center border-b-2 border-transparent transition whitespace-nowrap text-gray-500 hover:text-gray-700 active:bg-gray-50">
+            class="flex-1 min-w-0 px-1 sm:px-3 py-2.5 text-xs sm:text-sm font-semibold text-center border-b-2 border-transparent transition whitespace-nowrap text-gray-400 hover:text-green-600 active:bg-green-50/50 rounded-t-lg">
             대회 만들기
           </button>
           <button data-tab="schedule"
-            class="flex-1 min-w-0 px-1 sm:px-3 py-3 text-xs sm:text-sm font-medium text-center border-b-2 border-transparent transition whitespace-nowrap text-gray-500 hover:text-gray-700 active:bg-gray-50">
+            class="flex-1 min-w-0 px-1 sm:px-3 py-2.5 text-xs sm:text-sm font-semibold text-center border-b-2 border-transparent transition whitespace-nowrap text-gray-400 hover:text-green-600 active:bg-green-50/50 rounded-t-lg">
             대진표 만들기
           </button>
           <button data-tab="active"
-            class="flex-1 min-w-0 px-1 sm:px-3 py-3 text-xs sm:text-sm font-medium text-center border-b-2 border-transparent transition whitespace-nowrap text-gray-500 hover:text-gray-700 active:bg-gray-50">
+            class="flex-1 min-w-0 px-1 sm:px-3 py-2.5 text-xs sm:text-sm font-semibold text-center border-b-2 border-transparent transition whitespace-nowrap text-gray-400 hover:text-green-600 active:bg-green-50/50 rounded-t-lg">
             진행 중
           </button>
           <button data-tab="history"
-            class="flex-1 min-w-0 px-1 sm:px-3 py-3 text-xs sm:text-sm font-medium text-center border-b-2 border-transparent transition whitespace-nowrap text-gray-500 hover:text-gray-700 active:bg-gray-50">
+            class="flex-1 min-w-0 px-1 sm:px-3 py-2.5 text-xs sm:text-sm font-semibold text-center border-b-2 border-transparent transition whitespace-nowrap text-gray-400 hover:text-green-600 active:bg-green-50/50 rounded-t-lg">
             기록
           </button>
         </nav>

@@ -179,7 +179,7 @@ const App = {
         <div id="participants-section"></div>
 
         <button type="submit"
-          class="w-full py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition font-semibold text-lg">
+          class="w-full py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl hover:from-green-600 hover:to-emerald-700 active:scale-[0.98] transition-all font-semibold text-lg shadow-md shadow-green-200/50">
           대회 생성
         </button>
       </form>`;
@@ -270,7 +270,7 @@ const App = {
           <span id="selected-count" class="text-sm text-gray-500">0명 선택</span>
           <button type="button" id="select-all-btn" class="text-sm text-green-600 font-medium hover:underline">전체 선택</button>
         </div>
-        <div id="player-checkbox-list" class="bg-white border border-gray-200 rounded-xl max-h-48 overflow-y-auto divide-y divide-gray-50">
+        <div id="player-checkbox-list" class="bg-white/80 backdrop-blur-sm border border-white/60 rounded-xl max-h-48 overflow-y-auto divide-y divide-gray-50">
           ${eligible.map(p => `
             <label class="player-item flex items-center px-4 py-2.5 hover:bg-gray-50 cursor-pointer transition" data-name="${Results.escapeHtml(p.name.toLowerCase())}">
               <input type="checkbox" name="players" value="${Results.escapeHtml(p.name)}" class="player-checkbox w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500">
@@ -340,7 +340,7 @@ const App = {
           <span class="text-sm text-gray-500">${players.length}명 중 선택</span>
           <button type="button" id="${prefix}-all-btn" class="text-sm text-green-600 font-medium hover:underline">전체 선택</button>
         </div>
-        <div class="bg-white border border-gray-200 rounded-xl max-h-40 overflow-y-auto divide-y divide-gray-50">
+        <div class="bg-white/80 backdrop-blur-sm border border-white/60 rounded-xl max-h-40 overflow-y-auto divide-y divide-gray-50">
           ${players.map(p => `
             <label class="${prefix}-item player-item flex items-center px-4 py-2.5 hover:bg-gray-50 cursor-pointer transition" data-name="${Results.escapeHtml(p.name.toLowerCase())}">
               <input type="checkbox" name="${prefix}" value="${Results.escapeHtml(p.name)}" class="${prefix}-cb w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500">
@@ -528,7 +528,7 @@ const App = {
         </div>
 
         <button type="submit"
-          class="w-full py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition font-semibold text-lg">
+          class="w-full py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl hover:from-green-600 hover:to-emerald-700 active:scale-[0.98] transition-all font-semibold text-lg shadow-md shadow-green-200/50">
           빈 대진표 생성
         </button>
       </form>`;
@@ -655,7 +655,7 @@ const App = {
             <span class="text-sm text-gray-500">${males.length}명 중 선택</span>
             <button type="button" id="sch-male-all-btn" class="text-sm text-green-600 font-medium hover:underline">전체 선택</button>
           </div>
-          <div class="bg-white border border-gray-200 rounded-xl max-h-40 overflow-y-auto divide-y divide-gray-50">
+          <div class="bg-white/80 backdrop-blur-sm border border-white/60 rounded-xl max-h-40 overflow-y-auto divide-y divide-gray-50">
             ${males.map(p => `
               <label class="sch-male-item flex items-center px-4 py-2.5 hover:bg-gray-50 cursor-pointer transition" data-name="${Results.escapeHtml(p.name.toLowerCase())}">
                 <input type="checkbox" name="males" value="${Results.escapeHtml(p.name)}" class="male-cb w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500">
@@ -679,7 +679,7 @@ const App = {
             <span class="text-sm text-gray-500">${females.length}명 중 선택</span>
             <button type="button" id="sch-female-all-btn" class="text-sm text-green-600 font-medium hover:underline">전체 선택</button>
           </div>
-          <div class="bg-white border border-gray-200 rounded-xl max-h-40 overflow-y-auto divide-y divide-gray-50">
+          <div class="bg-white/80 backdrop-blur-sm border border-white/60 rounded-xl max-h-40 overflow-y-auto divide-y divide-gray-50">
             ${females.map(p => `
               <label class="sch-female-item flex items-center px-4 py-2.5 hover:bg-gray-50 cursor-pointer transition" data-name="${Results.escapeHtml(p.name.toLowerCase())}">
                 <input type="checkbox" name="females" value="${Results.escapeHtml(p.name)}" class="female-cb w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500">
@@ -696,7 +696,7 @@ const App = {
         </div>
 
         <button type="submit"
-          class="w-full py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition font-semibold text-lg">
+          class="w-full py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl hover:from-green-600 hover:to-emerald-700 active:scale-[0.98] transition-all font-semibold text-lg shadow-md shadow-green-200/50">
           대진표 생성
         </button>
       </form>`;
@@ -882,16 +882,18 @@ const App = {
     if (tournaments.length === 0) {
       container.innerHTML = `
         <div class="max-w-lg mx-auto text-center py-12">
-          <div class="text-5xl mb-4">${isActive ? '🎾' : '📋'}</div>
-          <h2 class="text-xl font-bold text-gray-800 mb-2">${isActive ? '진행 중인 대회가 없습니다' : '완료된 대회가 없습니다'}</h2>
-          <p class="text-gray-500 mb-4">${isActive ? '새 대회를 만들어보세요!' : '대회를 완료하면 여기에 표시됩니다.'}</p>
+          <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm shadow-green-50/30 border border-white/60 p-8">
+            <div class="text-5xl mb-4">${isActive ? '🎾' : '📋'}</div>
+            <h2 class="text-xl font-bold text-gray-800 mb-2">${isActive ? '진행 중인 대회가 없습니다' : '완료된 대회가 없습니다'}</h2>
+            <p class="text-gray-500 mb-4">${isActive ? '새 대회를 만들어보세요!' : '대회를 완료하면 여기에 표시됩니다.'}</p>
+          </div>
         </div>`;
       return;
     }
 
     container.innerHTML = `
       <div class="max-w-lg mx-auto">
-        <h2 class="text-2xl font-bold text-gray-800 mb-6">${isActive ? '진행 중' : '대회 기록'}</h2>
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">${isActive ? '진행 중' : '결과'}</h2>
         <div class="space-y-3">
           ${tournaments.map(t => {
             const dateStr = new Date(t.createdAt).toLocaleDateString('ko-KR');
@@ -900,7 +902,7 @@ const App = {
               const allMatches = Schedule.getAllMatches(t);
               const completed = allMatches.filter(m => m.winner).length;
               return `
-                <div class="tournament-card relative bg-white border border-gray-200 rounded-2xl p-4 cursor-pointer hover:shadow-md hover:border-green-300 transition"
+                <div class="tournament-card relative bg-white/80 backdrop-blur-sm border border-white/60 rounded-2xl p-4 cursor-pointer hover:shadow-lg hover:shadow-green-100/50 hover:border-green-200 transition-all shadow-sm shadow-green-50/30"
                      data-id="${t.id}">
                   <button type="button" class="delete-tournament-btn absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-full text-gray-300 hover:bg-red-50 hover:text-red-500 transition" data-id="${t.id}">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -921,7 +923,7 @@ const App = {
             const isDoubles = t.gameType ? GAME_TYPES[t.gameType]?.doubles : false;
             const countLabel = isDoubles ? `${t.players.length}팀` : `${t.players.length}명`;
             return `
-              <div class="tournament-card relative bg-white border border-gray-200 rounded-2xl p-4 cursor-pointer hover:shadow-md hover:border-green-300 transition"
+              <div class="tournament-card relative bg-white/80 backdrop-blur-sm border border-white/60 rounded-2xl p-4 cursor-pointer hover:shadow-lg hover:shadow-green-100/50 hover:border-green-200 transition-all shadow-sm shadow-green-50/30"
                    data-id="${t.id}">
                 <button type="button" class="delete-tournament-btn absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-full text-gray-300 hover:bg-red-50 hover:text-red-500 transition" data-id="${t.id}">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>

@@ -49,38 +49,86 @@ const Auth = {
   renderLogin() {
     const container = document.getElementById('auth-container');
     container.innerHTML = `
+      <!-- 테마 토글 -->
+      <button id="auth-theme-toggle" class="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-xl bg-white/30 backdrop-blur-sm border border-white/40 hover:bg-white/50 transition-all" title="테마 전환" aria-label="테마 전환">
+        <svg class="auth-icon-sun w-5 h-5 text-gray-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+        </svg>
+        <svg class="auth-icon-moon w-5 h-5 text-yellow-400" style="display:none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+        </svg>
+      </button>
+
       <div class="w-full max-w-sm mx-auto px-6">
+        <!-- 로고 영역 -->
         <div class="text-center mb-8">
-          <div class="text-5xl mb-3">🎾</div>
-          <h1 class="text-2xl font-bold text-gray-800">Happy Tennis Life</h1>
+          <div class="relative inline-block mb-4">
+            <div class="auth-logo-bg w-28 h-28 rounded-3xl flex items-center justify-center mx-auto">
+              <img src="css/tennis-smile-2.png" alt="Tennis" class="w-24 h-24 mix-blend-multiply">
+            </div>
+          </div>
+          <h1 class="text-2xl font-extrabold bg-gradient-to-r from-green-600 to-emerald-500 bg-clip-text text-transparent">Happy Tennis Life</h1>
+          <p class="text-sm text-gray-400 mt-1">테니스를 더 즐겁게</p>
         </div>
-        <form id="auth-form" class="space-y-4">
-          <div>
-            <input type="email" id="auth-email" required
-              class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500"
-              placeholder="이메일">
-          </div>
-          <div>
-            <input type="password" id="auth-password" required minlength="6"
-              class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500"
-              placeholder="비밀번호 (6자 이상)">
-          </div>
-          <div id="auth-confirm-wrap" style="display:none">
-            <input type="password" id="auth-password-confirm" minlength="6"
-              class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500"
-              placeholder="비밀번호 확인">
-          </div>
-          <p id="auth-error" class="text-sm text-red-500 hidden"></p>
-          <button type="submit" id="auth-submit-btn"
-            class="w-full py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition font-semibold text-lg">
-            로그인
-          </button>
-        </form>
-        <p class="text-center text-sm text-gray-500 mt-4">
+
+        <!-- 로그인 카드 -->
+        <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl shadow-green-100/50 p-6 border border-white/60">
+          <form id="auth-form" class="space-y-4">
+            <div>
+              <label class="block text-xs font-semibold text-gray-500 mb-1.5 ml-1">이메일</label>
+              <input type="email" id="auth-email" required
+                class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 focus:bg-white transition"
+                placeholder="email@example.com">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-500 mb-1.5 ml-1">비밀번호</label>
+              <input type="password" id="auth-password" required minlength="6"
+                class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 focus:bg-white transition"
+                placeholder="6자 이상">
+            </div>
+            <div id="auth-confirm-wrap" style="display:none">
+              <label class="block text-xs font-semibold text-gray-500 mb-1.5 ml-1">비밀번호 확인</label>
+              <input type="password" id="auth-password-confirm" minlength="6"
+                class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 focus:bg-white transition"
+                placeholder="비밀번호를 다시 입력">
+            </div>
+            <p id="auth-error" class="text-sm text-red-500 hidden"></p>
+            <button type="submit" id="auth-submit-btn"
+              class="w-full py-3.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl hover:from-green-600 hover:to-emerald-700 active:scale-[0.98] transition-all font-bold text-lg shadow-md shadow-green-200">
+              로그인
+            </button>
+          </form>
+        </div>
+
+        <p class="text-center text-sm text-gray-400 mt-5">
           <span id="auth-toggle-text">계정이 없으신가요?</span>
-          <button type="button" id="auth-toggle-btn" class="text-green-600 font-semibold hover:underline ml-1">회원가입</button>
+          <button type="button" id="auth-toggle-btn" class="text-green-600 font-bold hover:underline ml-1">회원가입</button>
         </p>
       </div>`;
+
+    // 로그인 페이지 테마 토글
+    const authThemeToggle = container.querySelector('#auth-theme-toggle');
+    const authIconSun = container.querySelector('.auth-icon-sun');
+    const authIconMoon = container.querySelector('.auth-icon-moon');
+
+    const updateAuthThemeIcons = (isDark) => {
+      authIconSun.style.display = isDark ? 'none' : 'block';
+      authIconMoon.style.display = isDark ? 'block' : 'none';
+    };
+    updateAuthThemeIcons(document.documentElement.classList.contains('dark'));
+
+    authThemeToggle.onclick = () => {
+      const isDark = document.documentElement.classList.toggle('dark');
+      localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      updateAuthThemeIcons(isDark);
+      // 앱 헤더 아이콘도 동기화
+      const iconSun = document.getElementById('icon-sun');
+      const iconMoon = document.getElementById('icon-moon');
+      const metaColor = document.getElementById('meta-theme-color');
+      if (iconSun) iconSun.style.display = isDark ? 'none' : 'block';
+      if (iconMoon) iconMoon.style.display = isDark ? 'block' : 'none';
+      if (metaColor) metaColor.content = isDark ? '#1e293b' : '#ffffff';
+    };
 
     let isRegister = false;
     const form = container.querySelector('#auth-form');
