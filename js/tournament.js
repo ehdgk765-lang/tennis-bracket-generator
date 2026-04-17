@@ -156,18 +156,17 @@ const Tournament = {
     }
 
     html += `</div></div></div>`;
-    container.innerHTML = html;
+    morphHTML(container, html);
 
     // 브래킷 스크롤 힌트: 끝까지 스크롤하면 그라데이션 숨김
     const scrollContainer = container.querySelector('.bracket-container');
     const scrollHint = container.querySelector('.bracket-scroll-hint');
     if (scrollContainer && scrollHint) {
-      const checkScroll = () => {
+      scrollContainer.onscroll = () => {
         const atEnd = scrollContainer.scrollLeft + scrollContainer.clientWidth >= scrollContainer.scrollWidth - 10;
         scrollHint.classList.toggle('scrolled-end', atEnd);
       };
-      scrollContainer.addEventListener('scroll', checkScroll, { passive: true });
-      checkScroll();
+      scrollContainer.onscroll();
     }
 
     // 클릭 이벤트 바인딩

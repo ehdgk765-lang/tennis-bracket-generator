@@ -322,7 +322,7 @@ const Schedule = {
       : `남${maleCount} 여${femaleCount}`;
     const maxCourts = Math.max(tournament.courts, ...tournament.timeSlots.map(s => s.matches.length));
 
-    container.innerHTML = `
+    morphHTML(container, `
       <div>
         <div id="schedule-header" class="mb-4 pb-1">
           <div class="flex items-start justify-between gap-2">
@@ -403,7 +403,7 @@ const Schedule = {
             </tbody>
           </table>
         </div>
-      </div>`;
+      </div>`);
 
     // PDF 다운로드
     const pdfBtn = container.querySelector('#pdf-download-btn');
@@ -436,7 +436,7 @@ const Schedule = {
 
     // 선수 이름 탭 → 선택/교환
     container.querySelectorAll('.swap-player').forEach(el => {
-      el.addEventListener('click', (e) => {
+      el.onclick = (e) => {
         e.stopPropagation(); // 카드 클릭(스코어) 방지
 
         const data = {
@@ -507,12 +507,12 @@ const Schedule = {
           Storage.updateTournament(tournament);
           this.render(container, tournament);
         }
-      });
+      };
     });
 
     // 카드 빈 영역 클릭 → 스코어 입력 (선수 선택 중이면 해제)
     cards.forEach(card => {
-      card.addEventListener('click', () => {
+      card.onclick = () => {
         if (selectedPlayer) {
           selectedPlayer.el.classList.remove('bg-green-200', 'ring-2', 'ring-green-500', 'rounded');
           selectedPlayer = null;
@@ -532,12 +532,12 @@ const Schedule = {
           }
           this.render(container, tournament);
         });
-      });
+      };
     });
 
     // 대진 삭제 (X 버튼)
     container.querySelectorAll('.delete-match-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
+      btn.onclick = (e) => {
         e.stopPropagation();
         const si = +btn.dataset.slotIdx;
         const mi = +btn.dataset.matchIdx;
@@ -549,34 +549,34 @@ const Schedule = {
         tournament.timeSlots[si].matches.forEach((m, i) => m.court = i + 1);
         Storage.updateTournament(tournament);
         this.render(container, tournament);
-      });
+      };
     });
 
     // 경기 종류 변경 (뱃지 클릭)
     container.querySelectorAll('.change-gametype-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
+      btn.onclick = (e) => {
         e.stopPropagation();
         const match = allMatches.find(m => m.id === btn.dataset.matchId);
         if (!match) return;
         this.showChangeGameTypeModal(container, tournament, match);
-      });
+      };
     });
 
     // 데스크톱: HTML5 Drag and Drop (매치 카드 위치 교환)
     cards.forEach(card => {
-      card.addEventListener('dragstart', (e) => {
+      card.ondragstart = (e) => {
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', `${card.dataset.slotIdx},${card.dataset.matchIdx}`);
         requestAnimationFrame(() => card.style.opacity = '0.4');
-      });
-      card.addEventListener('dragend', () => { card.style.opacity = ''; });
-      card.addEventListener('dragover', (e) => {
+      };
+      card.ondragend = () => { card.style.opacity = ''; };
+      card.ondragover = (e) => {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
         card.classList.add('ring-2', 'ring-green-500');
-      });
-      card.addEventListener('dragleave', () => card.classList.remove('ring-2', 'ring-green-500'));
-      card.addEventListener('drop', (e) => {
+      };
+      card.ondragleave = () => card.classList.remove('ring-2', 'ring-green-500');
+      card.ondrop = (e) => {
         e.preventDefault();
         card.classList.remove('ring-2', 'ring-green-500');
         const [si, mi] = e.dataTransfer.getData('text/plain').split(',').map(Number);
@@ -588,7 +588,7 @@ const Schedule = {
         if (si !== tSI) tgtSlot.matches.forEach((m, i) => m.court = i + 1);
         Storage.updateTournament(tournament);
         this.render(container, tournament);
-      });
+      };
     });
   },
 
@@ -950,7 +950,7 @@ const Schedule = {
     };
 
     const refreshModal = () => {
-      modal.innerHTML = renderModal();
+      morphHTML(modal, renderModal());
       bindModalEvents();
     };
 

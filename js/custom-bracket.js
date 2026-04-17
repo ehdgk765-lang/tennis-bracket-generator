@@ -21,7 +21,7 @@ const CustomBracket = {
   renderBuilder(container) {
     const st = this._state;
 
-    container.innerHTML = `
+    morphHTML(container, `
       <form id="custom-bracket-form" class="space-y-5">
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">대회명</label>
@@ -87,7 +87,7 @@ const CustomBracket = {
           class="w-full py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl hover:from-green-600 hover:to-emerald-700 active:scale-[0.98] transition-all font-semibold text-lg shadow-md shadow-green-200/50">
           대회 생성
         </button>
-      </form>`;
+      </form>`);
 
     // Bind doubles toggle
     container.querySelectorAll('input[name="cb-doubles"]').forEach(r => {
@@ -194,7 +194,7 @@ const CustomBracket = {
     }
 
     html += `</div></div></div>`;
-    previewContainer.innerHTML = html;
+    morphHTML(previewContainer, html);
 
     // Bind slot clicks
     previewContainer.querySelectorAll('.cb-slot').forEach(slot => {
@@ -220,12 +220,11 @@ const CustomBracket = {
     const scrollContainer = previewContainer.querySelector('.bracket-container');
     const scrollHint = previewContainer.querySelector('.bracket-scroll-hint');
     if (scrollContainer && scrollHint) {
-      const checkScroll = () => {
+      scrollContainer.onscroll = () => {
         const atEnd = scrollContainer.scrollLeft + scrollContainer.clientWidth >= scrollContainer.scrollWidth - 10;
         scrollHint.classList.toggle('scrolled-end', atEnd);
       };
-      scrollContainer.addEventListener('scroll', checkScroll, { passive: true });
-      checkScroll();
+      scrollContainer.onscroll();
     }
   },
 
@@ -430,7 +429,7 @@ const CustomBracket = {
     };
 
     const refreshPicker = () => {
-      picker.innerHTML = renderPickerContent();
+      morphHTML(picker, renderPickerContent());
       bindPickerEvents();
     };
 

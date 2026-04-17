@@ -48,7 +48,7 @@ const Auth = {
 
   renderLogin() {
     const container = document.getElementById('auth-container');
-    container.innerHTML = `
+    morphHTML(container, `
       <!-- 테마 토글 -->
       <button id="auth-theme-toggle" class="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-xl bg-white/30 backdrop-blur-sm border border-white/40 hover:bg-white/50 transition-all" title="테마 전환" aria-label="테마 전환">
         <svg class="auth-icon-sun w-5 h-5 text-gray-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -102,7 +102,7 @@ const Auth = {
           <span id="auth-toggle-text">계정이 없으신가요?</span>
           <button type="button" id="auth-toggle-btn" class="text-green-600 font-bold hover:underline ml-1">회원가입</button>
         </p>
-      </div>`;
+      </div>`);
 
     // 로그인 페이지 테마 토글
     const authThemeToggle = container.querySelector('#auth-theme-toggle');

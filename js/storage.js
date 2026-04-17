@@ -180,7 +180,7 @@ const Storage = {
   // 원격 변경 시 UI 갱신
   _onRemoteChange() {
     if (typeof App !== 'undefined' && App.currentTab) {
-      App.navigate(App.currentTab);
+      App.navigate(App.currentTab, App.currentTournamentId);
     }
   },
 };
