@@ -25,7 +25,7 @@ const Storage = {
     }
   },
 
-  // 선수 관련
+  // 멤버 관련
   getPlayers() {
     return this.get(this.KEYS.PLAYERS) || [];
   },
@@ -127,7 +127,7 @@ const Storage = {
     if (!user) return;
     const base = fbDb.collection('users').doc(user.uid).collection('data');
 
-    // 선수 데이터 실시간 리스너
+    // 멤버 데이터 실시간 리스너
     this._unsubPlayers = base.doc('players').onSnapshot((doc) => {
       // 내가 쓴 변경이 서버 반영 전이면 무시 (localStorage에 이미 있음)
       if (doc.metadata.hasPendingWrites) return;
@@ -138,7 +138,7 @@ const Storage = {
       const newJson = JSON.stringify(items);
       if (current !== newJson) {
         localStorage.setItem(this.KEYS.PLAYERS, newJson);
-        console.log('실시간 동기화: 선수 데이터 업데이트');
+        // console.log('실시간 동기화: 멤버 데이터 업데이트');
         this._onRemoteChange();
       }
     }, (err) => {
@@ -155,14 +155,14 @@ const Storage = {
       const newJson = JSON.stringify(items);
       if (current !== newJson) {
         localStorage.setItem(this.KEYS.TOURNAMENTS, newJson);
-        console.log('실시간 동기화: 대회 데이터 업데이트');
+        // console.log('실시간 동기화: 대회 데이터 업데이트');
         this._onRemoteChange();
       }
     }, (err) => {
       console.error('Tournaments realtime sync error:', err);
     });
 
-    console.log('실시간 동기화 시작');
+    // console.log('실시간 동기화 시작');
   },
 
   stopRealtimeSync() {
@@ -174,7 +174,7 @@ const Storage = {
       this._unsubTournaments();
       this._unsubTournaments = null;
     }
-    console.log('실시간 동기화 중지');
+    // console.log('실시간 동기화 중지');
   },
 
   // 원격 변경 시 UI 갱신

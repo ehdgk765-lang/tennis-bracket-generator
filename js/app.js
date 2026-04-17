@@ -109,8 +109,8 @@ const App = {
     if (allPlayers.length < 2) {
       morphHTML(container, `
         <div class="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-center">
-          <p class="text-yellow-800 font-medium mb-2">선수를 2명 이상 등록해주세요.</p>
-          <button onclick="App.navigate('players')" class="text-green-600 font-semibold hover:underline">선수 관리로 이동</button>
+          <p class="text-yellow-800 font-medium mb-2">멤버를 2명 이상 등록해주세요.</p>
+          <button onclick="App.navigate('players')" class="text-green-600 font-semibold hover:underline">멤버 관리로 이동</button>
         </div>`);
       return;
     }
@@ -256,14 +256,14 @@ const App = {
     if (eligible.length < minPlayers) {
       morphHTML(section, `
         <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-center text-sm">
-          <p class="text-yellow-800">${config.label}에 참가 가능한 선수가 부족합니다. (현재 ${eligible.length}명, 최소 ${minPlayers}명 필요)</p>
+          <p class="text-yellow-800">${config.label}에 참가 가능한 멤버가 부족합니다. (현재 ${eligible.length}명, 최소 ${minPlayers}명 필요)</p>
         </div>`);
       return;
     }
 
     morphHTML(section, `
       <div>
-        <label class="block text-sm font-semibold text-gray-700 mb-2">참가 선수 선택</label>
+        <label class="block text-sm font-semibold text-gray-700 mb-2">참가 멤버 선택</label>
         <input type="text" id="player-search" placeholder="이름 검색..."
           class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm mb-2">
         <div class="flex justify-between items-center mb-2">
@@ -331,7 +331,7 @@ const App = {
     const renderList = (players, prefix, genderLabel, badgeClass) => `
       <div>
         <label class="block text-sm font-semibold text-gray-700 mb-2">
-          ${genderLabel}자 선수 선택
+          ${genderLabel}자 멤버 선택
           <span id="${prefix}-count" class="text-green-600 font-normal">(0명 선택)</span>
         </label>
         <input type="text" id="${prefix}-search" placeholder="이름 검색..."
@@ -589,9 +589,9 @@ const App = {
     if (allPlayers.length < 4) {
       morphHTML(container, `
         <div class="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-center">
-          <p class="text-yellow-800 font-medium mb-2">복식 경기를 위해 최소 4명의 선수가 필요합니다.</p>
+          <p class="text-yellow-800 font-medium mb-2">복식 경기를 위해 최소 4명의 멤버가 필요합니다.</p>
           <p class="text-yellow-700 text-sm mb-3">현재: 남 ${males.length}명, 여 ${females.length}명</p>
-          <button onclick="App.navigate('players')" class="text-green-600 font-semibold hover:underline">선수 관리로 이동</button>
+          <button onclick="App.navigate('players')" class="text-green-600 font-semibold hover:underline">멤버 관리로 이동</button>
         </div>`);
       return;
     }
@@ -643,12 +643,12 @@ const App = {
           </div>
         </div>
 
-        <!-- 남자 선수 선택 -->
+        <!-- 남자 멤버 선택 -->
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">
-            남자 선수 <span id="male-count" class="text-green-600 font-normal">(0/${males.length}명 선택)</span>
+            남자 멤버 <span id="male-count" class="text-green-600 font-normal">(0/${males.length}명 선택)</span>
           </label>
-          ${males.length === 0 ? '<p class="text-sm text-gray-400">등록된 남자 선수가 없습니다.</p>' : `
+          ${males.length === 0 ? '<p class="text-sm text-gray-400">등록된 남자 멤버가 없습니다.</p>' : `
           <input type="text" id="sch-male-search" placeholder="이름 검색..."
             class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm mb-2">
           <div class="flex justify-between items-center mb-2">
@@ -667,12 +667,12 @@ const App = {
           </div>`}
         </div>
 
-        <!-- 여자 선수 선택 -->
+        <!-- 여자 멤버 선택 -->
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">
-            여자 선수 <span id="female-count" class="text-green-600 font-normal">(0/${females.length}명 선택)</span>
+            여자 멤버 <span id="female-count" class="text-green-600 font-normal">(0/${females.length}명 선택)</span>
           </label>
-          ${females.length === 0 ? '<p class="text-sm text-gray-400">등록된 여자 선수가 없습니다.</p>' : `
+          ${females.length === 0 ? '<p class="text-sm text-gray-400">등록된 여자 멤버가 없습니다.</p>' : `
           <input type="text" id="sch-female-search" placeholder="이름 검색..."
             class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm mb-2">
           <div class="flex justify-between items-center mb-2">
@@ -771,7 +771,7 @@ const App = {
 
       const totalPlayers = selectedMales.length + selectedFemales.length;
       if (totalPlayers < 4) {
-        alert('최소 4명의 선수를 선택해주세요.');
+        alert('최소 4명의 멤버를 선택해주세요.');
         return;
       }
 
@@ -779,7 +779,7 @@ const App = {
 
       const possibleTypes = Schedule.getPossibleTypes(selectedMales, selectedFemales, allowMixed);
       if (possibleTypes.length === 0) {
-        alert('선택한 선수 구성으로 복식 경기를 만들 수 없습니다.\n혼합복식: 남2+여2, 남자복식: 남4, 여자복식: 여4 이상 필요\n또는 섞어복식 허용을 체크해주세요.');
+        alert('선택한 멤버 구성으로 복식 경기를 만들 수 없습니다.\n혼합복식: 남2+여2, 남자복식: 남4, 여자복식: 여4 이상 필요\n또는 섞어복식 허용을 체크해주세요.');
         return;
       }
 
@@ -853,7 +853,7 @@ const App = {
       morphHTML(preview, `
         <div class="space-y-1">
           <p><span class="font-medium">총 경기:</span> 최대 ${totalGamesMax}경기 (${slots.length}타임 × ${courts}코트)</p>
-          <p><span class="font-medium">선수:</span> 남 ${maleCount}명, 여 ${femaleCount}명</p>
+          <p><span class="font-medium">멤버:</span> 남 ${maleCount}명, 여 ${femaleCount}명</p>
           <p><span class="font-medium">가능한 게임:</span> ${possibleTypes.join(', ')}</p>
         </div>`);
     } else {
