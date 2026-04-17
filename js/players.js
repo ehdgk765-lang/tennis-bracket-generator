@@ -2,8 +2,12 @@
 const NTRP_VALUES = [2.0, 2.5, 3.0, 3.5, 4.0];
 
 const Players = {
+  _expanded: false,
+  _searchQuery: '',
+  _VISIBLE_LIMIT: 10,
+
   render(container) {
-    const players = Storage.getPlayers();
+    const players = Storage.getPlayers().sort((a, b) => a.name.localeCompare(b.name, 'ko'));
     const males = players.filter(p => p.gender === 'M');
     const females = players.filter(p => p.gender === 'F');
 
@@ -16,8 +20,9 @@ const Players = {
           <div class="px-4 py-3 border-b border-gray-100">
             <div class="flex gap-2 overflow-hidden">
               <input type="text" id="player-name-input"
+                value="${this.escapeHtml(this._searchQuery)}"
                 class="min-w-0 flex-1 px-3 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 text-base"
-                placeholder="이름 입력" maxlength="20" style="flex:1 1 0;min-width:0">
+                placeholder="이름 입력 / 검색" maxlength="20" style="flex:1 1 0;min-width:0">
               <select id="player-gender-select"
                 class="px-2 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm font-medium bg-white flex-shrink-0">
                 <option value="M">남</option>
@@ -59,24 +64,8 @@ const Players = {
             </div>
           </div>
           <!-- 멤버 목록 -->
-          <div id="player-list" class="divide-y divide-gray-50">
-            ${players.length === 0
-              ? '<p class="text-gray-400 text-center py-8">등록된 멤버가 없습니다.</p>'
-              : players.map((p, i) => `
-                <div class="flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition">
-                  <div class="flex items-center gap-3 min-w-0">
-                    <input type="checkbox" class="player-select-cb w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500 cursor-pointer flex-shrink-0" data-id="${p.id}">
-                    <span class="w-7 h-7 bg-green-100 text-green-700 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">${i + 1}</span>
-                    <span class="text-gray-800 font-medium truncate">${this.escapeHtml(p.name)}</span>
-                    <button class="gender-toggle-btn text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0 cursor-pointer active:scale-95 transition ${p.gender === 'M' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}"
-                      data-id="${p.id}">${p.gender === 'M' ? '남' : '여'}</button>
-                    <button class="ntrp-toggle-btn text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0 cursor-pointer active:scale-95 transition bg-yellow-100 text-yellow-700"
-                      data-id="${p.id}">${(p.ntrp || 2.5).toFixed(1)}</button>
-                  </div>
-                  <button class="delete-player-btn text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg px-3 py-1 transition text-sm flex-shrink-0 ml-2"
-                    data-id="${p.id}">삭제</button>
-                </div>
-              `).join('')}
+          <div id="player-list-area">
+            ${this._buildListAreaHTML(players)}
           </div>
         </div>
       </div>`);
@@ -84,34 +73,110 @@ const Players = {
     this.bindEvents(container);
   },
 
-  bindEvents(container) {
-    const input = container.querySelector('#player-name-input');
-    const genderSelect = container.querySelector('#player-gender-select');
-    const ntrpSelect = container.querySelector('#player-ntrp-select');
-    const addBtn = container.querySelector('#add-player-btn');
+  _highlightMatch(name, query) {
+    const escaped = this.escapeHtml(name);
+    if (!query) return escaped;
+    const idx = name.toLowerCase().indexOf(query.toLowerCase());
+    if (idx === -1) return escaped;
+    const before = this.escapeHtml(name.substring(0, idx));
+    const match = this.escapeHtml(name.substring(idx, idx + query.length));
+    const after = this.escapeHtml(name.substring(idx + query.length));
+    return `${before}<mark class="bg-yellow-200 rounded px-0.5">${match}</mark>${after}`;
+  },
 
-    const addPlayer = () => {
-      const name = input.value.trim();
-      const gender = genderSelect.value;
-      const ntrp = parseFloat(ntrpSelect.value);
-      if (!name) return;
+  _buildListAreaHTML(allPlayers) {
+    const query = this._searchQuery.trim();
+    const isSearching = query.length > 0;
+    const lowerQuery = query.toLowerCase();
 
-      const players = Storage.getPlayers();
-      if (players.some(p => p.name === name)) {
-        alert('이미 등록된 멤버입니다.');
-        return;
-      }
+    const indexed = allPlayers.map((p, i) => ({ player: p, num: i + 1 }));
+    const filtered = isSearching
+      ? indexed.filter(item => item.player.name.toLowerCase().includes(lowerQuery))
+      : indexed;
 
-      players.push({ id: Storage.generateId(), name, gender, ntrp });
-      Storage.savePlayers(players);
-      this.render(container);
-    };
+    const hasMore = !isSearching && filtered.length > this._VISIBLE_LIMIT;
+    const visible = (!isSearching && !this._expanded)
+      ? filtered.slice(0, this._VISIBLE_LIMIT)
+      : filtered;
 
-    addBtn.onclick = addPlayer;
-    input.onkeydown = (e) => {
-      if (e.key === 'Enter') addPlayer();
-    };
+    let html = '<div id="player-list" class="divide-y divide-gray-50">';
 
+    if (visible.length === 0) {
+      html += isSearching
+        ? '<p class="text-gray-400 text-center py-8">검색 결과가 없습니다.</p>'
+        : '<p class="text-gray-400 text-center py-8">등록된 멤버가 없습니다.</p>';
+    } else {
+      html += visible.map(({ player: p, num }) => `
+        <div class="flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition">
+          <div class="flex items-center gap-3 min-w-0">
+            <input type="checkbox" class="player-select-cb w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500 cursor-pointer flex-shrink-0" data-id="${p.id}">
+            <span class="w-7 h-7 bg-green-100 text-green-700 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">${num}</span>
+            <span class="text-gray-800 font-medium truncate">${this._highlightMatch(p.name, isSearching ? query : '')}</span>
+            <button class="gender-toggle-btn text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0 cursor-pointer active:scale-95 transition ${p.gender === 'M' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}"
+              data-id="${p.id}">${p.gender === 'M' ? '남' : '여'}</button>
+            <button class="ntrp-toggle-btn text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0 cursor-pointer active:scale-95 transition bg-yellow-100 text-yellow-700"
+              data-id="${p.id}">${(p.ntrp || 2.5).toFixed(1)}</button>
+          </div>
+          <button class="delete-player-btn text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg px-3 py-1 transition text-sm flex-shrink-0 ml-2"
+            data-id="${p.id}">삭제</button>
+        </div>
+      `).join('');
+    }
+
+    html += '</div>';
+
+    if (hasMore) {
+      html += `
+        <div class="px-4 py-3 border-t border-gray-100">
+          <button id="toggle-player-list-btn"
+            class="w-full flex items-center justify-center gap-1 py-2 text-sm font-medium text-gray-500 hover:text-green-600 hover:bg-green-50/50 rounded-xl transition">
+            ${this._expanded
+              ? `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7"/></svg> 접기`
+              : `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg> 더보기 (${allPlayers.length - this._VISIBLE_LIMIT}명)`}
+          </button>
+        </div>`;
+    }
+
+    if (isSearching && filtered.length > 0) {
+      html += `<div class="px-4 py-2 text-center border-t border-gray-100">
+        <span class="text-xs text-gray-400">${filtered.length}명 검색됨</span>
+      </div>`;
+    }
+
+    return html;
+  },
+
+  _refreshList(container) {
+    const players = Storage.getPlayers().sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+    const listArea = container.querySelector('#player-list-area');
+    if (!listArea) return;
+    morphHTML(listArea, this._buildListAreaHTML(players));
+    this._bindListEvents(container);
+  },
+
+  _updateSelectionUI(container) {
+    const checked = container.querySelectorAll('.player-select-cb:checked');
+    const total = container.querySelectorAll('.player-select-cb').length;
+    const deleteSelectedBtn = container.querySelector('#delete-selected-btn');
+    const selectedCountEl = container.querySelector('#selected-player-count');
+    const selectAllCb = container.querySelector('#select-all-players');
+
+    if (checked.length > 0) {
+      deleteSelectedBtn.classList.remove('hidden');
+      selectedCountEl.classList.remove('hidden');
+      selectedCountEl.textContent = `${checked.length}명 선택`;
+    } else {
+      deleteSelectedBtn.classList.add('hidden');
+      selectedCountEl.classList.add('hidden');
+    }
+
+    if (selectAllCb) {
+      selectAllCb.checked = total > 0 && checked.length === total;
+      selectAllCb.indeterminate = checked.length > 0 && checked.length < total;
+    }
+  },
+
+  _bindListEvents(container) {
     container.querySelectorAll('.gender-toggle-btn').forEach(btn => {
       btn.onclick = () => {
         const players = Storage.getPlayers();
@@ -146,42 +211,66 @@ const Players = {
       };
     });
 
-    // 멤버 선택 체크박스
-    const selectAllCb = container.querySelector('#select-all-players');
-    const playerCbs = container.querySelectorAll('.player-select-cb');
-    const deleteSelectedBtn = container.querySelector('#delete-selected-btn');
-    const selectedCountEl = container.querySelector('#selected-player-count');
+    container.querySelectorAll('.player-select-cb').forEach(cb => {
+      cb.onchange = () => this._updateSelectionUI(container);
+    });
 
-    const updateSelectionUI = () => {
-      const checked = container.querySelectorAll('.player-select-cb:checked');
-      const count = checked.length;
-      const total = playerCbs.length;
+    const toggleBtn = container.querySelector('#toggle-player-list-btn');
+    if (toggleBtn) {
+      toggleBtn.onclick = () => {
+        this._expanded = !this._expanded;
+        this._refreshList(container);
+      };
+    }
+  },
 
-      if (count > 0) {
-        deleteSelectedBtn.classList.remove('hidden');
-        selectedCountEl.classList.remove('hidden');
-        selectedCountEl.textContent = `${count}명 선택`;
-      } else {
-        deleteSelectedBtn.classList.add('hidden');
-        selectedCountEl.classList.add('hidden');
+  bindEvents(container) {
+    const input = container.querySelector('#player-name-input');
+    const genderSelect = container.querySelector('#player-gender-select');
+    const ntrpSelect = container.querySelector('#player-ntrp-select');
+    const addBtn = container.querySelector('#add-player-btn');
+
+    const addPlayer = () => {
+      const name = input.value.trim();
+      const gender = genderSelect.value;
+      const ntrp = parseFloat(ntrpSelect.value);
+      if (!name) return;
+
+      const players = Storage.getPlayers();
+      if (players.some(p => p.name === name)) {
+        alert('이미 등록된 멤버입니다.');
+        return;
       }
 
-      if (selectAllCb) {
-        selectAllCb.checked = total > 0 && count === total;
-        selectAllCb.indeterminate = count > 0 && count < total;
-      }
+      players.push({ id: Storage.generateId(), name, gender, ntrp });
+      Storage.savePlayers(players);
+      this._searchQuery = '';
+      this._expanded = false;
+      this.render(container);
     };
 
+    addBtn.onclick = addPlayer;
+    input.onkeydown = (e) => {
+      if (e.key === 'Enter') addPlayer();
+    };
+
+    // 실시간 검색
+    input.oninput = () => {
+      this._searchQuery = input.value;
+      this._refreshList(container);
+    };
+
+    // 전체 선택
+    const selectAllCb = container.querySelector('#select-all-players');
     if (selectAllCb) {
       selectAllCb.onchange = () => {
-        const isChecked = selectAllCb.checked;
-        playerCbs.forEach(cb => { cb.checked = isChecked; });
-        updateSelectionUI();
+        container.querySelectorAll('.player-select-cb').forEach(cb => { cb.checked = selectAllCb.checked; });
+        this._updateSelectionUI(container);
       };
     }
 
-    playerCbs.forEach(cb => { cb.onchange = updateSelectionUI; });
-
+    // 선택 삭제
+    const deleteSelectedBtn = container.querySelector('#delete-selected-btn');
     if (deleteSelectedBtn) {
       deleteSelectedBtn.onclick = () => {
         const checkedIds = Array.from(container.querySelectorAll('.player-select-cb:checked')).map(cb => cb.dataset.id);
@@ -205,6 +294,7 @@ const Players = {
       excelInput.value = '';
     };
 
+    this._bindListEvents(container);
   },
 
   importExcel(file, container) {
@@ -260,6 +350,8 @@ const Players = {
         if (errors.length > 0) msg += `\n\n오류:\n${errors.slice(0, 5).join('\n')}`;
         alert(msg);
 
+        this._searchQuery = '';
+        this._expanded = false;
         this.render(container);
       } catch (err) {
         console.error('엑셀 파싱 오류:', err);
