@@ -100,8 +100,14 @@ const Storage = {
 
       if (pDoc.exists) {
         const d = pDoc.data();
-        const items = d.json ? JSON.parse(d.json) : (d.items || []);
-        localStorage.setItem(this.KEYS.PLAYERS, JSON.stringify(items));
+        const remote = d.json ? JSON.parse(d.json) : (d.items || []);
+        const local = this.getPlayers();
+        // 로컬에만 있는 멤버(아직 서버 미동기)를 병합
+        const remoteNames = new Set(remote.map(p => p.name));
+        const localOnly = local.filter(p => !remoteNames.has(p.name));
+        const merged = [...remote, ...localOnly];
+        localStorage.setItem(this.KEYS.PLAYERS, JSON.stringify(merged));
+        if (localOnly.length > 0) this.syncToFirestore('players', merged);
       } else {
         const local = this.getPlayers();
         if (local.length > 0) this.syncToFirestore('players', local);
@@ -109,8 +115,14 @@ const Storage = {
 
       if (tDoc.exists) {
         const d = tDoc.data();
-        const items = d.json ? JSON.parse(d.json) : (d.items || []);
-        localStorage.setItem(this.KEYS.TOURNAMENTS, JSON.stringify(items));
+        const remote = d.json ? JSON.parse(d.json) : (d.items || []);
+        const local = this.getTournaments();
+        // 로컬에만 있는 대회(아직 서버 미동기)를 병합
+        const remoteIds = new Set(remote.map(t => t.id));
+        const localOnly = local.filter(t => !remoteIds.has(t.id));
+        const merged = [...remote, ...localOnly];
+        localStorage.setItem(this.KEYS.TOURNAMENTS, JSON.stringify(merged));
+        if (localOnly.length > 0) this.syncToFirestore('tournaments', merged);
       } else {
         const local = this.getTournaments();
         if (local.length > 0) this.syncToFirestore('tournaments', local);

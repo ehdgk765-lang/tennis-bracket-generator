@@ -12,3 +12,14 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const fbAuth = firebase.auth();
 const fbDb = firebase.firestore();
+
+// 오프라인 퍼시스턴스 활성화 (IndexedDB 캐시)
+// .set() 쓰기가 즉시 로컬 캐시에 반영되어 새로고침 시 데이터 유실 방지
+fbDb.enablePersistence({ synchronizeTabs: true })
+  .catch((err) => {
+    if (err.code === 'failed-precondition') {
+      console.warn('Firestore persistence: 다른 탭에서 이미 활성화됨');
+    } else if (err.code === 'unimplemented') {
+      console.warn('Firestore persistence: 브라우저 미지원');
+    }
+  });

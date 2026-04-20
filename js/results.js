@@ -15,8 +15,8 @@ const Results = {
 
     const player1Name = match.player1 || 'BYE';
     const player2Name = match.player2 || 'BYE';
-    const t1Html = this.formatTeamHtml(player1Name);
-    const t2Html = this.formatTeamHtml(player2Name);
+    const t1Html = this.formatTeamHtml(player1Name, tournament.isCustom);
+    const t2Html = this.formatTeamHtml(player2Name, tournament.isCustom);
 
     // 팀 이름 축약 (첫 번째 멤버 성만 표시)
     const t1Short = player1Name.split(' / ')[0].slice(0, 3) + 'Team';
@@ -159,13 +159,23 @@ const Results = {
   },
 
   // 팀 문자열("A / B")을 NTRP 포함 HTML로 변환
-  formatTeamHtml(teamStr) {
+  formatTeamHtml(teamStr, isCustom) {
     const allPlayers = Storage.getPlayers();
     const names = teamStr.split(' / ');
     return names.map(name => {
       const pd = allPlayers.find(p => p.name === name);
-      const ntrp = (pd?.ntrp || 2.5).toFixed(1);
-      return `${this.escapeHtml(name)}<span class="text-yellow-600 text-xs ml-0.5">${ntrp}</span>`;
+      let badge = '';
+      if (isCustom) {
+        if (pd) {
+          const gClass = pd.gender === 'M' ? 'text-blue-600' : 'text-pink-600';
+          const gLabel = pd.gender === 'M' ? '남' : '여';
+          badge = `<span class="${gClass} text-xs ml-0.5">${gLabel}</span>`;
+        }
+      } else {
+        const ntrp = (pd?.ntrp || 2.5).toFixed(1);
+        badge = `<span class="text-yellow-600 text-xs ml-0.5">${ntrp}</span>`;
+      }
+      return `${this.escapeHtml(name)}${badge}`;
     }).join(' <span class="text-gray-300 mx-0.5">/</span> ');
   },
 

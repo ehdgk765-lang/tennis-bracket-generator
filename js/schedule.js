@@ -297,6 +297,7 @@ const Schedule = {
 
   // 대진표 렌더링
   render(container, tournament) {
+    this._tournament = tournament;
     const allMatches = this.getAllMatches(tournament);
     const totalMatches = allMatches.length;
     const completedMatches = allMatches.filter(m => m.winner || m.scores).length;
@@ -332,13 +333,13 @@ const Schedule = {
             </span>
           </div>
           <p class="text-sm text-gray-500 mt-1">
-            ${tournament.startTime} ~ ${tournament.endTime} · 코트 ${maxCourts}면 · ${playerInfo}
+            ${tournament.isCustom ? '' : `${tournament.startTime} ~ ${tournament.endTime} · `}코트 ${maxCourts}면 · ${playerInfo}
           </p>
           <div class="flex items-center gap-2 mt-3">
-            <button id="add-match-btn" class="text-sm px-3 py-1.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 active:scale-[0.98] transition-all font-medium flex items-center gap-1 shadow-sm shadow-green-200/50">
+            ${tournament.isCustom ? '' : `<button id="add-match-btn" class="text-sm px-3 py-1.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 active:scale-[0.98] transition-all font-medium flex items-center gap-1 shadow-sm shadow-green-200/50">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
               대진 추가
-            </button>
+            </button>`}
             <button id="pdf-download-btn" class="text-sm px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 transition font-medium flex items-center gap-1">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
               PDF
@@ -348,7 +349,7 @@ const Schedule = {
 
         <!-- 시간표 -->
         <div class="space-y-4 mb-6">
-          ${tournament.timeSlots.map((slot, si) => `
+          ${tournament.isCustom ? this._renderCourtLayout(tournament) : tournament.timeSlots.map((slot, si) => `
             <div class="schedule-slot" data-slot="${si}">
               <div class="flex items-center gap-2 mb-2">
                 <span class="text-sm font-bold text-gray-700 bg-gray-100 px-3 py-1 rounded-full">${slot.time}</span>
@@ -381,16 +382,19 @@ const Schedule = {
               </tr>
             </thead>
             <tbody>
-              ${(() => { const allPlayersData = Storage.getPlayers(); return playerStats.map(s => {
+              ${(() => { const allPlayersData = Storage.getPlayers(); return playerStats.map((s, idx) => {
                 const pd = allPlayersData.find(pl => pl.name === s.name);
                 const gender = pd?.gender;
                 const ntrp = pd?.ntrp || 2.5;
+                const medalPos = ['0%', '50%', '100%'];
+                const rank = playerStats.findIndex(p => p.matchPoints === s.matchPoints && p.scorePoints === s.scorePoints);
+                const medalHtml = isComplete && rank < 3 ? `<span style="display:inline-block;width:22px;height:26px;background:url('css/medal.png') no-repeat;background-size:300% auto;background-position:${medalPos[rank]} center;vertical-align:middle;margin-right:2px;"></span>` : '';
                 return `
-                  <tr class="border-b border-gray-50 hover:bg-gray-50">
+                  <tr class="border-b border-gray-50 hover:bg-gray-50${isComplete && rank < 3 ? ' bg-gradient-to-r' + (rank === 0 ? ' from-yellow-50/60' : rank === 1 ? ' from-gray-50/60' : ' from-orange-50/60') + ' to-transparent' : ''}">
                     <td class="px-4 py-2 font-medium text-gray-800">
-                      ${Results.escapeHtml(s.name)}
+                      ${medalHtml}${Results.escapeHtml(s.name)}
                       <span class="text-xs px-1 py-0.5 rounded font-medium ${gender === 'M' ? 'bg-blue-100 text-blue-700' : gender === 'F' ? 'bg-pink-100 text-pink-700' : 'bg-gray-100 text-gray-500'}">${gender === 'M' ? '남' : gender === 'F' ? '여' : '-'}</span>
-                      <span class="text-xs px-1 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">${ntrp.toFixed(1)}</span>
+                      ${tournament.isCustom ? '' : `<span class="text-xs px-1 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">${ntrp.toFixed(1)}</span>`}
                     </td>
                     <td class="text-center px-2 py-2 text-gray-600">${s.games}</td>
                     <td class="text-center px-2 py-2 text-green-600 font-medium">${s.wins}</td>
@@ -416,6 +420,14 @@ const Schedule = {
     if (addMatchBtn) {
       addMatchBtn.onclick = () => this.showAddMatchModal(container, tournament);
     }
+
+    // 코트별 대진 추가 버튼
+    container.querySelectorAll('.court-add-match-btn').forEach(btn => {
+      btn.onclick = () => {
+        const court = parseInt(btn.dataset.court);
+        this.showAddMatchModal(container, tournament, court);
+      };
+    });
 
     // 대진표 이름 수정
     const titleEl = container.querySelector('#schedule-title');
@@ -725,15 +737,50 @@ const Schedule = {
   renderSwapPlayer(name, slotIdx, matchIdx, team, pos) {
     const allPlayers = Storage.getPlayers();
     const pd = allPlayers.find(p => p.name === name);
-    const ntrp = (pd?.ntrp || 2.5).toFixed(1);
+    const isCustom = this._tournament?.isCustom;
+    const ntrpHtml = isCustom ? '' : `<span class="text-yellow-600 text-xs">${(pd?.ntrp || 2.5).toFixed(1)}</span>`;
+    const genderHtml = isCustom && pd ? `<span class="text-xs ${pd.gender === 'M' ? 'text-blue-600' : 'text-pink-600'}">${pd.gender === 'M' ? '남' : '여'}</span>` : '';
     return `<span class="swap-player cursor-pointer hover:bg-yellow-100 rounded px-0.5 transition inline-flex items-center gap-0.5"
       data-slot-idx="${slotIdx}" data-match-idx="${matchIdx}" data-team="${team}" data-pos="${pos}"
-      data-name="${Results.escapeHtml(name)}">${Results.escapeHtml(name)}<span class="text-yellow-600 text-xs">${ntrp}</span></span>`;
+      data-name="${Results.escapeHtml(name)}">${Results.escapeHtml(name)}${genderHtml}${ntrpHtml}</span>`;
+  },
+
+  // 커스텀 대진표: 코트별 세로 레이아웃
+  _renderCourtLayout(tournament) {
+    const allMatches = tournament.timeSlots[0]?.matches || [];
+    const courtCount = tournament.courts;
+    const courtMatches = {};
+    for (let c = 1; c <= courtCount; c++) courtMatches[c] = [];
+    allMatches.forEach((m, mi) => {
+      const c = m.court || 1;
+      if (!courtMatches[c]) courtMatches[c] = [];
+      courtMatches[c].push({ match: m, mi });
+    });
+
+    return `<div class="grid gap-3" style="grid-template-columns: repeat(${courtCount}, 1fr)">
+      ${Array.from({length: courtCount}, (_, i) => {
+        const c = i + 1;
+        const matches = courtMatches[c];
+        return `<div>
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-sm font-bold text-gray-700 bg-gray-100 px-3 py-1 rounded-full">코트 ${c}</span>
+            <div class="flex-1 border-t border-gray-200"></div>
+          </div>
+          <div class="space-y-2">
+            ${matches.map(({ match, mi }) => this.renderMatchCard(match, 0, mi)).join('')}
+            <button type="button" class="court-add-match-btn w-full py-2.5 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-400 hover:border-green-400 hover:text-green-600 hover:bg-green-50/50 transition flex items-center justify-center gap-1" data-court="${c}">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              대진 추가
+            </button>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
   },
 
   // 매치 카드 HTML
   renderMatchCard(match, slotIdx, matchIdx) {
-    const cfg = SCHEDULE_GAME_TYPES[match.gameType];
+    const cfg = match.gameType ? SCHEDULE_GAME_TYPES[match.gameType] : null;
     const hasResult = !!match.winner || !!match.scores;
     const isDraw = match.winner === 'draw';
     const t1Names = match.player1.split(' / ');
@@ -757,10 +804,10 @@ const Schedule = {
         <button type="button" class="delete-match-btn absolute top-1.5 right-1.5 w-6 h-6 flex items-center justify-center rounded-full text-gray-300 hover:bg-red-50 hover:text-red-500 transition" data-slot-idx="${slotIdx}" data-match-idx="${matchIdx}">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
-        <div class="flex items-center justify-between mb-2 pr-5">
+        ${cfg ? `<div class="flex items-center justify-between mb-2 pr-5">
           <span class="change-gametype-btn text-xs px-2 py-0.5 rounded-full font-medium ${cfg.badgeClass} cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-green-400 transition" data-match-id="${match.id}">${cfg.label}</span>
           <span class="text-xs text-gray-400">코트 ${match.court}</span>
-        </div>
+        </div>` : ''}
         <div class="space-y-0.5">
           <div class="flex items-center justify-between ${t1Bg} rounded-lg px-2 py-2.5">
             <span class="text-xs sm:text-sm font-medium ${t1TextClass} flex-1" style="min-width:0">
@@ -800,7 +847,7 @@ const Schedule = {
   },
 
   _renderPdfCard(match) {
-    const cfg = SCHEDULE_GAME_TYPES[match.gameType];
+    const cfg = match.gameType ? SCHEDULE_GAME_TYPES[match.gameType] : null;
     const hasScore = !!match.winner;
     const isWin1 = match.winner === match.player1;
     const isWin2 = match.winner === match.player2;
@@ -837,12 +884,12 @@ const Schedule = {
 
     return `
       <div style="border:1px solid ${border};border-radius:12px;padding:10px;background:#fff;margin-bottom:4px;">
-        <table style="width:100%;border-collapse:collapse;margin-bottom:6px;">
+        ${cfg ? `<table style="width:100%;border-collapse:collapse;margin-bottom:6px;">
           <tr>
             <td style="line-height:1;"><span style="display:inline-block;font-size:11px;${badgePad};border-radius:999px;font-weight:500;background:${b.bg};color:${b.c};line-height:1;">${cfg.label}</span></td>
             <td style="text-align:right;font-size:11px;color:#9ca3af;line-height:1;${courtPad};">코트 ${match.court}</td>
           </tr>
-        </table>
+        </table>` : ''}
         <table style="width:100%;border-collapse:collapse;">
           ${teamRow(match.player1, isWin1, hasScore ? match.scores[0][0] : null)}
           <tr><td colspan="2" style="text-align:center;font-size:11px;color:#d1d5db;padding:2px 0;">vs</td></tr>
@@ -852,16 +899,15 @@ const Schedule = {
   },
 
   // 커스텀 대진 추가 모달
-  showAddMatchModal(container, tournament) {
+  showAddMatchModal(container, tournament, presetCourt) {
     const existing = document.querySelector('.add-match-modal');
     if (existing) existing.remove();
 
     const allPlayers = Storage.getPlayers();
     const selected = { t1p1: null, t1p2: null, t2p1: null, t2p2: null };
-
-    const timeSlotOptions = tournament.timeSlots.map((s, i) =>
-      `<option value="${i}">${s.time}</option>`
-    ).join('');
+    let selectedCourt = presetCourt || 1;
+    let selectedSlot = 0;
+    let selectedGameType = 'XD';
 
     const modal = document.createElement('div');
     modal.className = 'add-match-modal fixed inset-0 z-50 flex items-end sm:items-center justify-center';
@@ -876,7 +922,7 @@ const Schedule = {
             <div class="flex items-center gap-2">
               <span class="text-sm text-gray-800 font-medium">${Results.escapeHtml(name)}</span>
               ${pd ? `<span class="text-xs px-1.5 py-0.5 rounded font-medium ${pd.gender === 'M' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}">${pd.gender === 'M' ? '남' : '여'}</span>
-              <span class="text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">${(pd.ntrp || 2.5).toFixed(1)}</span>` : ''}
+              ${tournament.isCustom ? '' : `<span class="text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">${(pd.ntrp || 2.5).toFixed(1)}</span>`}` : ''}
             </div>
             <button type="button" class="am-remove-player text-red-400 hover:text-red-600 text-xs" data-key="${key}">✕</button>
           </div>`;
@@ -891,11 +937,13 @@ const Schedule = {
           <div class="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-3 sm:hidden"></div>
           <h3 class="text-lg font-bold text-center mb-4">대진 추가</h3>
           <div class="space-y-4">
-            <div class="grid grid-cols-2 gap-3">
+            ${tournament.isCustom ? '' : `<div class="grid grid-cols-2 gap-3">
               <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">시간대</label>
                 <select id="am-slot" class="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-green-500">
-                  ${timeSlotOptions}
+                  ${tournament.timeSlots.map((s, i) =>
+                    `<option value="${i}" ${i === selectedSlot ? 'selected' : ''}>${s.time}</option>`
+                  ).join('')}
                 </select>
               </div>
               <div>
@@ -903,25 +951,25 @@ const Schedule = {
                 <div class="flex gap-1.5 flex-wrap">
                   ${Object.entries(SCHEDULE_GAME_TYPES).map(([key, cfg]) =>
                     `<label class="cursor-pointer">
-                      <input type="radio" name="am-gametype" value="${key}" ${key === 'XD' ? 'checked' : ''} class="sr-only peer">
+                      <input type="radio" name="am-gametype" value="${key}" ${key === selectedGameType ? 'checked' : ''} class="sr-only peer">
                       <div class="px-2.5 py-1.5 rounded-lg text-xs font-medium border-2 border-gray-200 peer-checked:border-green-500 peer-checked:bg-green-50 transition">${cfg.icon} ${cfg.label}</div>
                     </label>`
                   ).join('')}
                 </div>
               </div>
-            </div>
+            </div>`}
 
-            <div>
+            ${presetCourt && tournament.isCustom ? '' : `<div>
               <label class="block text-xs font-semibold text-gray-600 mb-1">코트 번호</label>
               <div class="flex gap-2">
                 ${Array.from({length: tournament.courts}, (_, i) => `
                   <label class="flex-1 cursor-pointer">
-                    <input type="radio" name="am-court" value="${i + 1}" ${i === 0 ? 'checked' : ''} class="sr-only peer">
+                    <input type="radio" name="am-court" value="${i + 1}" ${i + 1 === selectedCourt ? 'checked' : ''} class="sr-only peer">
                     <div class="border-2 border-gray-200 rounded-xl py-2 text-center peer-checked:border-green-500 peer-checked:bg-green-50 transition text-sm font-medium">${i + 1}번</div>
                   </label>
                 `).join('')}
               </div>
-            </div>
+            </div>`}
 
             <div>
               <label class="block text-xs font-semibold text-gray-600 mb-2">팀 1</label>
@@ -955,6 +1003,16 @@ const Schedule = {
     const bindModalEvents = () => {
       modal.querySelector('.am-cancel').onclick = () => modal.remove();
 
+      // 코트/시간대/경기종류 선택 상태 추적
+      modal.querySelectorAll('input[name="am-court"]').forEach(r => {
+        r.onchange = () => { selectedCourt = parseInt(r.value); };
+      });
+      const slotEl = modal.querySelector('#am-slot');
+      if (slotEl) slotEl.onchange = () => { selectedSlot = parseInt(slotEl.value); };
+      modal.querySelectorAll('input[name="am-gametype"]').forEach(r => {
+        r.onchange = () => { selectedGameType = r.value; };
+      });
+
       modal.querySelector('.am-submit').onclick = () => {
         const { t1p1, t1p2, t2p1, t2p2 } = selected;
         if (!t1p1 || !t1p2 || !t2p1 || !t2p2) {
@@ -966,19 +1024,25 @@ const Schedule = {
           alert('중복된 멤버가 있습니다.');
           return;
         }
-        const slotIdx = parseInt(modal.querySelector('#am-slot').value);
-        const gameType = modal.querySelector('input[name="am-gametype"]:checked').value;
-        const court = parseInt(modal.querySelector('input[name="am-court"]:checked').value);
+        const slotIdx = tournament.isCustom ? 0 : parseInt(modal.querySelector('#am-slot').value);
+        const gameType = tournament.isCustom ? null : modal.querySelector('input[name="am-gametype"]:checked').value;
+        const courtEl = modal.querySelector('input[name="am-court"]:checked');
+        const court = courtEl ? parseInt(courtEl.value) : selectedCourt;
 
-        tournament.timeSlots[slotIdx].matches.push({
+        const newMatch = {
           id: Storage.generateId(),
           court,
-          gameType,
           player1: `${t1p1} / ${t1p2}`,
           player2: `${t2p1} / ${t2p2}`,
           scores: null,
           winner: null,
-        });
+        };
+        if (gameType) newMatch.gameType = gameType;
+        tournament.timeSlots[slotIdx].matches.push(newMatch);
+        if (tournament.status === 'completed') {
+          tournament.status = 'active';
+          tournament.completedAt = null;
+        }
         Storage.updateTournament(tournament);
         modal.remove();
         this.render(container, tournament);
@@ -1040,7 +1104,7 @@ const Schedule = {
                   data-name="${Results.escapeHtml(p.name)}" data-used="${isUsed}">
                   <span class="text-sm text-gray-800">${Results.escapeHtml(p.name)}</span>
                   <span class="ml-2 text-xs px-1.5 py-0.5 rounded font-medium ${p.gender === 'M' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}">${p.gender === 'M' ? '남' : '여'}</span>
-                  <span class="ml-1 text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">${(p.ntrp || 2.5).toFixed(1)}</span>
+                  ${this._tournament?.isCustom ? '' : `<span class="ml-1 text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">${(p.ntrp || 2.5).toFixed(1)}</span>`}
                   ${isUsed ? '<span class="ml-auto text-xs text-gray-400">선택됨</span>' : ''}
                 </div>`;
             }).join('')}

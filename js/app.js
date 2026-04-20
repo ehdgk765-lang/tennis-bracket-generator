@@ -50,10 +50,7 @@ const App = {
         this.renderScheduleForm(content);
         break;
       case 'active':
-        this.renderTournamentList(content, 'active', tournamentId);
-        break;
-      case 'history':
-        this.renderTournamentList(content, 'completed');
+        this.renderTournamentList(content, tournamentId);
         break;
     }
   },
@@ -497,27 +494,14 @@ const App = {
           <label class="block text-sm font-semibold text-gray-700 mb-2">대진표 이름</label>
           <input type="text" id="cs-name" maxlength="30"
             class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500"
-            placeholder="미입력 시 날짜+시간으로 자동 생성">
-        </div>
-
-        <div>
-          <label class="block text-sm font-semibold text-gray-700 mb-2">시간 설정</label>
-          <div class="flex items-center gap-2">
-            <select id="cs-start" class="flex-1 px-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white">
-              ${this.generateTimeOptions('08:00')}
-            </select>
-            <span class="text-gray-500 font-medium">~</span>
-            <select id="cs-end" class="flex-1 px-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white">
-              ${this.generateTimeOptions('10:00')}
-            </select>
-          </div>
+            placeholder="미입력 시 날짜로 자동 생성">
         </div>
 
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">코트 수</label>
-          <div class="flex gap-2">
-            ${[1, 2, 3, 4].map(n => `
-              <label class="flex-1 cursor-pointer">
+          <div class="grid grid-cols-4 gap-2">
+            ${[1, 2, 3, 4, 5, 6, 7, 8].map(n => `
+              <label class="cursor-pointer">
                 <input type="radio" name="cs-courts" value="${n}" ${n === 2 ? 'checked' : ''} class="sr-only peer">
                 <div class="border-2 border-gray-200 rounded-xl py-2.5 text-center peer-checked:border-green-500 peer-checked:bg-green-50 transition">
                   <span class="font-semibold text-gray-800">${n}면</span>
@@ -536,33 +520,17 @@ const App = {
     container.querySelector('#custom-schedule-form').onsubmit = (e) => {
       e.preventDefault();
 
-      const startTime = container.querySelector('#cs-start').value;
-      const endTime = container.querySelector('#cs-end').value;
       const courts = parseInt(container.querySelector('input[name="cs-courts"]:checked').value);
-
-      if (startTime >= endTime) {
-        alert('종료 시간은 시작 시간보다 뒤여야 합니다.');
-        return;
-      }
-
-      const slots = Schedule.calculateTimeSlots(startTime, endTime);
-      if (slots.length === 0) {
-        alert('시간이 부족합니다. 최소 30분 이상 설정해주세요.');
-        return;
-      }
-
-      const timeSlots = slots.map(time => ({ time, matches: [] }));
 
       const today = new Date().toISOString().slice(0, 10);
       const customName = container.querySelector('#cs-name').value.trim();
       const tournament = {
         id: Storage.generateId(),
-        name: customName || `${today} ${startTime} 대진표`,
+        name: customName || `${today} 대진표`,
         format: 'schedule',
+        isCustom: true,
         setCount: 1,
         courts,
-        startTime,
-        endTime,
         allowMixed: true,
         males: [],
         females: [],
@@ -570,7 +538,7 @@ const App = {
         status: 'active',
         createdAt: new Date().toISOString(),
         completedAt: null,
-        timeSlots,
+        timeSlots: [{ time: '', matches: [] }],
       };
 
       const tournaments = Storage.getTournaments();
@@ -863,16 +831,11 @@ const App = {
 
   // ─── 목록 / 상세 ───
 
-  renderTournamentList(container, statusFilter, openTournamentId) {
-    const all = Storage.getTournaments();
-    const tournaments = statusFilter === 'active'
-      ? all.filter(t => t.status === 'active')
-      : all.filter(t => t.status === 'completed');
-
-    const isActive = statusFilter === 'active';
+  renderTournamentList(container, openTournamentId) {
+    const tournaments = Storage.getTournaments();
 
     if (openTournamentId) {
-      const t = all.find(t => t.id === openTournamentId);
+      const t = tournaments.find(t => t.id === openTournamentId);
       if (t) {
         this.renderTournamentDetail(container, t);
         return;
@@ -883,9 +846,9 @@ const App = {
       morphHTML(container, `
         <div class="max-w-lg mx-auto text-center py-12">
           <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm shadow-green-50/30 border border-white/60 p-8">
-            <div class="text-5xl mb-4">${isActive ? '🎾' : '📋'}</div>
-            <h2 class="text-xl font-bold text-gray-800 mb-2">${isActive ? '진행 중인 대회가 없습니다' : '완료된 대회가 없습니다'}</h2>
-            <p class="text-gray-500 mb-4">${isActive ? '새 대회를 만들어보세요!' : '대회를 완료하면 여기에 표시됩니다.'}</p>
+            <div class="text-5xl mb-4">🎾</div>
+            <h2 class="text-xl font-bold text-gray-800 mb-2">대진표가 없습니다</h2>
+            <p class="text-gray-500 mb-4">새 대회를 만들어보세요!</p>
           </div>
         </div>`);
       return;
@@ -893,7 +856,7 @@ const App = {
 
     morphHTML(container, `
       <div class="max-w-lg mx-auto">
-        <h2 class="text-2xl font-bold text-gray-800 mb-6">${isActive ? '진행 중' : '결과'}</h2>
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">대진표</h2>
         <div class="space-y-3">
           ${tournaments.map(t => {
             const dateStr = new Date(t.createdAt).toLocaleDateString('ko-KR');
@@ -901,6 +864,17 @@ const App = {
             if (t.format === 'schedule') {
               const allMatches = Schedule.getAllMatches(t);
               const completed = allMatches.filter(m => m.winner).length;
+              const playerNames = new Set();
+              allMatches.forEach(m => {
+                if (m.player1) m.player1.split(' / ').forEach(n => playerNames.add(n.trim()));
+                if (m.player2) m.player2.split(' / ').forEach(n => playerNames.add(n.trim()));
+              });
+              const regPlayers = Storage.getPlayers();
+              let mCount = 0, fCount = 0;
+              playerNames.forEach(name => {
+                const p = regPlayers.find(rp => rp.name === name);
+                if (p) { if (p.gender === 'M') mCount++; else fCount++; }
+              });
               return `
                 <div class="tournament-card relative bg-white/80 backdrop-blur-sm border border-white/60 rounded-2xl p-4 cursor-pointer hover:shadow-lg hover:shadow-green-100/50 hover:border-green-200 transition-all shadow-sm shadow-green-50/30"
                      data-id="${t.id}">
@@ -909,11 +883,16 @@ const App = {
                   </button>
                   <div class="flex items-center justify-between mb-2 pr-6">
                     <h3 class="font-bold text-gray-800">${Results.escapeHtml(t.name)}</h3>
-                    <span class="text-xs px-2 py-1 rounded-full bg-orange-100 text-orange-700">대진표</span>
+                    <div class="flex items-center gap-1.5">
+                      ${t.status === 'completed'
+                        ? '<span class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-500">완료</span>'
+                        : '<span class="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700">진행중</span>'}
+                      <span class="text-xs px-2 py-1 rounded-full bg-orange-100 text-orange-700">대진표</span>
+                    </div>
                   </div>
                   <div class="flex items-center gap-4 text-sm text-gray-500">
-                    <span>남${t.males.length} · 여${t.females.length}</span>
-                    <span>${t.startTime}~${t.endTime}</span>
+                    <span>남${mCount} · 여${fCount}</span>
+                    ${t.isCustom ? `<span>코트 ${t.courts}면</span>` : `<span>${t.startTime}~${t.endTime}</span>`}
                     <span>${completed}/${allMatches.length}경기</span>
                   </div>
                 </div>`;
@@ -930,7 +909,10 @@ const App = {
                 </button>
                 <div class="flex items-center justify-between mb-2 pr-6">
                   <h3 class="font-bold text-gray-800">${Results.escapeHtml(t.name)}</h3>
-                  <div class="flex items-center gap-2">
+                  <div class="flex items-center gap-1.5">
+                    ${t.status === 'completed'
+                      ? '<span class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-500">완료</span>'
+                      : '<span class="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700">진행중</span>'}
                     ${gameLabel ? `<span class="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700">${gameLabel}</span>` : ''}
                     <span class="text-xs px-2 py-1 rounded-full ${t.format === 'tournament' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}">
                       ${t.format === 'tournament' ? '토너먼트' : '리그'}
@@ -955,7 +937,7 @@ const App = {
         const name = Storage.getTournamentById(btn.dataset.id)?.name || '';
         if (!confirm(`"${name}" 대회를 삭제하시겠습니까?`)) return;
         Storage.deleteTournament(btn.dataset.id);
-        this.renderTournamentList(container, statusFilter);
+        this.renderTournamentList(container);
       };
     });
 
@@ -982,7 +964,7 @@ const App = {
 
     container.querySelector('#detail-back-btn').onclick = () => {
       this.currentTournamentId = null;
-      this.navigate(tournament.status === 'completed' ? 'history' : 'active');
+      this.navigate('active');
     };
 
     const viewContainer = container.querySelector('#detail-view-container');

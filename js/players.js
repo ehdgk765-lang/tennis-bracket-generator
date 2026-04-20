@@ -111,7 +111,7 @@ const Players = {
           <div class="flex items-center gap-3 min-w-0">
             <input type="checkbox" class="player-select-cb w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500 cursor-pointer flex-shrink-0" data-id="${p.id}">
             <span class="w-7 h-7 bg-green-100 text-green-700 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">${num}</span>
-            <span class="text-gray-800 font-medium truncate">${this._highlightMatch(p.name, isSearching ? query : '')}</span>
+            <span class="player-name-label text-gray-800 font-medium truncate cursor-pointer hover:text-green-600 hover:underline underline-offset-2 transition" data-id="${p.id}" data-name="${this.escapeHtml(p.name)}">${this._highlightMatch(p.name, isSearching ? query : '')}</span>
             <button class="gender-toggle-btn text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0 cursor-pointer active:scale-95 transition ${p.gender === 'M' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}"
               data-id="${p.id}">${p.gender === 'M' ? '남' : '여'}</button>
             <button class="ntrp-toggle-btn text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0 cursor-pointer active:scale-95 transition bg-yellow-100 text-yellow-700"
@@ -184,6 +184,7 @@ const Players = {
         if (!player) return;
         player.gender = player.gender === 'M' ? 'F' : 'M';
         Storage.savePlayers(players);
+        this._syncGenderToTournaments(player.name, player.gender);
         this.render(container);
       };
     });
@@ -208,6 +209,56 @@ const Players = {
         const players = Storage.getPlayers().filter(p => p.id !== id);
         Storage.savePlayers(players);
         this.render(container);
+      };
+    });
+
+    // 이름 인라인 편집
+    container.querySelectorAll('.player-name-label').forEach(label => {
+      label.onclick = () => {
+        if (label.querySelector('input')) return;
+        const id = label.dataset.id;
+        const oldName = label.dataset.name;
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = oldName;
+        input.maxLength = 20;
+        input.className = 'px-1.5 py-0.5 border border-green-400 rounded-lg text-sm font-medium focus:ring-2 focus:ring-green-500 outline-none w-full';
+        label.textContent = '';
+        label.appendChild(input);
+        input.focus();
+        input.select();
+
+        let saved = false;
+        const save = () => {
+          if (saved) return;
+          saved = true;
+          const newName = input.value.trim();
+          if (!newName || newName === oldName) {
+            this._refreshList(container);
+            return;
+          }
+          const players = Storage.getPlayers();
+          if (players.some(p => p.name === newName && p.id !== id)) {
+            alert('이미 등록된 이름입니다.');
+            saved = false;
+            input.focus();
+            input.select();
+            return;
+          }
+          const player = players.find(p => p.id === id);
+          if (player) {
+            player.name = newName;
+            Storage.savePlayers(players);
+            this._syncNameToTournaments(oldName, newName);
+          }
+          this.render(container);
+        };
+
+        input.onkeydown = (e) => {
+          if (e.key === 'Enter') { e.preventDefault(); save(); }
+          if (e.key === 'Escape') { this._refreshList(container); }
+        };
+        input.onblur = save;
       };
     });
 
@@ -359,6 +410,78 @@ const Players = {
       }
     };
     reader.readAsArrayBuffer(file);
+  },
+
+  // 대진표 내 선수 이름 치환 (싱글: "이름", 복식: "이름1 / 이름2" 모두 처리)
+  _replaceNameInField(field, oldName, newName) {
+    if (!field || field === 'draw') return field;
+    return field.split(' / ').map(n => n === oldName ? newName : n).join(' / ');
+  },
+
+  _syncNameToTournaments(oldName, newName) {
+    const tournaments = Storage.getTournaments();
+    let changed = false;
+
+    tournaments.forEach(t => {
+      // players 배열
+      if (t.players) {
+        for (let i = 0; i < t.players.length; i++) {
+          const updated = this._replaceNameInField(t.players[i], oldName, newName);
+          if (updated !== t.players[i]) { t.players[i] = updated; changed = true; }
+        }
+      }
+
+      // males/females 배열 (스케줄 형식)
+      ['males', 'females'].forEach(key => {
+        if (t[key]) {
+          const idx = t[key].indexOf(oldName);
+          if (idx !== -1) { t[key][idx] = newName; changed = true; }
+        }
+      });
+
+      // 매치 데이터 업데이트
+      const updateMatch = (match) => {
+        ['player1', 'player2', 'winner'].forEach(field => {
+          const updated = this._replaceNameInField(match[field], oldName, newName);
+          if (updated !== match[field]) { match[field] = updated; changed = true; }
+        });
+      };
+
+      // 토너먼트/리그: rounds[round][matchIndex]
+      if (t.rounds) {
+        t.rounds.forEach(round => {
+          if (Array.isArray(round)) round.forEach(updateMatch);
+        });
+      }
+
+      // 스케줄: timeSlots[slot].matches[matchIndex]
+      if (t.timeSlots) {
+        t.timeSlots.forEach(slot => {
+          if (slot.matches) slot.matches.forEach(updateMatch);
+        });
+      }
+    });
+
+    if (changed) Storage.saveTournaments(tournaments);
+  },
+
+  _syncGenderToTournaments(playerName, newGender) {
+    const tournaments = Storage.getTournaments();
+    let changed = false;
+
+    tournaments.forEach(t => {
+      if (!t.males || !t.females) return;
+      const fromArr = newGender === 'M' ? t.females : t.males;
+      const toArr = newGender === 'M' ? t.males : t.females;
+      const idx = fromArr.indexOf(playerName);
+      if (idx !== -1) {
+        fromArr.splice(idx, 1);
+        if (!toArr.includes(playerName)) toArr.push(playerName);
+        changed = true;
+      }
+    });
+
+    if (changed) Storage.saveTournaments(tournaments);
   },
 
   escapeHtml(text) {
