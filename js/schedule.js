@@ -757,7 +757,8 @@ const Schedule = {
       courtMatches[c].push({ match: m, mi });
     });
 
-    return `<div class="grid gap-3" style="grid-template-columns: repeat(${courtCount}, 1fr)">
+    const gridCols = courtCount <= 1 ? 'grid-cols-1' : `grid-cols-2${courtCount > 2 ? ` sm:grid-cols-${courtCount}` : ''}`;
+    return `<div class="grid gap-3 ${gridCols}">
       ${Array.from({length: courtCount}, (_, i) => {
         const c = i + 1;
         const matches = courtMatches[c];
@@ -801,7 +802,7 @@ const Schedule = {
     return `
       <div class="schedule-match-card relative bg-white border ${borderColor} rounded-xl p-3 cursor-pointer hover:shadow-md transition"
            draggable="true" data-match-id="${match.id}" data-slot-idx="${slotIdx}" data-match-idx="${matchIdx}">
-        <button type="button" class="delete-match-btn absolute top-1.5 right-1.5 w-6 h-6 flex items-center justify-center rounded-full text-gray-300 hover:bg-red-50 hover:text-red-500 transition" data-slot-idx="${slotIdx}" data-match-idx="${matchIdx}">
+        <button type="button" class="delete-match-btn absolute -top-2 -right-2 w-6 h-6 flex items-center justify-center rounded-full bg-white border border-gray-200 text-gray-400 hover:bg-red-50 hover:border-red-300 hover:text-red-500 shadow-sm transition z-10" data-slot-idx="${slotIdx}" data-match-idx="${matchIdx}">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
         ${cfg ? `<div class="flex items-center justify-between mb-2 pr-5">
@@ -809,15 +810,15 @@ const Schedule = {
           <span class="text-xs text-gray-400">코트 ${match.court}</span>
         </div>` : ''}
         <div class="space-y-0.5">
-          <div class="flex items-center justify-between ${t1Bg} rounded-lg px-2 py-2.5">
-            <span class="text-xs sm:text-sm font-medium ${t1TextClass} flex-1" style="min-width:0">
+          <div class="flex items-center justify-center ${t1Bg} rounded-lg px-2 py-2.5">
+            <span class="text-xs sm:text-sm font-medium ${t1TextClass} text-center" style="min-width:0">
               ${isWin1 ? '🏆 ' : ''}${isDraw ? '🤝 ' : ''}${t1Html}
             </span>
             ${hasResult && match.scores ? `<span class="text-xs font-bold ${s1Class} ml-1 flex-shrink-0">${match.scores[0][0]}</span>` : ''}
           </div>
           <div class="text-center text-xs text-gray-300 leading-tight">vs</div>
-          <div class="flex items-center justify-between ${t2Bg} rounded-lg px-2 py-2.5">
-            <span class="text-xs sm:text-sm font-medium ${t2TextClass} flex-1" style="min-width:0">
+          <div class="flex items-center justify-center ${t2Bg} rounded-lg px-2 py-2.5">
+            <span class="text-xs sm:text-sm font-medium ${t2TextClass} text-center" style="min-width:0">
               ${isWin2 ? '🏆 ' : ''}${isDraw ? '🤝 ' : ''}${t2Html}
             </span>
             ${hasResult && match.scores ? `<span class="text-xs font-bold ${s2Class} ml-1 flex-shrink-0">${match.scores[0][1]}</span>` : ''}
