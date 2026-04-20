@@ -63,7 +63,7 @@ const Auth = {
         <!-- 로고 영역 -->
         <div class="text-center mb-8">
           <div class="relative inline-block mb-4">
-            <div class="auth-logo-bg w-28 h-28 rounded-3xl mx-auto" role="img" aria-label="Tennis"></div>
+            <div class="auth-logo-bg w-36 h-36 rounded-3xl mx-auto" role="img" aria-label="Tennis"></div>
           </div>
           <h1 class="text-2xl font-extrabold bg-gradient-to-r from-green-600 to-emerald-500 bg-clip-text text-transparent">Happy Tennis Life</h1>
           <p class="text-sm text-gray-400 mt-1">테니스를 더 즐겁게</p>
