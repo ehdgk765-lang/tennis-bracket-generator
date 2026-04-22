@@ -99,6 +99,17 @@ const Tournament = {
     const roundNames = this.getRoundNames(totalRounds);
     const isComplete = rounds[totalRounds - 1][0].winner !== null;
 
+    // 멤버→팀 매핑
+    const _teamMap = {};
+    Storage.getTeams().forEach(t => (t.members || []).forEach(n => { _teamMap[n] = t.name; }));
+    const _teamBadge = (playerStr) => {
+      if (!playerStr) return '';
+      const names = playerStr.split(' / ');
+      const tns = [...new Set(names.map(n => _teamMap[n]).filter(Boolean))];
+      if (tns.length === 0) return '';
+      return tns.map(tn => `<span class="text-xs px-1 py-0.5 rounded bg-green-50 text-green-600 border border-green-200 whitespace-nowrap flex-shrink-0">${Results.escapeHtml(tn)}</span>`).join(' ');
+    };
+
     let html = `
       <div class="mb-4 flex items-center justify-between">
         <div>
@@ -114,6 +125,7 @@ const Tournament = {
         <div class="bg-gradient-to-r from-yellow-50 to-yellow-100 border border-yellow-200 rounded-2xl p-4 mb-6 text-center">
           <div class="text-yellow-600 text-sm font-medium mb-1">우승</div>
           <div class="text-2xl font-bold text-yellow-800">${Results.escapeHtml(rounds[totalRounds - 1][0].winner)}</div>
+          ${_teamBadge(rounds[totalRounds - 1][0].winner) ? `<div class="mt-1">${_teamBadge(rounds[totalRounds - 1][0].winner)}</div>` : ''}
         </div>`;
     }
 
@@ -135,11 +147,17 @@ const Tournament = {
                data-match-id="${match.id}" data-round="${r}">
             <div class="match-card bg-white border ${hasResult ? 'border-green-200' : 'border-gray-200'} rounded-xl overflow-hidden shadow-sm">
               <div class="match-player flex items-center justify-between px-3 py-2 ${match.winner === match.player1 && match.player1 ? 'bg-green-50 font-semibold text-green-800' : 'text-gray-700'} ${!match.player1 ? 'text-gray-300 italic' : ''} border-b border-gray-100">
-                <span class="truncate text-sm">${match.player1 ? Results.escapeHtml(match.player1) : (isBye ? 'BYE' : '대기 중')}</span>
+                <div class="flex items-center gap-1 min-w-0">
+                  <span class="truncate text-sm">${match.player1 ? Results.escapeHtml(match.player1) : (isBye ? 'BYE' : '대기 중')}</span>
+                  ${_teamBadge(match.player1)}
+                </div>
                 ${match.scores && match.scores.length > 0 ? `<span class="text-xs text-gray-500 ml-2 whitespace-nowrap">${match.scores.map(s => s[0]).join(' ')}</span>` : ''}
               </div>
               <div class="match-player flex items-center justify-between px-3 py-2 ${match.winner === match.player2 && match.player2 ? 'bg-green-50 font-semibold text-green-800' : 'text-gray-700'} ${!match.player2 ? 'text-gray-300 italic' : ''}">
-                <span class="truncate text-sm">${match.player2 ? Results.escapeHtml(match.player2) : (isBye ? 'BYE' : '대기 중')}</span>
+                <div class="flex items-center gap-1 min-w-0">
+                  <span class="truncate text-sm">${match.player2 ? Results.escapeHtml(match.player2) : (isBye ? 'BYE' : '대기 중')}</span>
+                  ${_teamBadge(match.player2)}
+                </div>
                 ${match.scores && match.scores.length > 0 ? `<span class="text-xs text-gray-500 ml-2 whitespace-nowrap">${match.scores.map(s => s[1]).join(' ')}</span>` : ''}
               </div>
             </div>

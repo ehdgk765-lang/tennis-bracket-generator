@@ -74,19 +74,19 @@ const Auth = {
           <form id="auth-form" class="space-y-4">
             <div>
               <label class="block text-xs font-semibold text-gray-500 mb-1.5 ml-1">이메일</label>
-              <input type="email" id="auth-email" required
+              <input type="email" autocomplete="off" id="auth-email" required
                 class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 focus:bg-white transition"
                 placeholder="email@example.com">
             </div>
             <div>
               <label class="block text-xs font-semibold text-gray-500 mb-1.5 ml-1">비밀번호</label>
-              <input type="password" id="auth-password" required minlength="6"
+              <input type="password" autocomplete="off" id="auth-password" required minlength="6"
                 class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 focus:bg-white transition"
                 placeholder="6자 이상">
             </div>
             <div id="auth-confirm-wrap" style="display:none">
               <label class="block text-xs font-semibold text-gray-500 mb-1.5 ml-1">비밀번호 확인</label>
-              <input type="password" id="auth-password-confirm" minlength="6"
+              <input type="password" autocomplete="off" id="auth-password-confirm" minlength="6"
                 class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 focus:bg-white transition"
                 placeholder="비밀번호를 다시 입력">
             </div>

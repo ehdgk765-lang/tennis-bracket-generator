@@ -491,8 +491,14 @@ const App = {
       <p class="text-xs text-gray-400 mb-4">빈 대진표를 생성한 후, 직접 매치를 추가할 수 있습니다.</p>
       <form id="custom-schedule-form" class="space-y-5">
         <div>
-          <label class="block text-sm font-semibold text-gray-700 mb-2">대진표 이름</label>
-          <input type="text" id="cs-name" maxlength="30"
+          <div class="flex items-center justify-between mb-2">
+            <label class="block text-sm font-semibold text-gray-700">대진표 이름</label>
+            <label class="flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" id="cs-team-mode" class="w-3.5 h-3.5 text-green-600 rounded border-gray-300 focus:ring-green-500">
+              <span class="text-xs text-gray-500">팀전</span>
+            </label>
+          </div>
+          <input type="text" autocomplete="off" id="cs-name" maxlength="30"
             class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500"
             placeholder="미입력 시 날짜로 자동 생성">
         </div>
@@ -521,6 +527,7 @@ const App = {
       e.preventDefault();
 
       const courts = parseInt(container.querySelector('input[name="cs-courts"]:checked').value);
+      const isTeamMode = container.querySelector('#cs-team-mode')?.checked || false;
 
       const today = new Date().toISOString().slice(0, 10);
       const customName = container.querySelector('#cs-name').value.trim();
@@ -529,6 +536,7 @@ const App = {
         name: customName || `${today} 대진표`,
         format: 'schedule',
         isCustom: true,
+        isTeamMode,
         setCount: 1,
         courts,
         allowMixed: true,
@@ -553,6 +561,8 @@ const App = {
     const allPlayers = Storage.getPlayers();
     const males = allPlayers.filter(p => p.gender === 'M');
     const females = allPlayers.filter(p => p.gender === 'F');
+    const _teamMap = {};
+    Storage.getTeams().forEach(t => (t.members || []).forEach(n => { _teamMap[n] = t.name; }));
 
     if (allPlayers.length < 4) {
       morphHTML(container, `
@@ -565,7 +575,11 @@ const App = {
     }
 
     morphHTML(container, `
-      <div class="flex items-center justify-end mb-4">
+      <div class="flex items-center justify-end gap-4 mb-4">
+        <label class="flex items-center gap-1.5 cursor-pointer">
+          <input type="checkbox" id="sch-team-mode" class="w-3.5 h-3.5 text-green-600 rounded border-gray-300 focus:ring-green-500">
+          <span class="text-xs text-gray-500">팀전</span>
+        </label>
         <label class="flex items-center gap-1.5 cursor-pointer">
           <input type="checkbox" id="allow-mixed" class="w-3.5 h-3.5 text-green-600 rounded border-gray-300 focus:ring-green-500">
           <span class="text-xs text-gray-500">섞어복식 허용</span>
@@ -624,14 +638,17 @@ const App = {
             <button type="button" id="sch-male-all-btn" class="text-sm text-green-600 font-medium hover:underline">전체 선택</button>
           </div>
           <div class="bg-white/80 backdrop-blur-sm border border-white/60 rounded-xl max-h-40 overflow-y-auto divide-y divide-gray-50">
-            ${males.map(p => `
+            ${males.map(p => {
+              const tn = _teamMap[p.name];
+              return `
               <label class="sch-male-item flex items-center px-4 py-2.5 hover:bg-gray-50 cursor-pointer transition" data-name="${Results.escapeHtml(p.name.toLowerCase())}">
                 <input type="checkbox" name="males" value="${Results.escapeHtml(p.name)}" class="male-cb w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500">
                 <span class="ml-3 text-sm text-gray-800">${Results.escapeHtml(p.name)}</span>
                 <span class="ml-2 text-xs px-1.5 py-0.5 rounded font-medium bg-blue-100 text-blue-700">남</span>
                 <span class="text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">${(p.ntrp || 2.5).toFixed(1)}</span>
-              </label>
-            `).join('')}
+                ${tn ? `<span class="sch-team-badge text-xs px-1.5 py-0.5 rounded font-medium bg-green-50 text-green-600 border border-green-200 hidden">${Results.escapeHtml(tn)}</span>` : ''}
+              </label>`;
+            }).join('')}
           </div>`}
         </div>
 
@@ -648,14 +665,17 @@ const App = {
             <button type="button" id="sch-female-all-btn" class="text-sm text-green-600 font-medium hover:underline">전체 선택</button>
           </div>
           <div class="bg-white/80 backdrop-blur-sm border border-white/60 rounded-xl max-h-40 overflow-y-auto divide-y divide-gray-50">
-            ${females.map(p => `
+            ${females.map(p => {
+              const tn = _teamMap[p.name];
+              return `
               <label class="sch-female-item flex items-center px-4 py-2.5 hover:bg-gray-50 cursor-pointer transition" data-name="${Results.escapeHtml(p.name.toLowerCase())}">
                 <input type="checkbox" name="females" value="${Results.escapeHtml(p.name)}" class="female-cb w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500">
                 <span class="ml-3 text-sm text-gray-800">${Results.escapeHtml(p.name)}</span>
                 <span class="ml-2 text-xs px-1.5 py-0.5 rounded font-medium bg-pink-100 text-pink-700">여</span>
                 <span class="text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">${(p.ntrp || 2.5).toFixed(1)}</span>
-              </label>
-            `).join('')}
+                ${tn ? `<span class="sch-team-badge text-xs px-1.5 py-0.5 rounded font-medium bg-green-50 text-green-600 border border-green-200 hidden">${Results.escapeHtml(tn)}</span>` : ''}
+              </label>`;
+            }).join('')}
           </div>`}
         </div>
 
@@ -680,6 +700,16 @@ const App = {
     container.querySelectorAll('.male-cb, .female-cb').forEach(cb => {
       cb.onchange = updateCounts;
     });
+
+    // 팀전 체크박스: 팀 배지 토글
+    const teamModeCb = container.querySelector('#sch-team-mode');
+    if (teamModeCb) {
+      teamModeCb.onchange = () => {
+        container.querySelectorAll('.sch-team-badge').forEach(el => {
+          el.classList.toggle('hidden', !teamModeCb.checked);
+        });
+      };
+    }
 
     const bindScheduleList = (prefix, cbClass) => {
       const search = container.querySelector(`#sch-${prefix}-search`);
@@ -744,6 +774,7 @@ const App = {
       }
 
       const allowMixed = container.querySelector('#allow-mixed')?.checked || false;
+      const isTeamMode = container.querySelector('#sch-team-mode')?.checked || false;
 
       const possibleTypes = Schedule.getPossibleTypes(selectedMales, selectedFemales, allowMixed);
       if (possibleTypes.length === 0) {
@@ -764,6 +795,7 @@ const App = {
         id: Storage.generateId(),
         name: customName || `${today} ${startTime} 대진표`,
         format: 'schedule',
+        isTeamMode,
         setCount: 1,
         courts,
         startTime,

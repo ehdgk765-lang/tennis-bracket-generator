@@ -3,6 +3,7 @@ const Storage = {
   KEYS: {
     PLAYERS: 'tennis_players',
     TOURNAMENTS: 'tennis_tournaments',
+    TEAMS: 'tennis_teams',
   },
 
   get(key) {
@@ -33,6 +34,17 @@ const Storage = {
   savePlayers(players) {
     const result = this.set(this.KEYS.PLAYERS, players);
     this.syncToFirestore('players', players);
+    return result;
+  },
+
+  // 팀 관련
+  getTeams() {
+    return this.get(this.KEYS.TEAMS) || [];
+  },
+
+  saveTeams(teams) {
+    const result = this.set(this.KEYS.TEAMS, teams);
+    this.syncToFirestore('teams', teams);
     return result;
   },
 
@@ -77,6 +89,7 @@ const Storage = {
 
   _unsubPlayers: null,
   _unsubTournaments: null,
+  _unsubTeams: null,
 
   // localStorage → Firestore (JSON 문자열로 직렬화하여 저장)
   syncToFirestore(docName, data) {
@@ -93,9 +106,10 @@ const Storage = {
     if (!user) return;
     try {
       const base = fbDb.collection('users').doc(user.uid).collection('data');
-      const [pDoc, tDoc] = await Promise.all([
+      const [pDoc, tDoc, teamsDoc] = await Promise.all([
         base.doc('players').get(),
-        base.doc('tournaments').get()
+        base.doc('tournaments').get(),
+        base.doc('teams').get()
       ]);
 
       if (pDoc.exists) {
@@ -126,6 +140,20 @@ const Storage = {
       } else {
         const local = this.getTournaments();
         if (local.length > 0) this.syncToFirestore('tournaments', local);
+      }
+
+      if (teamsDoc.exists) {
+        const d = teamsDoc.data();
+        const remote = d.json ? JSON.parse(d.json) : (d.items || []);
+        const local = this.getTeams();
+        const remoteIds = new Set(remote.map(t => t.id));
+        const localOnly = local.filter(t => !remoteIds.has(t.id));
+        const merged = [...remote, ...localOnly];
+        localStorage.setItem(this.KEYS.TEAMS, JSON.stringify(merged));
+        if (localOnly.length > 0) this.syncToFirestore('teams', merged);
+      } else {
+        const local = this.getTeams();
+        if (local.length > 0) this.syncToFirestore('teams', local);
       }
     } catch (err) {
       console.error('Firestore load error:', err);
@@ -174,6 +202,22 @@ const Storage = {
       console.error('Tournaments realtime sync error:', err);
     });
 
+    // 팀 데이터 실시간 리스너
+    this._unsubTeams = base.doc('teams').onSnapshot((doc) => {
+      if (doc.metadata.hasPendingWrites) return;
+      if (!doc.exists) return;
+      const d = doc.data();
+      const items = d.json ? JSON.parse(d.json) : (d.items || []);
+      const current = localStorage.getItem(this.KEYS.TEAMS);
+      const newJson = JSON.stringify(items);
+      if (current !== newJson) {
+        localStorage.setItem(this.KEYS.TEAMS, newJson);
+        this._onRemoteChange();
+      }
+    }, (err) => {
+      console.error('Teams realtime sync error:', err);
+    });
+
     // console.log('실시간 동기화 시작');
   },
 
@@ -185,6 +229,10 @@ const Storage = {
     if (this._unsubTournaments) {
       this._unsubTournaments();
       this._unsubTournaments = null;
+    }
+    if (this._unsubTeams) {
+      this._unsubTeams();
+      this._unsubTeams = null;
     }
     // console.log('실시간 동기화 중지');
   },

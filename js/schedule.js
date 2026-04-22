@@ -295,6 +295,57 @@ const Schedule = {
     return Object.values(stats).sort((a, b) => b.matchPoints - a.matchPoints || b.scorePoints - a.scorePoints || b.wins - a.wins || b.games - a.games);
   },
 
+  // 팀별 통계 계산
+  calcTeamStats(tournament) {
+    const teamMap = {};
+    Storage.getTeams().forEach(t => (t.members || []).forEach(n => { teamMap[n] = t.name; }));
+
+    const stats = {};
+    const ensureTeam = (name) => {
+      if (!name) return;
+      if (!stats[name]) stats[name] = { name, games: 0, wins: 0, losses: 0, draws: 0, matchPoints: 0, scorePoints: 0 };
+    };
+
+    for (const slot of tournament.timeSlots) {
+      for (const m of slot.matches) {
+        if (!m.player1 || !m.player2) continue;
+        const t1Names = m.player1.split(' / ');
+        const t2Names = m.player2.split(' / ');
+
+        // 매치의 각 side에서 팀 결정 (첫 번째 매핑된 멤버 기준)
+        const team1 = t1Names.map(n => teamMap[n]).find(Boolean) || null;
+        const team2 = t2Names.map(n => teamMap[n]).find(Boolean) || null;
+
+        if (team1) { ensureTeam(team1); stats[team1].games++; }
+        if (team2) { ensureTeam(team2); stats[team2].games++; }
+
+        if (m.winner === 'draw') {
+          if (team1) stats[team1].draws++;
+          if (team2) stats[team2].draws++;
+        } else if (m.winner) {
+          const winnerNames = m.winner.split(' / ');
+          const winTeam = winnerNames.map(n => teamMap[n]).find(Boolean) || null;
+          const loseTeam = winTeam === team1 ? team2 : team1;
+          if (winTeam && stats[winTeam]) stats[winTeam].wins++;
+          if (loseTeam && stats[loseTeam]) stats[loseTeam].losses++;
+        }
+
+        if (m.scores && m.scores.length > 0) {
+          let t1Pts = 0, t2Pts = 0;
+          m.scores.forEach(([s1, s2]) => { t1Pts += s1; t2Pts += s2; });
+          if (team1 && stats[team1]) stats[team1].scorePoints += t1Pts;
+          if (team2 && stats[team2]) stats[team2].scorePoints += t2Pts;
+        }
+      }
+    }
+
+    Object.values(stats).forEach(s => {
+      s.matchPoints = s.wins * 3 + s.draws * 1;
+    });
+
+    return Object.values(stats).sort((a, b) => b.matchPoints - a.matchPoints || b.scorePoints - a.scorePoints || b.wins - a.wins || b.games - a.games);
+  },
+
   // 대진표 렌더링
   render(container, tournament) {
     this._tournament = tournament;
@@ -347,6 +398,16 @@ const Schedule = {
           </div>
         </div>
 
+        ${isComplete && tournament.isTeamMode ? (() => {
+          const teamStats = this.calcTeamStats(tournament);
+          return teamStats.length > 0 ? `
+            <div class="bg-gradient-to-r from-yellow-50 to-yellow-100 border border-yellow-200 rounded-2xl p-4 mb-6 text-center">
+              <div class="text-yellow-600 text-sm font-medium mb-1">우승 팀</div>
+              <div class="text-2xl font-bold text-yellow-800">${Results.escapeHtml(teamStats[0].name)}</div>
+              <div class="text-sm text-yellow-700 mt-1">승점 ${teamStats[0].matchPoints} · 포인트 ${teamStats[0].scorePoints}</div>
+            </div>` : '';
+        })() : ''}
+
         <!-- 시간표 -->
         <div class="space-y-4 mb-6">
           ${tournament.isCustom ? this._renderCourtLayout(tournament) : tournament.timeSlots.map((slot, si) => `
@@ -364,6 +425,83 @@ const Schedule = {
           `).join('')}
         </div>
 
+        ${tournament.isTeamMode ? (() => {
+          const teamStats = this.calcTeamStats(tournament);
+          const medalPos = ['0%', '50%', '100%'];
+          return `
+          <!-- 팀별 통계 -->
+          <div id="stats-section" class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm shadow-green-50/30 border border-white/60 overflow-hidden mb-4">
+            <div class="px-4 py-3 bg-gray-50/50 border-b border-gray-100">
+              <span class="font-semibold text-gray-700 text-sm">팀별 통계</span>
+            </div>
+            <table class="w-full text-sm standings-table">
+              <thead>
+                <tr class="border-b border-gray-100 text-gray-500 text-xs">
+                  <th class="text-left px-4 py-2">팀</th>
+                  <th class="text-center px-2 py-2">경기</th>
+                  <th class="text-center px-2 py-2">승</th>
+                  <th class="text-center px-2 py-2">무</th>
+                  <th class="text-center px-2 py-2">패</th>
+                  <th class="text-center px-2 py-2">승점</th>
+                  <th class="text-center px-2 py-2">포인트</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${teamStats.map((s, idx) => {
+                  const rank = teamStats.findIndex(p => p.matchPoints === s.matchPoints && p.scorePoints === s.scorePoints);
+                  const medalHtml = isComplete && rank < 3 ? '<span style="display:inline-block;width:22px;height:26px;background:url(css/medal.png) no-repeat;background-size:300% auto;background-position:' + medalPos[rank] + ' center;vertical-align:middle;margin-right:2px;"></span>' : '';
+                  return '<tr class="border-b border-gray-50 hover:bg-gray-50' + (isComplete && rank < 3 ? ' bg-gradient-to-r' + (rank === 0 ? ' from-yellow-50/60' : rank === 1 ? ' from-gray-50/60' : ' from-orange-50/60') + ' to-transparent' : '') + '">' +
+                    '<td class="px-4 py-2 font-medium text-gray-800">' + medalHtml + Results.escapeHtml(s.name) + '</td>' +
+                    '<td class="text-center px-2 py-2 text-gray-600">' + s.games + '</td>' +
+                    '<td class="text-center px-2 py-2 text-green-600 font-medium">' + s.wins + '</td>' +
+                    '<td class="text-center px-2 py-2 text-gray-500">' + s.draws + '</td>' +
+                    '<td class="text-center px-2 py-2 text-red-500">' + s.losses + '</td>' +
+                    '<td class="text-center px-2 py-2 text-orange-600 font-bold">' + s.matchPoints + '</td>' +
+                    '<td class="text-center px-2 py-2 text-purple-600 font-medium">' + s.scorePoints + '</td>' +
+                  '</tr>';
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+          <!-- 멤버별 통계 -->
+          <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm shadow-green-50/30 border border-white/60 overflow-hidden">
+            <div class="px-4 py-3 bg-gray-50/50 border-b border-gray-100">
+              <span class="font-semibold text-gray-700 text-sm">멤버별 통계</span>
+            </div>
+            <table class="w-full text-sm standings-table">
+              <thead>
+                <tr class="border-b border-gray-100 text-gray-500 text-xs">
+                  <th class="text-left px-4 py-2">멤버</th>
+                  <th class="text-center px-2 py-2">경기</th>
+                  <th class="text-center px-2 py-2">승</th>
+                  <th class="text-center px-2 py-2">무</th>
+                  <th class="text-center px-2 py-2">패</th>
+                  <th class="text-center px-2 py-2">승점</th>
+                  <th class="text-center px-2 py-2">포인트</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${(() => { const allPlayersData = Storage.getPlayers(); return playerStats.map((s) => {
+                  const pd = allPlayersData.find(pl => pl.name === s.name);
+                  const gender = pd?.gender;
+                  const teamName = (() => { const teams = Storage.getTeams(); for (const t of teams) { if ((t.members || []).includes(s.name)) return t.name; } return ''; })();
+                  return '<tr class="border-b border-gray-50 hover:bg-gray-50">' +
+                    '<td class="px-4 py-2 font-medium text-gray-800">' + Results.escapeHtml(s.name) +
+                      ' <span class="text-xs px-1 py-0.5 rounded font-medium ' + (gender === 'M' ? 'bg-blue-100 text-blue-700' : gender === 'F' ? 'bg-pink-100 text-pink-700' : 'bg-gray-100 text-gray-500') + '">' + (gender === 'M' ? '남' : gender === 'F' ? '여' : '-') + '</span>' +
+                      (teamName ? ' <span class="text-xs px-1 py-0.5 rounded font-medium bg-green-50 text-green-600 border border-green-200">' + Results.escapeHtml(teamName) + '</span>' : '') +
+                    '</td>' +
+                    '<td class="text-center px-2 py-2 text-gray-600">' + s.games + '</td>' +
+                    '<td class="text-center px-2 py-2 text-green-600 font-medium">' + s.wins + '</td>' +
+                    '<td class="text-center px-2 py-2 text-gray-500">' + s.draws + '</td>' +
+                    '<td class="text-center px-2 py-2 text-red-500">' + s.losses + '</td>' +
+                    '<td class="text-center px-2 py-2 text-orange-600 font-bold">' + s.matchPoints + '</td>' +
+                    '<td class="text-center px-2 py-2 text-purple-600 font-medium">' + s.scorePoints + '</td>' +
+                  '</tr>';
+                }).join(''); })()}
+              </tbody>
+            </table>
+          </div>`;
+        })() : `
         <!-- 멤버별 통계 -->
         <div id="stats-section" class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm shadow-green-50/30 border border-white/60 overflow-hidden">
           <div class="px-4 py-3 bg-gray-50/50 border-b border-gray-100">
@@ -388,25 +526,24 @@ const Schedule = {
                 const ntrp = pd?.ntrp || 2.5;
                 const medalPos = ['0%', '50%', '100%'];
                 const rank = playerStats.findIndex(p => p.matchPoints === s.matchPoints && p.scorePoints === s.scorePoints);
-                const medalHtml = isComplete && rank < 3 ? `<span style="display:inline-block;width:22px;height:26px;background:url('css/medal.png') no-repeat;background-size:300% auto;background-position:${medalPos[rank]} center;vertical-align:middle;margin-right:2px;"></span>` : '';
-                return `
-                  <tr class="border-b border-gray-50 hover:bg-gray-50${isComplete && rank < 3 ? ' bg-gradient-to-r' + (rank === 0 ? ' from-yellow-50/60' : rank === 1 ? ' from-gray-50/60' : ' from-orange-50/60') + ' to-transparent' : ''}">
-                    <td class="px-4 py-2 font-medium text-gray-800">
-                      ${medalHtml}${Results.escapeHtml(s.name)}
-                      <span class="text-xs px-1 py-0.5 rounded font-medium ${gender === 'M' ? 'bg-blue-100 text-blue-700' : gender === 'F' ? 'bg-pink-100 text-pink-700' : 'bg-gray-100 text-gray-500'}">${gender === 'M' ? '남' : gender === 'F' ? '여' : '-'}</span>
-                      ${tournament.isCustom ? '' : `<span class="text-xs px-1 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">${ntrp.toFixed(1)}</span>`}
-                    </td>
-                    <td class="text-center px-2 py-2 text-gray-600">${s.games}</td>
-                    <td class="text-center px-2 py-2 text-green-600 font-medium">${s.wins}</td>
-                    <td class="text-center px-2 py-2 text-gray-500">${s.draws}</td>
-                    <td class="text-center px-2 py-2 text-red-500">${s.losses}</td>
-                    <td class="text-center px-2 py-2 text-orange-600 font-bold">${s.matchPoints}</td>
-                    <td class="text-center px-2 py-2 text-purple-600 font-medium">${s.scorePoints}</td>
-                  </tr>`;
+                const medalHtml = isComplete && rank < 3 ? '<span style="display:inline-block;width:22px;height:26px;background:url(\'css/medal.png\') no-repeat;background-size:300% auto;background-position:' + medalPos[rank] + ' center;vertical-align:middle;margin-right:2px;"></span>' : '';
+                return '<tr class="border-b border-gray-50 hover:bg-gray-50' + (isComplete && rank < 3 ? ' bg-gradient-to-r' + (rank === 0 ? ' from-yellow-50/60' : rank === 1 ? ' from-gray-50/60' : ' from-orange-50/60') + ' to-transparent' : '') + '">' +
+                  '<td class="px-4 py-2 font-medium text-gray-800">' +
+                    medalHtml + Results.escapeHtml(s.name) +
+                    ' <span class="text-xs px-1 py-0.5 rounded font-medium ' + (gender === 'M' ? 'bg-blue-100 text-blue-700' : gender === 'F' ? 'bg-pink-100 text-pink-700' : 'bg-gray-100 text-gray-500') + '">' + (gender === 'M' ? '남' : gender === 'F' ? '여' : '-') + '</span>' +
+                    (tournament.isCustom ? '' : ' <span class="text-xs px-1 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">' + ntrp.toFixed(1) + '</span>') +
+                  '</td>' +
+                  '<td class="text-center px-2 py-2 text-gray-600">' + s.games + '</td>' +
+                  '<td class="text-center px-2 py-2 text-green-600 font-medium">' + s.wins + '</td>' +
+                  '<td class="text-center px-2 py-2 text-gray-500">' + s.draws + '</td>' +
+                  '<td class="text-center px-2 py-2 text-red-500">' + s.losses + '</td>' +
+                  '<td class="text-center px-2 py-2 text-orange-600 font-bold">' + s.matchPoints + '</td>' +
+                  '<td class="text-center px-2 py-2 text-purple-600 font-medium">' + s.scorePoints + '</td>' +
+                '</tr>';
               }).join(''); })()}
             </tbody>
           </table>
-        </div>
+        </div>`}
       </div>`);
 
     // PDF 다운로드
@@ -532,7 +669,7 @@ const Schedule = {
         }
         const match = allMatches.find(m => m.id === card.dataset.matchId);
         if (!match) return;
-        Results.showScoreModal(match, { setCount: 1, allowDraw: true }, (result) => {
+        Results.showScoreModal(match, { setCount: 1, allowDraw: true, isTeamMode: tournament.isTeamMode, isCustom: tournament.isCustom }, (result) => {
           match.scores = result.scores;
           match.winner = result.winner;
           Storage.updateTournament(tournament);
@@ -788,6 +925,19 @@ const Schedule = {
     const t2Names = match.player2.split(' / ');
     const t1Html = t1Names.map((n, p) => this.renderSwapPlayer(n, slotIdx, matchIdx, 1, p)).join(' <span class="text-gray-300">/</span> ');
     const t2Html = t2Names.map((n, p) => this.renderSwapPlayer(n, slotIdx, matchIdx, 2, p)).join(' <span class="text-gray-300">/</span> ');
+
+    // 팀전 모드: 팀 이름
+    let t1TeamName = '', t2TeamName = '';
+    if (this._tournament?.isTeamMode) {
+      const _tm = {};
+      Storage.getTeams().forEach(t => (t.members || []).forEach(n => { _tm[n] = t.name; }));
+      const getTeam = (names) => {
+        const tns = [...new Set(names.map(n => _tm[n]).filter(Boolean))];
+        return tns.map(tn => Results.escapeHtml(tn)).join(' / ');
+      };
+      t1TeamName = getTeam(t1Names);
+      t2TeamName = getTeam(t2Names);
+    }
     const isWin1 = !isDraw && match.winner === match.player1;
     const isWin2 = !isDraw && match.winner === match.player2;
 
@@ -810,18 +960,24 @@ const Schedule = {
           <span class="text-xs text-gray-400">코트 ${match.court}</span>
         </div>` : ''}
         <div class="space-y-0.5">
-          <div class="flex items-center justify-center ${t1Bg} rounded-lg px-2 py-2.5">
-            <span class="text-xs sm:text-sm font-medium ${t1TextClass} text-center" style="min-width:0">
-              ${isWin1 ? '🏆 ' : ''}${isDraw ? '🤝 ' : ''}${t1Html}
-            </span>
-            ${hasResult && match.scores ? `<span class="text-xs font-bold ${s1Class} ml-1 flex-shrink-0">${match.scores[0][0]}</span>` : ''}
+          <div class="${t1Bg} rounded-lg px-2 ${t1TeamName ? 'pt-1.5 pb-2' : 'py-2.5'}">
+            ${t1TeamName ? `<div class="text-center mb-1"><span class="inline-block text-[10px] leading-tight px-1.5 py-0.5 rounded bg-green-50 text-green-600 border border-green-200 font-medium">${t1TeamName}</span></div>` : ''}
+            <div class="flex items-center justify-center gap-1">
+              <span class="text-xs sm:text-sm font-medium ${t1TextClass} text-center truncate" style="min-width:0">
+                ${isWin1 ? '🏆 ' : ''}${isDraw ? '🤝 ' : ''}${t1Html}
+              </span>
+              ${hasResult && match.scores ? `<span class="text-xs font-bold ${s1Class} flex-shrink-0">${match.scores[0][0]}</span>` : ''}
+            </div>
           </div>
           <div class="text-center text-xs text-gray-300 leading-tight">vs</div>
-          <div class="flex items-center justify-center ${t2Bg} rounded-lg px-2 py-2.5">
-            <span class="text-xs sm:text-sm font-medium ${t2TextClass} text-center" style="min-width:0">
-              ${isWin2 ? '🏆 ' : ''}${isDraw ? '🤝 ' : ''}${t2Html}
-            </span>
-            ${hasResult && match.scores ? `<span class="text-xs font-bold ${s2Class} ml-1 flex-shrink-0">${match.scores[0][1]}</span>` : ''}
+          <div class="${t2Bg} rounded-lg px-2 ${t2TeamName ? 'pt-1.5 pb-2' : 'py-2.5'}">
+            ${t2TeamName ? `<div class="text-center mb-1"><span class="inline-block text-[10px] leading-tight px-1.5 py-0.5 rounded bg-green-50 text-green-600 border border-green-200 font-medium">${t2TeamName}</span></div>` : ''}
+            <div class="flex items-center justify-center gap-1">
+              <span class="text-xs sm:text-sm font-medium ${t2TextClass} text-center truncate" style="min-width:0">
+                ${isWin2 ? '🏆 ' : ''}${isDraw ? '🤝 ' : ''}${t2Html}
+              </span>
+              ${hasResult && match.scores ? `<span class="text-xs font-bold ${s2Class} flex-shrink-0">${match.scores[0][1]}</span>` : ''}
+            </div>
           </div>
         </div>
         ${!hasResult ? '<p class="text-xs text-gray-400 text-center mt-1.5">탭하여 스코어 입력</p>' : ''}
@@ -905,6 +1061,10 @@ const Schedule = {
     if (existing) existing.remove();
 
     const allPlayers = Storage.getPlayers();
+    const _teamMap = {};
+    if (tournament.isTeamMode) {
+      Storage.getTeams().forEach(t => (t.members || []).forEach(n => { _teamMap[n] = t.name; }));
+    }
     const selected = { t1p1: null, t1p2: null, t2p1: null, t2p2: null };
     let selectedCourt = presetCourt || 1;
     let selectedSlot = 0;
@@ -918,12 +1078,14 @@ const Schedule = {
       const playerSlot = (key, label) => {
         const name = selected[key];
         const pd = name ? allPlayers.find(p => p.name === name) : null;
+        const tn = name ? _teamMap[name] : null;
         if (name) {
           return `<div class="am-player-slot flex items-center justify-between px-3 py-2.5 border border-gray-200 rounded-xl cursor-pointer hover:bg-green-50 transition" data-key="${key}">
             <div class="flex items-center gap-2">
               <span class="text-sm text-gray-800 font-medium">${Results.escapeHtml(name)}</span>
               ${pd ? `<span class="text-xs px-1.5 py-0.5 rounded font-medium ${pd.gender === 'M' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}">${pd.gender === 'M' ? '남' : '여'}</span>
               ${tournament.isCustom ? '' : `<span class="text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">${(pd.ntrp || 2.5).toFixed(1)}</span>`}` : ''}
+              ${tn ? `<span class="text-xs px-1.5 py-0.5 rounded font-medium bg-green-50 text-green-600 border border-green-200">${Results.escapeHtml(tn)}</span>` : ''}
             </div>
             <button type="button" class="am-remove-player text-red-400 hover:text-red-600 text-xs" data-key="${key}">✕</button>
           </div>`;
@@ -1079,6 +1241,10 @@ const Schedule = {
     if (existing) existing.remove();
 
     const usedNames = new Set(Object.values(selected).filter(Boolean));
+    const _teamMap = {};
+    if (this._tournament?.isTeamMode) {
+      Storage.getTeams().forEach(t => (t.members || []).forEach(n => { _teamMap[n] = t.name; }));
+    }
 
     const picker = document.createElement('div');
     picker.className = 'am-player-picker fixed inset-0 z-[60] flex items-end sm:items-center justify-center';
@@ -1100,12 +1266,14 @@ const Schedule = {
           <div class="overflow-y-auto flex-1 divide-y divide-gray-50">
             ${allPlayers.map(p => {
               const isUsed = usedNames.has(p.name);
+              const tn = _teamMap[p.name];
               return `
                 <div class="amp-option flex items-center px-3 py-2.5 ${isUsed ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-green-50'} transition"
                   data-name="${Results.escapeHtml(p.name)}" data-used="${isUsed}">
                   <span class="text-sm text-gray-800">${Results.escapeHtml(p.name)}</span>
                   <span class="ml-2 text-xs px-1.5 py-0.5 rounded font-medium ${p.gender === 'M' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}">${p.gender === 'M' ? '남' : '여'}</span>
                   ${this._tournament?.isCustom ? '' : `<span class="ml-1 text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">${(p.ntrp || 2.5).toFixed(1)}</span>`}
+                  ${tn ? `<span class="ml-1 text-xs px-1.5 py-0.5 rounded font-medium bg-green-50 text-green-600 border border-green-200">${Results.escapeHtml(tn)}</span>` : ''}
                   ${isUsed ? '<span class="ml-auto text-xs text-gray-400">선택됨</span>' : ''}
                 </div>`;
             }).join('')}
