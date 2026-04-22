@@ -309,7 +309,7 @@ const CustomBracket = {
     const existing = document.querySelector('.cb-player-picker');
     if (existing) existing.remove();
 
-    const allPlayers = Storage.getPlayers();
+    const allPlayers = Storage.getPlayers().sort((a, b) => a.name.localeCompare(b.name, 'ko'));
     const placedNames = this.getPlacedNames();
     const teamMap = {};
     Storage.getTeams().forEach(t => (t.members || []).forEach(n => { teamMap[n] = t.name; }));
@@ -388,7 +388,7 @@ const CustomBracket = {
     const existing = document.querySelector('.cb-player-picker');
     if (existing) existing.remove();
 
-    const allPlayers = Storage.getPlayers();
+    const allPlayers = Storage.getPlayers().sort((a, b) => a.name.localeCompare(b.name, 'ko'));
     const teamMap = {};
     Storage.getTeams().forEach(t => (t.members || []).forEach(n => { teamMap[n] = t.name; }));
     const usedNames = this._getPlacedPlayerNames();

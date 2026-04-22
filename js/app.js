@@ -264,7 +264,7 @@ const App = {
   },
 
   renderSinglesSection(section, gameType) {
-    const eligible = this.getEligiblePlayers(gameType);
+    const eligible = this.getEligiblePlayers(gameType).sort((a, b) => a.name.localeCompare(b.name, 'ko'));
     const config = GAME_TYPES[gameType];
     const minPlayers = config.doubles ? 4 : 2;
 
@@ -332,8 +332,8 @@ const App = {
 
   renderMixedSection(section) {
     const allPlayers = Storage.getPlayers();
-    const males = allPlayers.filter(p => p.gender === 'M');
-    const females = allPlayers.filter(p => p.gender === 'F');
+    const males = allPlayers.filter(p => p.gender === 'M').sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+    const females = allPlayers.filter(p => p.gender === 'F').sort((a, b) => a.name.localeCompare(b.name, 'ko'));
 
     if (males.length < 2 || females.length < 2) {
       morphHTML(section, `
@@ -577,8 +577,8 @@ const App = {
 
   _renderTimeCourtForm(container) {
     const allPlayers = Storage.getPlayers();
-    const males = allPlayers.filter(p => p.gender === 'M');
-    const females = allPlayers.filter(p => p.gender === 'F');
+    const males = allPlayers.filter(p => p.gender === 'M').sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+    const females = allPlayers.filter(p => p.gender === 'F').sort((a, b) => a.name.localeCompare(b.name, 'ko'));
     const _teamMap = {};
     Storage.getTeams().forEach(t => (t.members || []).forEach(n => { _teamMap[n] = t.name; }));
 

@@ -533,7 +533,7 @@ const Schedule = {
                   '<td class="px-4 py-2 font-medium text-gray-800">' +
                     medalHtml + Results.escapeHtml(s.name) +
                     ' <span class="text-xs px-1 py-0.5 rounded font-medium ' + (gender === 'M' ? 'bg-blue-100 text-blue-700' : gender === 'F' ? 'bg-pink-100 text-pink-700' : 'bg-gray-100 text-gray-500') + '">' + (gender === 'M' ? '남' : gender === 'F' ? '여' : '-') + '</span>' +
-                    (tournament.isCustom ? '' : ' <span class="text-xs px-1 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">' + ntrp.toFixed(1) + '</span>') +
+                    (!App.isAdmin ? '' : ' <span class="text-xs px-1 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">' + ntrp.toFixed(1) + '</span>') +
                   '</td>' +
                   '<td class="text-center px-2 py-2 text-gray-600">' + s.games + '</td>' +
                   '<td class="text-center px-2 py-2 text-green-600 font-medium">' + s.wins + '</td>' +
@@ -883,7 +883,7 @@ const Schedule = {
     const allPlayers = Storage.getPlayers();
     const pd = allPlayers.find(p => p.name === name);
     const isCustom = this._tournament?.isCustom;
-    const ntrpHtml = isCustom ? '' : `<span class="text-yellow-600 text-xs">${(pd?.ntrp || 2.5).toFixed(1)}</span>`;
+    const ntrpHtml = !App.isAdmin ? '' : `<span class="text-yellow-600 text-xs">${(pd?.ntrp || 2.5).toFixed(1)}</span>`;
     const genderHtml = isCustom && pd ? `<span class="text-xs ${pd.gender === 'M' ? 'text-blue-600' : 'text-pink-600'}">${pd.gender === 'M' ? '남' : '여'}</span>` : '';
     return `<span class="swap-player cursor-pointer hover:bg-yellow-100 rounded px-0.5 transition inline-flex items-center gap-0.5"
       data-slot-idx="${slotIdx}" data-match-idx="${matchIdx}" data-team="${team}" data-pos="${pos}"
@@ -997,7 +997,7 @@ const Schedule = {
     const existing = document.querySelector('.add-match-modal');
     if (existing) existing.remove();
 
-    const allPlayers = Storage.getPlayers();
+    const allPlayers = Storage.getPlayers().sort((a, b) => a.name.localeCompare(b.name, 'ko'));
     const _teamMap = {};
     if (tournament.isTeamMode) {
       Storage.getTeams().forEach(t => (t.members || []).forEach(n => { _teamMap[n] = t.name; }));
