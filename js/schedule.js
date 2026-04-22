@@ -548,45 +548,55 @@ const Schedule = {
         </div>`}
       </div>`);
 
+    // 게스트 모드: 수정 UI 숨기기 (스코어 입력만 허용)
+    if (!App.isAdmin) {
+      container.querySelectorAll('#add-match-btn, .delete-match-btn, .court-add-match-btn, #pdf-download-btn').forEach(el => el.style.display = 'none');
+      const titleEl = container.querySelector('#schedule-title');
+      if (titleEl) titleEl.style.cursor = 'default';
+    }
+
     // PDF 다운로드
     const pdfBtn = container.querySelector('#pdf-download-btn');
     if (pdfBtn) {
       pdfBtn.onclick = () => this.exportPDF(container, tournament);
     }
 
-    // 대진 추가
-    const addMatchBtn = container.querySelector('#add-match-btn');
-    if (addMatchBtn) {
-      addMatchBtn.onclick = () => this.showAddMatchModal(container, tournament);
-    }
+    if (App.isAdmin) {
+      // 대진 추가
+      const addMatchBtn = container.querySelector('#add-match-btn');
+      if (addMatchBtn) {
+        addMatchBtn.onclick = () => this.showAddMatchModal(container, tournament);
+      }
 
-    // 코트별 대진 추가 버튼
-    container.querySelectorAll('.court-add-match-btn').forEach(btn => {
-      btn.onclick = () => {
-        const court = parseInt(btn.dataset.court);
-        this.showAddMatchModal(container, tournament, court);
-      };
-    });
+      // 코트별 대진 추가 버튼
+      container.querySelectorAll('.court-add-match-btn').forEach(btn => {
+        btn.onclick = () => {
+          const court = parseInt(btn.dataset.court);
+          this.showAddMatchModal(container, tournament, court);
+        };
+      });
 
-    // 대진표 이름 수정
-    const titleEl = container.querySelector('#schedule-title');
-    if (titleEl) {
-      titleEl.onclick = () => {
-        const newName = prompt('대진표 이름을 입력하세요', tournament.name);
-        if (newName !== null && newName.trim() !== '') {
-          tournament.name = newName.trim();
-          Storage.updateTournament(tournament);
-          this.render(container, tournament);
-        }
-      };
+      // 대진표 이름 수정
+      const titleEl = container.querySelector('#schedule-title');
+      if (titleEl) {
+        titleEl.onclick = () => {
+          const newName = prompt('대진표 이름을 입력하세요', tournament.name);
+          if (newName !== null && newName.trim() !== '') {
+            tournament.name = newName.trim();
+            Storage.updateTournament(tournament);
+            this.render(container, tournament);
+          }
+        };
+      }
     }
 
     // ─── 멤버 탭-교환 + 매치 카드 드래그 ───
     const cards = container.querySelectorAll('.schedule-match-card');
     let selectedPlayer = null;
 
-    // 멤버 이름 탭 → 선택/교환
+    // 멤버 이름 탭 → 선택/교환 (관리자만)
     container.querySelectorAll('.swap-player').forEach(el => {
+      if (!App.isAdmin) { el.style.cursor = 'default'; return; }
       el.onclick = (e) => {
         e.stopPropagation(); // 카드 클릭(스코어) 방지
 
@@ -686,8 +696,9 @@ const Schedule = {
       };
     });
 
-    // 대진 삭제 (X 버튼)
+    // 대진 삭제 (X 버튼, 관리자만)
     container.querySelectorAll('.delete-match-btn').forEach(btn => {
+      if (!App.isAdmin) return;
       btn.onclick = (e) => {
         e.stopPropagation();
         const si = +btn.dataset.slotIdx;

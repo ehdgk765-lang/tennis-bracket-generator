@@ -8,14 +8,28 @@ const GAME_TYPES = {
 };
 
 const App = {
+  isAdmin: false,
   currentTab: 'players',
   currentTournamentId: null,
   _createSubTab: 'custom-bracket',
   _scheduleSubTab: 'custom-schedule',
 
   init() {
+    this.applyRoleUI();
     this.bindTabs();
-    this.navigate('players');
+    this.navigate(this.isAdmin ? 'players' : 'active');
+  },
+
+  applyRoleUI() {
+    document.querySelectorAll('[data-tab]').forEach(tab => {
+      if (tab.dataset.tab === 'active') {
+        tab.style.display = '';
+      } else {
+        tab.style.display = this.isAdmin ? '' : 'none';
+      }
+    });
+    const adminBtn = document.getElementById('admin-settings-btn');
+    if (adminBtn) adminBtn.classList.toggle('hidden', !this.isAdmin);
   },
 
   bindTabs() {
@@ -25,6 +39,10 @@ const App = {
   },
 
   navigate(tabName, tournamentId) {
+    // 게스트는 대진표 탭만 허용
+    if (!this.isAdmin && tabName !== 'active') {
+      tabName = 'active';
+    }
     this.currentTab = tabName;
 
     document.querySelectorAll('[data-tab]').forEach(tab => {
@@ -963,8 +981,14 @@ const App = {
         </div>
       </div>`);
 
-    // 삭제 버튼
+    // 게스트 모드: 삭제 버튼 숨기기
+    if (!this.isAdmin) {
+      container.querySelectorAll('.delete-tournament-btn').forEach(el => el.style.display = 'none');
+    }
+
+    // 삭제 버튼 (관리자만)
     container.querySelectorAll('.delete-tournament-btn').forEach(btn => {
+      if (!this.isAdmin) return;
       btn.onclick = (e) => {
         e.stopPropagation();
         const name = Storage.getTournamentById(btn.dataset.id)?.name || '';
