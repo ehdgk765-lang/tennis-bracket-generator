@@ -481,12 +481,14 @@ const Schedule = {
                 </tr>
               </thead>
               <tbody>
-                ${(() => { const allPlayersData = Storage.getPlayers(); return playerStats.map((s) => {
+                ${(() => { const allPlayersData = Storage.getPlayers(); const medalPos = ['0%', '50%', '100%']; return playerStats.map((s) => {
                   const pd = allPlayersData.find(pl => pl.name === s.name);
                   const gender = pd?.gender;
                   const teamName = (() => { const teams = Storage.getTeams(); for (const t of teams) { if ((t.members || []).includes(s.name)) return t.name; } return ''; })();
-                  return '<tr class="border-b border-gray-50 hover:bg-gray-50">' +
-                    '<td class="px-4 py-2 font-medium text-gray-800">' + Results.escapeHtml(s.name) +
+                  const rank = playerStats.findIndex(p => p.matchPoints === s.matchPoints && p.scorePoints === s.scorePoints);
+                  const medalHtml = isComplete && rank < 3 ? '<span style="display:inline-block;width:22px;height:26px;background:url(\'css/medal.png\') no-repeat;background-size:300% auto;background-position:' + medalPos[rank] + ' center;vertical-align:middle;margin-right:2px;"></span>' : '';
+                  return '<tr class="border-b border-gray-50 hover:bg-gray-50' + (isComplete && rank < 3 ? ' bg-gradient-to-r' + (rank === 0 ? ' from-yellow-50/60' : rank === 1 ? ' from-gray-50/60' : ' from-orange-50/60') + ' to-transparent' : '') + '">' +
+                    '<td class="px-4 py-2 font-medium text-gray-800">' + medalHtml + Results.escapeHtml(s.name) +
                       ' <span class="text-xs px-1 py-0.5 rounded font-medium ' + (gender === 'M' ? 'bg-blue-100 text-blue-700' : gender === 'F' ? 'bg-pink-100 text-pink-700' : 'bg-gray-100 text-gray-500') + '">' + (gender === 'M' ? '남' : gender === 'F' ? '여' : '-') + '</span>' +
                       (teamName ? ' <span class="text-xs px-1 py-0.5 rounded font-medium bg-green-50 text-green-600 border border-green-200">' + Results.escapeHtml(teamName) + '</span>' : '') +
                     '</td>' +
@@ -751,113 +753,108 @@ const Schedule = {
     try {
       const { jsPDF } = window.jspdf;
 
-      // PDF에서 숨길 요소 (기록 탭에서는 통계 포함)
-      const hideSelector = tournament.status === 'completed'
-        ? '#pdf-download-btn, #add-match-btn, .schedule-match-card p, .delete-match-btn'
-        : '#pdf-download-btn, #add-match-btn, .schedule-match-card p, .delete-match-btn, #stats-section';
+      // ── 화면 그대로 캡처 방식 ──
+      // 1) 숨길 UI 요소
+      const hideSelector = '#pdf-download-btn, #add-match-btn, .schedule-match-card p, .delete-match-btn, .court-add-match-btn';
       const hideEls = container.querySelectorAll(hideSelector);
       hideEls.forEach(el => el.style.display = 'none');
 
-      // ── html2canvas + table HTML: 레이아웃 정확, 비대칭 패딩으로 텍스트 위치 보정 ──
-      const captureOpts = { scale: 2, useCORS: true, backgroundColor: '#ffffff', scrollY: -window.scrollY };
-      const headerCaptureW = '700px';
+      // 2) html2canvas 텍스트 클리핑 보정용 임시 스타일 주입
+      const pdfFixStyle = document.createElement('style');
+      pdfFixStyle.id = 'pdf-capture-fix';
+      pdfFixStyle.textContent = `
+        .schedule-match-card, .schedule-match-card * {
+          overflow: visible !important;
+          text-overflow: clip !important;
+          white-space: normal !important;
+          line-height: 1.6 !important;
+        }
+        .schedule-match-card .truncate {
+          overflow: visible !important;
+          text-overflow: clip !important;
+        }
+        .schedule-match-card .rounded-lg {
+          overflow: visible !important;
+          padding-top: 8px !important;
+          padding-bottom: 8px !important;
+        }
+        .schedule-match-card span, .schedule-match-card div {
+          padding-bottom: 1px !important;
+        }
+        [class*="backdrop-blur"] {
+          backdrop-filter: none !important;
+          -webkit-backdrop-filter: none !important;
+        }
+        [class*="bg-white\\/"] {
+          background: #fff !important;
+        }
+        .standings-table td, .standings-table th {
+          line-height: 1.6 !important;
+          padding-top: 6px !important;
+          padding-bottom: 6px !important;
+        }
+        .schedule-slot span, .schedule-slot div {
+          line-height: 1.6 !important;
+        }
+      `;
+      document.head.appendChild(pdfFixStyle);
 
-      // 헤더 캡처 (화면 DOM)
-      const headerEl = container.querySelector('#schedule-header');
-      const origHeaderW = headerEl.style.width;
-      headerEl.style.width = headerCaptureW;
-      const headerCanvas = await html2canvas(headerEl, captureOpts);
-      headerEl.style.width = origHeaderW;
-
-      // PDF 전용 table HTML로 슬롯 캡처 (html2canvas flex 버그 우회)
-      const pdfBox = document.createElement('div');
-      pdfBox.style.cssText = 'position:fixed;left:-9999px;top:0;';
-      document.body.appendChild(pdfBox);
-
-      const slotDivs = [];
-      for (const slot of tournament.timeSlots) {
-        const d = document.createElement('div');
-        d.innerHTML = this._renderPdfSlot(slot);
-        pdfBox.appendChild(d);
-        slotDivs.push(d);
-      }
+      // 3) 컨테이너를 고정 너비로 설정 (일관된 렌더링)
+      const captureW = 800;
+      const origWidth = container.style.width;
+      const origMaxWidth = container.style.maxWidth;
+      container.style.width = captureW + 'px';
+      container.style.maxWidth = captureW + 'px';
       await new Promise(r => requestAnimationFrame(r));
 
-      const slotCanvases = [];
-      for (const d of slotDivs) {
-        slotCanvases.push(await html2canvas(d, { ...captureOpts, scrollY: 0 }));
-      }
-      document.body.removeChild(pdfBox);
+      // 4) 화면 DOM 그대로 캡처
+      const fullCanvas = await html2canvas(container, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        scrollY: -window.scrollY,
+        windowWidth: captureW,
+      });
 
-      // 통계 테이블 캡처 (기록 탭일 때만)
-      let statsCanvas = null;
-      const statsEl = container.querySelector('#stats-section');
-      if (tournament.status === 'completed' && statsEl) {
-        const origStatsW = statsEl.style.width;
-        statsEl.style.width = headerCaptureW;
-        statsCanvas = await html2canvas(statsEl, captureOpts);
-        statsEl.style.width = origStatsW;
-      }
-
-      // 숨긴 요소 복원
+      // 5) 스타일 복원
+      pdfFixStyle.remove();
+      container.style.width = origWidth;
+      container.style.maxWidth = origMaxWidth;
       hideEls.forEach(el => el.style.display = '');
 
-      // PDF 생성 (2열, 페이지에 들어가는 만큼 채움)
+      // 5) 캔버스를 A4 페이지에 맞춰 분할
       const pdf = new jsPDF('p', 'mm', 'a4');
-      const margin = 10;
-      const colGap = 4;
-      const rowGap = 4;
+      const margin = 8;
       const contentW = 210 - margin * 2;
-      const colW = (contentW - colGap) / 2;
-      const pageH = 297;
+      const pageContentH = 297 - margin * 2;
 
-      // 슬롯 1개의 자연 높이 (모두 동일한 코트 수이므로 첫 번째로 계산)
-      const slotRowH = slotCanvases.length > 0
-        ? (slotCanvases[0].height * colW) / slotCanvases[0].width
-        : 0;
+      const imgW = fullCanvas.width;
+      const imgH = fullCanvas.height;
+      const ratio = contentW / imgW;
+      const totalH_mm = imgH * ratio;
 
-      const headerH = (headerCanvas.height * contentW) / headerCanvas.width;
-      let currentY = margin;
-      let slotIdx = 0;
+      // 1페이지 높이에 해당하는 픽셀 수
+      const pagePixelH = pageContentH / ratio;
+      let srcY = 0;
       let pageNum = 0;
 
-      while (slotIdx < slotCanvases.length) {
+      while (srcY < imgH) {
         if (pageNum > 0) pdf.addPage();
-        currentY = margin;
 
-        // 첫 페이지에 헤더 삽입
-        if (pageNum === 0) {
-          pdf.addImage(headerCanvas.toDataURL('image/png'), 'PNG', margin, currentY, contentW, headerH);
-          currentY += headerH + rowGap;
-        }
+        const sliceH = Math.min(pagePixelH, imgH - srcY);
+        const sliceH_mm = sliceH * ratio;
 
-        // 남은 공간에 행을 채울 수 있는 만큼 배치
-        while (slotIdx < slotCanvases.length) {
-          const remainH = pageH - margin - currentY;
-          if (remainH < slotRowH * 0.9) break; // 다음 행이 들어갈 공간 부족
+        // 캔버스에서 해당 영역만 잘라내기
+        const pageCanvas = document.createElement('canvas');
+        pageCanvas.width = imgW;
+        pageCanvas.height = sliceH;
+        const ctx = pageCanvas.getContext('2d');
+        ctx.drawImage(fullCanvas, 0, srcY, imgW, sliceH, 0, 0, imgW, sliceH);
 
-          // 2열 배치
-          for (let col = 0; col < 2 && slotIdx < slotCanvases.length; col++) {
-            const canvas = slotCanvases[slotIdx];
-            const x = margin + col * (colW + colGap);
-            pdf.addImage(canvas.toDataURL('image/png'), 'PNG', x, currentY, colW, slotRowH);
-            slotIdx++;
-          }
+        pdf.addImage(pageCanvas.toDataURL('image/png'), 'PNG', margin, margin, contentW, sliceH_mm);
 
-          currentY += slotRowH + rowGap;
-        }
-
+        srcY += pagePixelH;
         pageNum++;
-      }
-
-      // 통계 테이블 추가 (기록 탭)
-      if (statsCanvas) {
-        const statsH = (statsCanvas.height * contentW) / statsCanvas.width;
-        const remainH = pageH - margin - currentY;
-
-        if (statsH > remainH) pdf.addPage();
-        const statsY = statsH > remainH ? margin : currentY;
-        pdf.addImage(statsCanvas.toDataURL('image/png'), 'PNG', margin, statsY, contentW, statsH);
       }
 
       pdf.save(`${tournament.name}.pdf`);
@@ -981,77 +978,6 @@ const Schedule = {
           </div>
         </div>
         ${!hasResult ? '<p class="text-xs text-gray-400 text-center mt-1.5">탭하여 스코어 입력</p>' : ''}
-      </div>`;
-  },
-
-  // ── PDF 전용 table HTML (html2canvas flex 버그 우회) ──
-  // 핵심: html2canvas는 텍스트를 셀 하단에 렌더링하므로, padding-top을 줄이고 padding-bottom을 늘려서 시각적 가운데로 보정
-
-  _renderPdfSlot(slot) {
-    const n = slot.matches.length;
-    const cards = slot.matches.map(m =>
-      `<td style="width:${Math.floor(100/n)}%;vertical-align:top;padding:0 3px;">${this._renderPdfCard(m)}</td>`
-    ).join('');
-    // ── [패딩 조정] 시간 뱃지 (20:00): padding: 상 좌우 하 좌우 ──
-    const timePad = 'padding:0 12px 12px 12px';
-    return `
-      <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;width:450px;">
-        <div style="margin-bottom:8px;">
-          <span style="display:inline-block;font-size:13px;font-weight:700;color:#374151;background:#f3f4f6;${timePad};border-radius:999px;line-height:1;">${slot.time}</span>
-        </div>
-        <table style="width:100%;border-collapse:separate;border-spacing:4px 0;"><tr>${cards}</tr></table>
-      </div>`;
-  },
-
-  _renderPdfCard(match) {
-    const cfg = match.gameType ? SCHEDULE_GAME_TYPES[match.gameType] : null;
-    const hasScore = !!match.winner;
-    const isWin1 = match.winner === match.player1;
-    const isWin2 = match.winner === match.player2;
-    const bMap = {
-      XD:{bg:'#f3e8ff',c:'#7e22ce'}, MD:{bg:'#dbeafe',c:'#1d4ed8'},
-      WD:{bg:'#fce7f3',c:'#be185d'}, FD:{bg:'#ffedd5',c:'#c2410c'},
-    };
-    const b = bMap[match.gameType] || {bg:'#f3f4f6',c:'#374151'};
-    const border = hasScore ? '#bbf7d0' : '#e5e7eb';
-    const allPlayers = Storage.getPlayers();
-
-    // ── [패딩 조정] 멤버이름 행: padding: 상 우 하 좌 ──
-    const teamPad = 'padding:6px 8px 14px 8px';
-    const scorePad = 'padding:6px 6px 14px 6px';
-    // ── [패딩 조정] 게임타입 뱃지 (혼합복식): padding: 상 우 하 좌 ──
-    const badgePad = 'padding:0 8px 8px 8px';
-    // ── [패딩 조정] 코트번호 (코트 1): padding: 상 우 하 좌 ──
-    const courtPad = 'padding:0 0 7px 0';
-
-    const teamRow = (team, isWin, score) => {
-      const bg = isWin ? '#f0fdf4' : '#f9fafb';
-      const tc = isWin ? '#15803d' : '#1f2937';
-      const sc = isWin ? '#16a34a' : '#6b7280';
-      const names = team.split(' / ').map(name => {
-        return `${Results.escapeHtml(name)}`;
-      }).join(' <span style="color:#d1d5db;">/</span> ');
-      return `<tr>
-        <td style="background:${bg};border-radius:8px;${teamPad};font-size:12px;font-weight:500;color:${tc};line-height:1;">
-          ${isWin ? '🏆 ' : ''}${names}
-        </td>
-        ${hasScore ? `<td style="background:${bg};${scorePad};text-align:right;font-size:12px;font-weight:700;color:${sc};white-space:nowrap;line-height:1;">${score}</td>` : ''}
-      </tr>`;
-    };
-
-    return `
-      <div style="border:1px solid ${border};border-radius:12px;padding:10px;background:#fff;margin-bottom:4px;">
-        ${cfg ? `<table style="width:100%;border-collapse:collapse;margin-bottom:6px;">
-          <tr>
-            <td style="line-height:1;"><span style="display:inline-block;font-size:11px;${badgePad};border-radius:999px;font-weight:500;background:${b.bg};color:${b.c};line-height:1;">${cfg.label}</span></td>
-            <td style="text-align:right;font-size:11px;color:#9ca3af;line-height:1;${courtPad};">코트 ${match.court}</td>
-          </tr>
-        </table>` : ''}
-        <table style="width:100%;border-collapse:collapse;">
-          ${teamRow(match.player1, isWin1, hasScore ? match.scores[0][0] : null)}
-          <tr><td colspan="2" style="text-align:center;font-size:11px;color:#d1d5db;padding:2px 0;">vs</td></tr>
-          ${teamRow(match.player2, isWin2, hasScore ? match.scores[0][1] : null)}
-        </table>
       </div>`;
   },
 

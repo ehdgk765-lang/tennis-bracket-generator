@@ -880,7 +880,7 @@ const App = {
           <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm shadow-green-50/30 border border-white/60 p-8">
             <div class="text-5xl mb-4">🎾</div>
             <h2 class="text-xl font-bold text-gray-800 mb-2">대진표가 없습니다</h2>
-            <p class="text-gray-500 mb-4">새 대회를 만들어보세요!</p>
+            <p class="text-gray-500 mb-4">새로운 매치를 만들어보세요!</p>
           </div>
         </div>`);
       return;
@@ -919,6 +919,7 @@ const App = {
                       ${t.status === 'completed'
                         ? '<span class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-500">완료</span>'
                         : '<span class="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700">진행중</span>'}
+                      ${t.isTeamMode ? '<span class="text-xs px-2 py-1 rounded-full bg-green-50 text-green-600 border border-green-200">팀전</span>' : ''}
                       <span class="text-xs px-2 py-1 rounded-full bg-orange-100 text-orange-700">대진표</span>
                     </div>
                   </div>
