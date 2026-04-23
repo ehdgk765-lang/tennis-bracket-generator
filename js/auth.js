@@ -2,82 +2,102 @@
 const Auth = {
   initialized: false,
   loginMode: null, // 'admin' | 'member'
+  _skipAuthHandler: false, // 멤버 로그인 중 onAuthStateChanged 스킵용
 
   init() {
     fbAuth.onAuthStateChanged(async (user) => {
+      if (this._skipAuthHandler) return;
+
       const authEl = document.getElementById('auth-container');
       const appEl = document.getElementById('app-container');
 
       if (user) {
-        const savedMode = sessionStorage.getItem('memberLoginMode');
+        if (user.isAnonymous) {
+          // 익명 사용자는 더 이상 사용하지 않음 → 로그아웃
+          fbAuth.signOut();
+          return;
+        }
 
-        if (user.isAnonymous && savedMode === 'member') {
-          // ── 멤버 로그인 ──
-          const adminUID = sessionStorage.getItem('memberAdminUID');
-          if (!adminUID) { fbAuth.signOut(); return; }
+        // Firestore에서 멤버 계정인지 확인
+        try {
+          const memberDoc = await fbDb.collection('memberAccounts').doc(user.uid).get();
 
-          this.loginMode = 'member';
-          localStorage.removeItem(Storage.KEYS.PLAYERS);
-          localStorage.removeItem(Storage.KEYS.TOURNAMENTS);
-          localStorage.removeItem(Storage.KEYS.TEAMS);
-
-          try {
-            await Storage.loadFromFirestoreAsAdmin(adminUID);
-          } catch (e) {
-            console.error('Firestore 로드 실패:', e);
-          }
-          Storage.startRealtimeSync();
-
-          App.isAdmin = false;
-          authEl.style.display = 'none';
-          appEl.style.display = '';
-
-          const savedName = sessionStorage.getItem('memberName');
-          if (savedName) {
-            App.memberName = savedName;
-            this.updateRoleBadge();
-            if (!this.initialized) { App.init(); this.initialized = true; }
-            else App.navigate(App.currentTab);
-          } else {
-            this.showMemberNameSelection(() => {
-              this.updateRoleBadge();
-              if (!this.initialized) { App.init(); this.initialized = true; }
-              else App.navigate(App.currentTab);
-            });
-          }
-
-        } else if (!user.isAnonymous) {
-          // ── 관리자 로그인 ──
-          this.loginMode = 'admin';
-          Storage.resetMemberMode();
-
-          const lastUid = localStorage.getItem('tennis_last_uid');
-          if (lastUid && lastUid !== user.uid) {
+          if (memberDoc.exists) {
+            // ── 멤버 로그인 ──
+            const adminUID = memberDoc.data().adminUID;
+            this.loginMode = 'member';
             localStorage.removeItem(Storage.KEYS.PLAYERS);
             localStorage.removeItem(Storage.KEYS.TOURNAMENTS);
             localStorage.removeItem(Storage.KEYS.TEAMS);
-          }
-          localStorage.setItem('tennis_last_uid', user.uid);
 
-          try {
-            await Storage.loadFromFirestore();
-          } catch (e) {
-            console.error('Firestore 로드 실패 (오프라인 모드):', e);
+            try {
+              await Storage.loadFromFirestoreAsAdmin(adminUID);
+            } catch (e) {
+              console.error('Firestore 로드 실패:', e);
+            }
+            Storage.startRealtimeSync();
+
+            App.isAdmin = false;
+
+            const showApp = () => {
+              authEl.style.display = 'none';
+              appEl.style.display = '';
+              this.updateRoleBadge();
+              if (!this.initialized) { App.init(); this.initialized = true; }
+              else App.navigate(App.currentTab);
+            };
+
+            const savedName = sessionStorage.getItem('memberName');
+            if (savedName) {
+              App.memberName = savedName;
+              showApp();
+            } else {
+              this.showMemberNameSelection(() => { showApp(); });
+            }
+
+          } else {
+            // ── 관리자 로그인 ──
+            this.loginMode = 'admin';
+            Storage.resetMemberMode();
+
+            const lastUid = localStorage.getItem('tennis_last_uid');
+            if (lastUid && lastUid !== user.uid) {
+              localStorage.removeItem(Storage.KEYS.PLAYERS);
+              localStorage.removeItem(Storage.KEYS.TOURNAMENTS);
+              localStorage.removeItem(Storage.KEYS.TEAMS);
+            }
+            localStorage.setItem('tennis_last_uid', user.uid);
+
+            try {
+              await Storage.loadFromFirestore();
+            } catch (e) {
+              console.error('Firestore 로드 실패 (오프라인 모드):', e);
+            }
+            Storage.startRealtimeSync();
+
+            App.isAdmin = true;
+            App.memberName = null;
+            authEl.style.display = 'none';
+            appEl.style.display = '';
+            this.updateRoleBadge();
+
+            if (!this.initialized) { App.init(); this.initialized = true; }
+            else App.navigate(App.currentTab);
           }
+        } catch (e) {
+          console.error('계정 유형 확인 실패:', e);
+          // Firestore 오류 시 관리자로 처리
+          this.loginMode = 'admin';
+          Storage.resetMemberMode();
+          try { await Storage.loadFromFirestore(); } catch (_) {}
           Storage.startRealtimeSync();
-
           App.isAdmin = true;
           App.memberName = null;
           authEl.style.display = 'none';
           appEl.style.display = '';
           this.updateRoleBadge();
-
           if (!this.initialized) { App.init(); this.initialized = true; }
           else App.navigate(App.currentTab);
-
-        } else {
-          // 익명 Auth인데 멤버 세션 없음 → 로그아웃
-          fbAuth.signOut();
         }
 
       } else {
@@ -160,10 +180,10 @@ const Auth = {
         <div id="member-login-section" class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl shadow-green-100/50 p-6 border border-white/60" style="display:none">
           <form id="member-auth-form" class="space-y-4">
             <div>
-              <label class="block text-xs font-semibold text-gray-500 mb-1.5 ml-1">멤버 로그인 ID</label>
-              <input type="text" autocomplete="off" id="member-login-id" required
+              <label class="block text-xs font-semibold text-gray-500 mb-1.5 ml-1">이메일</label>
+              <input type="email" autocomplete="off" id="member-login-email" required
                 class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 focus:bg-white transition"
-                placeholder="호스트가 알려준 ID">
+                placeholder="호스트가 알려준 이메일">
             </div>
             <div>
               <label class="block text-xs font-semibold text-gray-500 mb-1.5 ml-1">비밀번호</label>
@@ -177,7 +197,7 @@ const Auth = {
               멤버 로그인
             </button>
           </form>
-          <p class="text-center text-sm text-gray-400 mt-4">관리자에게 로그인 ID와 비밀번호를 문의하세요</p>
+          <p class="text-center text-sm text-gray-400 mt-4">관리자에게 이메일과 비밀번호를 문의하세요</p>
         </div>
       </div>`);
 
@@ -272,14 +292,14 @@ const Auth = {
 
     memberForm.onsubmit = async (e) => {
       e.preventDefault();
-      const loginId = container.querySelector('#member-login-id').value.trim();
+      const email = container.querySelector('#member-login-email').value.trim();
       const password = container.querySelector('#member-login-pw').value;
       memberErrorEl.classList.add('hidden');
       memberSubmitBtn.disabled = true;
       memberSubmitBtn.textContent = '처리 중...';
 
       try {
-        await this.handleMemberLogin(loginId, password);
+        await this.handleMemberLogin(email, password);
       } catch (err) {
         memberErrorEl.textContent = err.message || '로그인에 실패했습니다.';
         memberErrorEl.classList.remove('hidden');
@@ -289,21 +309,10 @@ const Auth = {
     };
   },
 
-  async handleMemberLogin(loginId, password) {
-    // Firestore에서 멤버 계정 검증
-    const doc = await fbDb.collection('memberAccounts').doc(loginId).get();
-    if (!doc.exists) throw { message: '존재하지 않는 계정입니다.' };
-
-    const data = doc.data();
-    if (data.password !== password) throw { message: '비밀번호가 올바르지 않습니다.' };
-
-    // 세션 정보 저장 (signInAnonymously 전에 저장해야 onAuthStateChanged에서 사용 가능)
-    sessionStorage.setItem('memberLoginMode', 'member');
-    sessionStorage.setItem('memberLoginId', loginId);
-    sessionStorage.setItem('memberAdminUID', data.adminUID);
-
-    // 익명 로그인
-    await fbAuth.signInAnonymously();
+  async handleMemberLogin(email, password) {
+    // onAuthStateChanged가 자동 처리하므로 signIn만 하면 됨
+    // 단, 관리자 계정으로 멤버 탭에서 로그인 시 onAuthStateChanged에서 자동 판별
+    await fbAuth.signInWithEmailAndPassword(email, password);
   },
 
   showMemberNameSelection(onComplete) {
@@ -375,10 +384,6 @@ const Auth = {
 
     closeBtn.onclick = () => {
       modal.remove();
-      // 로그인 화면으로 돌아가기
-      sessionStorage.removeItem('memberLoginMode');
-      sessionStorage.removeItem('memberLoginId');
-      sessionStorage.removeItem('memberAdminUID');
       sessionStorage.removeItem('memberName');
       App.memberName = null;
       this.loginMode = null;
@@ -421,9 +426,6 @@ const Auth = {
       localStorage.removeItem(Storage.KEYS.TOURNAMENTS);
       localStorage.removeItem(Storage.KEYS.TEAMS);
       localStorage.removeItem('tennis_last_uid');
-      sessionStorage.removeItem('memberLoginMode');
-      sessionStorage.removeItem('memberLoginId');
-      sessionStorage.removeItem('memberAdminUID');
       sessionStorage.removeItem('memberName');
       App.memberName = null;
       this.loginMode = null;

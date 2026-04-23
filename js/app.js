@@ -1053,12 +1053,14 @@ const App = {
 
     // 현재 관리자의 멤버 계정 조회
     fbDb.collection('memberAccounts').where('adminUID', '==', user.uid).get().then(snapshot => {
-      let existingId = null;
-      let existingPw = null;
+      let acctEmail = null;
+      let acctPassword = null;
+      let acctUID = null;
       if (!snapshot.empty) {
         const doc = snapshot.docs[0];
-        existingId = doc.id;
-        existingPw = doc.data().password;
+        acctUID = doc.id;
+        acctEmail = doc.data().email;
+        acctPassword = doc.data().password;
       }
 
       modal.innerHTML = `
@@ -1069,71 +1071,109 @@ const App = {
               <svg class="w-7 h-7 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
             </div>
             <h3 class="text-lg font-bold text-gray-800">멤버 계정 관리</h3>
-            <p class="text-sm text-gray-500 mt-1">멤버들이 로그인할 계정을 설정합니다</p>
+            <p class="text-sm text-gray-500 mt-1">멤버들이 공유할 로그인 계정을 설정합니다</p>
           </div>
           <div class="space-y-3 mb-5">
             <div>
-              <label class="block text-xs font-semibold text-gray-500 mb-1 ml-1">로그인 ID</label>
-              <input type="text" id="ma-login-id" value="${existingId || ''}" autocomplete="off"
+              <label class="block text-xs font-semibold text-gray-500 mb-1 ml-1">이메일</label>
+              <input type="email" id="ma-email" value="${acctEmail || ''}" autocomplete="off"
                 class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white transition"
-                placeholder="멤버 로그인 ID" ${existingId ? 'readonly style="background:#f0f0f0;color:#888;"' : ''}>
+                placeholder="member@example.com" ${acctEmail ? 'readonly style="background:#f0f0f0;color:#888;"' : ''}>
             </div>
             <div>
               <label class="block text-xs font-semibold text-gray-500 mb-1 ml-1">비밀번호</label>
-              <input type="text" id="ma-password" value="${existingPw || ''}" autocomplete="off"
+              <input type="text" id="ma-password" value="${acctPassword || ''}" autocomplete="off"
                 class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white transition"
-                placeholder="멤버 비밀번호">
+                placeholder="6자 이상">
             </div>
             <p id="ma-error" class="text-sm text-red-500 text-center hidden"></p>
           </div>
-          ${existingId ? `
+          ${acctEmail ? `
           <div class="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4 text-center">
             <p class="text-xs text-gray-500 mb-1">멤버에게 공유할 정보</p>
-            <p class="text-sm font-mono font-bold text-blue-700">ID: ${existingId} / PW: ${existingPw}</p>
+            <p class="text-sm font-mono font-bold text-blue-700">${acctEmail}</p>
+            <p class="text-sm font-mono font-bold text-blue-700">PW: ${acctPassword}</p>
             <button id="ma-copy-btn" class="mt-2 text-xs text-blue-600 hover:underline">복사하기</button>
           </div>` : ''}
           <div class="space-y-2">
             <button id="ma-save-btn"
               class="w-full py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl hover:from-blue-600 hover:to-indigo-700 active:scale-[0.98] transition-all font-bold shadow-md shadow-blue-200">
-              ${existingId ? '비밀번호 변경' : '멤버 계정 생성'}
+              ${acctEmail ? '비밀번호 변경' : '멤버 계정 생성'}
             </button>
-            ${existingId ? '<button id="ma-delete-btn" class="w-full py-3 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition font-medium">계정 삭제</button>' : ''}
+            ${acctEmail ? '<button id="ma-delete-btn" class="w-full py-3 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition font-medium">계정 삭제</button>' : ''}
             <button id="ma-cancel-btn" class="w-full py-3 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition font-medium">닫기</button>
           </div>
         </div>`;
 
       const errorEl = modal.querySelector('#ma-error');
 
-      // 저장
+      // 저장 (생성 또는 비밀번호 변경)
       modal.querySelector('#ma-save-btn').onclick = async () => {
-        const loginId = modal.querySelector('#ma-login-id').value.trim();
+        const email = modal.querySelector('#ma-email').value.trim();
         const password = modal.querySelector('#ma-password').value.trim();
         errorEl.classList.add('hidden');
 
-        if (!loginId) { errorEl.textContent = '로그인 ID를 입력해주세요.'; errorEl.classList.remove('hidden'); return; }
-        if (!password) { errorEl.textContent = '비밀번호를 입력해주세요.'; errorEl.classList.remove('hidden'); return; }
+        if (!email) { errorEl.textContent = '이메일을 입력해주세요.'; errorEl.classList.remove('hidden'); return; }
+        if (!password || password.length < 6) { errorEl.textContent = '비밀번호는 6자 이상이어야 합니다.'; errorEl.classList.remove('hidden'); return; }
+
+        const saveBtn = modal.querySelector('#ma-save-btn');
+        saveBtn.disabled = true;
+        saveBtn.textContent = '처리 중...';
 
         try {
-          // 다른 관리자가 사용 중인 ID인지 확인
-          if (!existingId) {
-            const check = await fbDb.collection('memberAccounts').doc(loginId).get();
-            if (check.exists) {
-              errorEl.textContent = '이미 사용 중인 ID입니다.';
-              errorEl.classList.remove('hidden');
-              return;
+          if (!acctEmail) {
+            // ── 신규 생성: 보조 앱으로 Firebase Auth 계정 생성 ──
+            const secondaryApp = firebase.initializeApp(firebase.app().options, 'memberCreator');
+            try {
+              const secondaryAuth = secondaryApp.auth();
+              const cred = await secondaryAuth.createUserWithEmailAndPassword(email, password);
+              const memberUID = cred.user.uid;
+
+              // Firestore에 멤버 계정 정보 저장 (doc ID = 멤버 UID)
+              await fbDb.collection('memberAccounts').doc(memberUID).set({
+                email,
+                password,
+                adminUID: user.uid,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+              });
+
+              await secondaryAuth.signOut();
+              modal.remove();
+              alert('멤버 계정이 생성되었습니다.');
+            } finally {
+              await secondaryApp.delete();
+            }
+          } else {
+            // ── 비밀번호 변경: 보조 앱으로 로그인 후 비밀번호 업데이트 ──
+            const secondaryApp = firebase.initializeApp(firebase.app().options, 'memberUpdater');
+            try {
+              const secondaryAuth = secondaryApp.auth();
+              await secondaryAuth.signInWithEmailAndPassword(acctEmail, acctPassword);
+              await secondaryAuth.currentUser.updatePassword(password);
+
+              // Firestore 비밀번호도 업데이트
+              await fbDb.collection('memberAccounts').doc(acctUID).update({
+                password,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+              });
+
+              await secondaryAuth.signOut();
+              modal.remove();
+              alert('비밀번호가 변경되었습니다.');
+            } finally {
+              await secondaryApp.delete();
             }
           }
-
-          await fbDb.collection('memberAccounts').doc(existingId || loginId).set({
-            password,
-            adminUID: user.uid,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-          });
-          modal.remove();
-          alert(existingId ? '비밀번호가 변경되었습니다.' : '멤버 계정이 생성되었습니다.');
         } catch (e) {
-          errorEl.textContent = '저장 중 오류가 발생했습니다.';
+          console.error('멤버 계정 처리 오류:', e);
+          const msg = e.code === 'auth/email-already-in-use' ? '이미 사용 중인 이메일입니다.'
+            : e.code === 'auth/invalid-email' ? '올바른 이메일 형식을 입력해주세요.'
+            : e.code === 'auth/weak-password' ? '비밀번호가 너무 짧습니다. (6자 이상)'
+            : '처리 중 오류가 발생했습니다.';
+          errorEl.textContent = msg;
           errorEl.classList.remove('hidden');
+          saveBtn.disabled = false;
+          saveBtn.textContent = acctEmail ? '비밀번호 변경' : '멤버 계정 생성';
         }
       };
 
@@ -1141,7 +1181,7 @@ const App = {
       const copyBtn = modal.querySelector('#ma-copy-btn');
       if (copyBtn) {
         copyBtn.onclick = () => {
-          const text = 'ID: ' + existingId + ' / PW: ' + existingPw;
+          const text = acctEmail + ' / PW: ' + acctPassword;
           navigator.clipboard.writeText(text).then(() => {
             copyBtn.textContent = '복사됨!';
             setTimeout(() => { copyBtn.textContent = '복사하기'; }, 2000);
@@ -1157,7 +1197,19 @@ const App = {
         deleteBtn.onclick = async () => {
           if (!confirm('멤버 계정을 삭제하시겠습니까?\n멤버들이 더 이상 로그인할 수 없습니다.')) return;
           try {
-            await fbDb.collection('memberAccounts').doc(existingId).delete();
+            // 보조 앱으로 로그인하여 Auth 계정 삭제
+            const secondaryApp = firebase.initializeApp(firebase.app().options, 'memberDeleter');
+            try {
+              const secondaryAuth = secondaryApp.auth();
+              await secondaryAuth.signInWithEmailAndPassword(acctEmail, acctPassword);
+              await secondaryAuth.currentUser.delete();
+              await secondaryApp.delete();
+            } catch (authErr) {
+              try { await secondaryApp.delete(); } catch (_) {}
+              console.warn('Auth 계정 삭제 실패 (Firestore만 삭제):', authErr);
+            }
+            // Firestore 문서 삭제
+            await fbDb.collection('memberAccounts').doc(acctUID).delete();
             modal.remove();
             alert('멤버 계정이 삭제되었습니다.');
           } catch (e) {
