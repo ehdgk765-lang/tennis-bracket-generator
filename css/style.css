@@ -170,7 +170,7 @@ header {
   .match-player {
     padding: 6px 8px !important;
   }
-  .match-player span {
+  .match-player span:not(.match-score) {
     max-width: 90px;
     font-size: 12px !important;
   }
@@ -539,6 +539,25 @@ html.dark .my-match.schedule-match-card {
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4), 0 2px 8px rgba(59, 130, 246, 0.2) !important;
   border-color: #3b82f6 !important;
 }
+/* 스코어 바 (대진표 브래킷) */
+.match-score-bar {
+  min-height: 28px;
+}
+html.dark .match-score-bar {
+  background-color: rgba(31, 41, 55, 0.5) !important;
+  border-color: rgba(75, 85, 99, 0.4) !important;
+}
+
+/* 스코어 표시 - 다크 모드 */
+html.dark .match-score.text-green-600 { color: #4ade80 !important; }
+html.dark .match-score.text-green-700 { color: #4ade80 !important; }
+html.dark .match-score.text-gray-400 { color: #9ca3af !important; }
+html.dark .match-score.text-gray-500 { color: #9ca3af !important; }
+html.dark .match-score.bg-green-100 { background-color: rgba(22, 163, 74, 0.15) !important; }
+html.dark .match-score.bg-gray-100 { background-color: rgba(107, 114, 128, 0.15) !important; }
+html.dark .match-score.bg-yellow-100 { background-color: rgba(202, 138, 4, 0.15) !important; }
+html.dark .match-score.text-yellow-600 { color: #facc15 !important; }
+
 /* 대진표 목록 카드 하이라이트 (다크 모드) */
 html.dark .tournament-card.ring-2 {
   --tw-ring-color: rgba(59, 130, 246, 0.4) !important;
