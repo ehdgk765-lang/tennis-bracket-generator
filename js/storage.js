@@ -278,10 +278,15 @@ const Storage = {
     }
   },
 
-  // 원격 변경 시 UI 갱신
+  // 원격 변경 시 UI 갱신 (300ms 디바운싱)
+  _remoteChangeTimer: null,
   _onRemoteChange() {
-    if (typeof App !== 'undefined' && App.currentTab) {
-      App.navigate(App.currentTab, App.currentTournamentId);
-    }
+    if (this._remoteChangeTimer) clearTimeout(this._remoteChangeTimer);
+    this._remoteChangeTimer = setTimeout(() => {
+      this._remoteChangeTimer = null;
+      if (typeof App !== 'undefined' && App.currentTab) {
+        App.navigate(App.currentTab, App.currentTournamentId);
+      }
+    }, 300);
   },
 };

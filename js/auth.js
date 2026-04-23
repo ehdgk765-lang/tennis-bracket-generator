@@ -2,12 +2,9 @@
 const Auth = {
   initialized: false,
   loginMode: null, // 'admin' | 'member'
-  _skipAuthHandler: false, // 멤버 로그인 중 onAuthStateChanged 스킵용
 
   init() {
     fbAuth.onAuthStateChanged(async (user) => {
-      if (this._skipAuthHandler) return;
-
       const authEl = document.getElementById('auth-container');
       const appEl = document.getElementById('app-container');
 
