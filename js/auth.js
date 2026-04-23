@@ -3,6 +3,11 @@ const Auth = {
   initialized: false,
   loginMode: null, // 'admin' | 'member'
 
+  // 멤버 ID → Firebase Auth 이메일 변환
+  toMemberEmail(id) { return id + '@member.htl.app'; },
+  // 멤버 숫자 비밀번호 → Firebase Auth 비밀번호 변환 (6자 최소 충족용)
+  toMemberPw(pin) { return pin + '_HTL!'; },
+
   init() {
     fbAuth.onAuthStateChanged(async (user) => {
       const authEl = document.getElementById('auth-container');
@@ -136,12 +141,18 @@ const Auth = {
 
         <!-- 로그인 탭 -->
         <div class="flex gap-2 mb-4">
-          <button id="login-tab-admin" class="flex-1 py-2 rounded-full text-sm font-semibold transition bg-green-600 text-white">관리자 로그인</button>
+          <button id="login-tab-admin" class="flex-1 py-2 rounded-full text-sm font-semibold transition bg-green-600 text-white">호스트 로그인</button>
           <button id="login-tab-member" class="flex-1 py-2 rounded-full text-sm font-semibold transition bg-gray-100 text-gray-600 hover:bg-gray-200">멤버 로그인</button>
         </div>
 
         <!-- 관리자 로그인 카드 -->
         <div id="admin-login-section" class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl shadow-green-100/50 p-6 border border-white/60">
+          <div class="flex justify-end mb-2">
+            <label class="flex items-center gap-1.5 cursor-pointer select-none">
+              <input type="checkbox" id="remember-admin-email" class="w-3.5 h-3.5 rounded accent-green-600">
+              <span class="text-xs text-gray-400">이메일 기억하기</span>
+            </label>
+          </div>
           <form id="admin-auth-form" class="space-y-4">
             <div>
               <label class="block text-xs font-semibold text-gray-500 mb-1.5 ml-1">이메일</label>
@@ -168,25 +179,31 @@ const Auth = {
             </button>
           </form>
           <p class="text-center text-sm text-gray-400 mt-4">
-            <span id="auth-toggle-text">계정이 없으신가요?</span>
+            <span id="auth-toggle-text">호스트 계정이 없으신가요?</span>
             <button type="button" id="auth-toggle-btn" class="text-green-600 font-bold hover:underline ml-1">회원가입</button>
           </p>
         </div>
 
         <!-- 멤버 로그인 카드 -->
         <div id="member-login-section" class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl shadow-green-100/50 p-6 border border-white/60" style="display:none">
+          <div class="flex justify-end mb-2">
+            <label class="flex items-center gap-1.5 cursor-pointer select-none">
+              <input type="checkbox" id="remember-member-id" class="w-3.5 h-3.5 rounded accent-blue-600">
+              <span class="text-xs text-gray-400">ID 기억하기</span>
+            </label>
+          </div>
           <form id="member-auth-form" class="space-y-4">
             <div>
-              <label class="block text-xs font-semibold text-gray-500 mb-1.5 ml-1">이메일</label>
-              <input type="email" autocomplete="off" id="member-login-email" required
+              <label class="block text-xs font-semibold text-gray-500 mb-1.5 ml-1">멤버 ID</label>
+              <input type="text" autocomplete="off" id="member-login-id" required
                 class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 focus:bg-white transition"
-                placeholder="호스트가 알려준 이메일">
+                placeholder="관리자가 알려준 ID">
             </div>
             <div>
               <label class="block text-xs font-semibold text-gray-500 mb-1.5 ml-1">비밀번호</label>
-              <input type="password" autocomplete="off" id="member-login-pw" required
+              <input type="password" autocomplete="off" id="member-login-pw" required inputmode="numeric" pattern="[0-9]*"
                 class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 focus:bg-white transition"
-                placeholder="비밀번호">
+                placeholder="숫자 비밀번호">
             </div>
             <p id="member-auth-error" class="text-sm text-red-500 hidden"></p>
             <button type="submit" id="member-submit-btn"
@@ -194,7 +211,7 @@ const Auth = {
               멤버 로그인
             </button>
           </form>
-          <p class="text-center text-sm text-gray-400 mt-4">관리자에게 이메일과 비밀번호를 문의하세요</p>
+          <p class="text-center text-sm text-gray-400 mt-4">관리자에게 ID와 비밀번호를 문의하세요</p>
         </div>
       </div>`);
 
@@ -239,6 +256,25 @@ const Auth = {
       memberSection.style.display = '';
     };
 
+    // ── 기억하기: 저장된 값 복원 ──
+    const rememberAdminCb = container.querySelector('#remember-admin-email');
+    const rememberMemberCb = container.querySelector('#remember-member-id');
+    const adminEmailInput = container.querySelector('#auth-email');
+    const memberIdInput = container.querySelector('#member-login-id');
+
+    const savedAdminEmail = localStorage.getItem('tennis_saved_admin_email');
+    if (savedAdminEmail) {
+      adminEmailInput.value = savedAdminEmail;
+      rememberAdminCb.checked = true;
+    }
+    const savedMemberId = localStorage.getItem('tennis_saved_member_id');
+    if (savedMemberId) {
+      memberIdInput.value = savedMemberId;
+      rememberMemberCb.checked = true;
+      // 저장된 멤버 ID가 있으면 멤버 탭으로 자동 전환
+      tabMember.click();
+    }
+
     // ── 관리자: 로그인/회원가입 토글 ──
     let isRegister = false;
     const adminForm = container.querySelector('#admin-auth-form');
@@ -274,6 +310,9 @@ const Auth = {
         } else {
           await fbAuth.signInWithEmailAndPassword(email, password);
         }
+        // 기억하기 처리
+        if (rememberAdminCb.checked) localStorage.setItem('tennis_saved_admin_email', email);
+        else localStorage.removeItem('tennis_saved_admin_email');
       } catch (err) {
         adminErrorEl.textContent = this.getErrorMessage(err);
         adminErrorEl.classList.remove('hidden');
@@ -289,14 +328,19 @@ const Auth = {
 
     memberForm.onsubmit = async (e) => {
       e.preventDefault();
-      const email = container.querySelector('#member-login-email').value.trim();
-      const password = container.querySelector('#member-login-pw').value;
+      const loginId = container.querySelector('#member-login-id').value.trim();
+      const pin = container.querySelector('#member-login-pw').value.trim();
       memberErrorEl.classList.add('hidden');
       memberSubmitBtn.disabled = true;
       memberSubmitBtn.textContent = '처리 중...';
 
       try {
-        await this.handleMemberLogin(email, password);
+        if (!loginId) throw { message: 'ID를 입력해주세요.' };
+        if (!pin) throw { message: '비밀번호를 입력해주세요.' };
+        await this.handleMemberLogin(loginId, pin);
+        // 기억하기 처리
+        if (rememberMemberCb.checked) localStorage.setItem('tennis_saved_member_id', loginId);
+        else localStorage.removeItem('tennis_saved_member_id');
       } catch (err) {
         memberErrorEl.textContent = err.message || '로그인에 실패했습니다.';
         memberErrorEl.classList.remove('hidden');
@@ -306,9 +350,9 @@ const Auth = {
     };
   },
 
-  async handleMemberLogin(email, password) {
-    // onAuthStateChanged가 자동 처리하므로 signIn만 하면 됨
-    // 단, 관리자 계정으로 멤버 탭에서 로그인 시 onAuthStateChanged에서 자동 판별
+  async handleMemberLogin(loginId, pin) {
+    const email = this.toMemberEmail(loginId);
+    const password = this.toMemberPw(pin);
     await fbAuth.signInWithEmailAndPassword(email, password);
   },
 

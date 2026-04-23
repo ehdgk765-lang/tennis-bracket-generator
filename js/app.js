@@ -1066,14 +1066,16 @@ const App = {
 
     // 현재 관리자의 멤버 계정 조회
     fbDb.collection('memberAccounts').where('adminUID', '==', user.uid).get().then(snapshot => {
-      let acctEmail = null;
-      let acctPassword = null;
+      let acctLoginId = null;
+      let acctPin = null;
       let acctUID = null;
       if (!snapshot.empty) {
-        const doc = snapshot.docs[0];
+        // 새 형식(loginId) 문서 우선, 없으면 첫 번째 문서 사용
+        const doc = snapshot.docs.find(d => d.data().loginId) || snapshot.docs[0];
         acctUID = doc.id;
-        acctEmail = doc.data().email;
-        acctPassword = doc.data().password;
+        const data = doc.data();
+        acctLoginId = data.loginId || data.email || null;
+        acctPin = data.password || null;
       }
 
       modal.innerHTML = `
@@ -1088,32 +1090,32 @@ const App = {
           </div>
           <div class="space-y-3 mb-5">
             <div>
-              <label class="block text-xs font-semibold text-gray-500 mb-1 ml-1">이메일</label>
-              <input type="email" id="ma-email" value="${acctEmail || ''}" autocomplete="off"
+              <label class="block text-xs font-semibold text-gray-500 mb-1 ml-1">멤버 ID</label>
+              <input type="text" id="ma-login-id" value="${acctLoginId || ''}" autocomplete="off"
                 class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white transition"
-                placeholder="member@example.com" ${acctEmail ? 'readonly style="background:#f0f0f0;color:#888;"' : ''}>
+                placeholder="영문, 숫자 조합" ${acctLoginId ? 'readonly style="background:#f0f0f0;color:#888;"' : ''}>
             </div>
             <div>
-              <label class="block text-xs font-semibold text-gray-500 mb-1 ml-1">비밀번호</label>
-              <input type="text" id="ma-password" value="${acctPassword || ''}" autocomplete="off"
+              <label class="block text-xs font-semibold text-gray-500 mb-1 ml-1">비밀번호 (숫자)</label>
+              <input type="tel" id="ma-password" value="${acctPin || ''}" autocomplete="off" inputmode="numeric" pattern="[0-9]*"
                 class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white transition"
-                placeholder="6자 이상">
+                placeholder="숫자 비밀번호">
             </div>
             <p id="ma-error" class="text-sm text-red-500 text-center hidden"></p>
           </div>
-          ${acctEmail ? `
+          ${acctLoginId ? `
           <div class="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4 text-center">
             <p class="text-xs text-gray-500 mb-1">멤버에게 공유할 정보</p>
-            <p class="text-sm font-mono font-bold text-blue-700">${acctEmail}</p>
-            <p class="text-sm font-mono font-bold text-blue-700">PW: ${acctPassword}</p>
+            <p class="text-sm font-mono font-bold text-blue-700">ID: ${acctLoginId}</p>
+            <p class="text-sm font-mono font-bold text-blue-700">PW: ${acctPin}</p>
             <button id="ma-copy-btn" class="mt-2 text-xs text-blue-600 hover:underline">복사하기</button>
           </div>` : ''}
           <div class="space-y-2">
             <button id="ma-save-btn"
               class="w-full py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl hover:from-blue-600 hover:to-indigo-700 active:scale-[0.98] transition-all font-bold shadow-md shadow-blue-200">
-              ${acctEmail ? '비밀번호 변경' : '멤버 계정 생성'}
+              ${acctLoginId ? '비밀번호 변경' : '멤버 계정 생성'}
             </button>
-            ${acctEmail ? '<button id="ma-delete-btn" class="w-full py-3 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition font-medium">계정 삭제</button>' : ''}
+            ${acctLoginId ? '<button id="ma-delete-btn" class="w-full py-3 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition font-medium">계정 삭제</button>' : ''}
             <button id="ma-cancel-btn" class="w-full py-3 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition font-medium">닫기</button>
           </div>
         </div>`;
@@ -1122,30 +1124,33 @@ const App = {
 
       // 저장 (생성 또는 비밀번호 변경)
       modal.querySelector('#ma-save-btn').onclick = async () => {
-        const email = modal.querySelector('#ma-email').value.trim();
-        const password = modal.querySelector('#ma-password').value.trim();
+        const loginId = modal.querySelector('#ma-login-id').value.trim();
+        const pin = modal.querySelector('#ma-password').value.trim();
         errorEl.classList.add('hidden');
 
-        if (!email) { errorEl.textContent = '이메일을 입력해주세요.'; errorEl.classList.remove('hidden'); return; }
-        if (!password || password.length < 6) { errorEl.textContent = '비밀번호는 6자 이상이어야 합니다.'; errorEl.classList.remove('hidden'); return; }
+        if (!loginId) { errorEl.textContent = 'ID를 입력해주세요.'; errorEl.classList.remove('hidden'); return; }
+        if (!pin || !/^\d+$/.test(pin)) { errorEl.textContent = '비밀번호는 숫자만 입력해주세요.'; errorEl.classList.remove('hidden'); return; }
 
         const saveBtn = modal.querySelector('#ma-save-btn');
         saveBtn.disabled = true;
         saveBtn.textContent = '처리 중...';
 
+        const authEmail = Auth.toMemberEmail(loginId);
+        const authPassword = Auth.toMemberPw(pin);
+
         try {
-          if (!acctEmail) {
+          if (!acctLoginId) {
             // ── 신규 생성: 보조 앱으로 Firebase Auth 계정 생성 ──
             const secondaryApp = firebase.initializeApp(firebase.app().options, 'memberCreator');
             try {
               const secondaryAuth = secondaryApp.auth();
-              const cred = await secondaryAuth.createUserWithEmailAndPassword(email, password);
+              const cred = await secondaryAuth.createUserWithEmailAndPassword(authEmail, authPassword);
               const memberUID = cred.user.uid;
 
               // Firestore에 멤버 계정 정보 저장 (doc ID = 멤버 UID)
               await fbDb.collection('memberAccounts').doc(memberUID).set({
-                email,
-                password,
+                loginId,
+                password: pin,
                 adminUID: user.uid,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
               });
@@ -1158,15 +1163,17 @@ const App = {
             }
           } else {
             // ── 비밀번호 변경: 보조 앱으로 로그인 후 비밀번호 업데이트 ──
+            const oldAuthEmail = Auth.toMemberEmail(acctLoginId);
+            const oldAuthPassword = Auth.toMemberPw(acctPin);
             const secondaryApp = firebase.initializeApp(firebase.app().options, 'memberUpdater');
             try {
               const secondaryAuth = secondaryApp.auth();
-              await secondaryAuth.signInWithEmailAndPassword(acctEmail, acctPassword);
-              await secondaryAuth.currentUser.updatePassword(password);
+              await secondaryAuth.signInWithEmailAndPassword(oldAuthEmail, oldAuthPassword);
+              await secondaryAuth.currentUser.updatePassword(authPassword);
 
               // Firestore 비밀번호도 업데이트
               await fbDb.collection('memberAccounts').doc(acctUID).update({
-                password,
+                password: pin,
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
               });
 
@@ -1179,14 +1186,13 @@ const App = {
           }
         } catch (e) {
           console.error('멤버 계정 처리 오류:', e);
-          const msg = e.code === 'auth/email-already-in-use' ? '이미 사용 중인 이메일입니다.'
-            : e.code === 'auth/invalid-email' ? '올바른 이메일 형식을 입력해주세요.'
-            : e.code === 'auth/weak-password' ? '비밀번호가 너무 짧습니다. (6자 이상)'
+          const msg = e.code === 'auth/email-already-in-use' ? '이미 사용 중인 ID입니다.'
+            : e.code === 'auth/weak-password' ? '비밀번호가 너무 짧습니다.'
             : '처리 중 오류가 발생했습니다.';
           errorEl.textContent = msg;
           errorEl.classList.remove('hidden');
           saveBtn.disabled = false;
-          saveBtn.textContent = acctEmail ? '비밀번호 변경' : '멤버 계정 생성';
+          saveBtn.textContent = acctLoginId ? '비밀번호 변경' : '멤버 계정 생성';
         }
       };
 
@@ -1194,7 +1200,7 @@ const App = {
       const copyBtn = modal.querySelector('#ma-copy-btn');
       if (copyBtn) {
         copyBtn.onclick = () => {
-          const text = acctEmail + ' / PW: ' + acctPassword;
+          const text = 'ID: ' + acctLoginId + ' / PW: ' + acctPin;
           navigator.clipboard.writeText(text).then(() => {
             copyBtn.textContent = '복사됨!';
             setTimeout(() => { copyBtn.textContent = '복사하기'; }, 2000);
@@ -1211,10 +1217,12 @@ const App = {
           if (!confirm('멤버 계정을 삭제하시겠습니까?\n멤버들이 더 이상 로그인할 수 없습니다.')) return;
           try {
             // 보조 앱으로 로그인하여 Auth 계정 삭제
+            const authEmail = Auth.toMemberEmail(acctLoginId);
+            const authPassword = Auth.toMemberPw(acctPin);
             const secondaryApp = firebase.initializeApp(firebase.app().options, 'memberDeleter');
             try {
               const secondaryAuth = secondaryApp.auth();
-              await secondaryAuth.signInWithEmailAndPassword(acctEmail, acctPassword);
+              await secondaryAuth.signInWithEmailAndPassword(authEmail, authPassword);
               await secondaryAuth.currentUser.delete();
               await secondaryApp.delete();
             } catch (authErr) {
