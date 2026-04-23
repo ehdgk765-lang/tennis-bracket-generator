@@ -911,6 +911,19 @@ const App = {
         <div class="space-y-3">
           ${tournaments.map(t => {
             const dateStr = new Date(t.createdAt).toLocaleDateString('ko-KR');
+            const isMember = !App.isAdmin && !!App.memberName;
+            // 멤버 본인이 참가한 대진표인지 확인
+            let hasMyName = false;
+            if (isMember) {
+              const mn = App.memberName;
+              if (t.format === 'schedule') {
+                hasMyName = Schedule.getAllMatches(t).some(m =>
+                  (m.player1 && m.player1.split(' / ').includes(mn)) || (m.player2 && m.player2.split(' / ').includes(mn)));
+              } else if (t.players) {
+                hasMyName = t.players.some(p => p && p.split(' / ').includes(mn));
+              }
+            }
+            const myCardClass = isMember && hasMyName ? 'border-blue-400 ring-2 ring-blue-200 shadow-blue-100/50' : 'border-white/60';
 
             if (t.format === 'schedule') {
               const allMatches = Schedule.getAllMatches(t);
@@ -927,7 +940,7 @@ const App = {
                 if (p) { if (p.gender === 'M') mCount++; else fCount++; }
               });
               return `
-                <div class="tournament-card relative bg-white/80 backdrop-blur-sm border border-white/60 rounded-2xl p-4 cursor-pointer hover:shadow-lg hover:shadow-green-100/50 hover:border-green-200 transition-all shadow-sm shadow-green-50/30"
+                <div class="tournament-card relative bg-white/80 backdrop-blur-sm border ${myCardClass} rounded-2xl p-4 cursor-pointer hover:shadow-lg hover:shadow-green-100/50 hover:border-green-200 transition-all shadow-sm shadow-green-50/30"
                      data-id="${t.id}">
                   <button type="button" class="delete-tournament-btn absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-full text-gray-300 hover:bg-red-50 hover:text-red-500 transition" data-id="${t.id}">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -954,7 +967,7 @@ const App = {
             const isDoubles = t.gameType ? GAME_TYPES[t.gameType]?.doubles : false;
             const countLabel = isDoubles ? `${t.players.length}팀` : `${t.players.length}명`;
             return `
-              <div class="tournament-card relative bg-white/80 backdrop-blur-sm border border-white/60 rounded-2xl p-4 cursor-pointer hover:shadow-lg hover:shadow-green-100/50 hover:border-green-200 transition-all shadow-sm shadow-green-50/30"
+              <div class="tournament-card relative bg-white/80 backdrop-blur-sm border ${myCardClass} rounded-2xl p-4 cursor-pointer hover:shadow-lg hover:shadow-green-100/50 hover:border-green-200 transition-all shadow-sm shadow-green-50/30"
                    data-id="${t.id}">
                 <button type="button" class="delete-tournament-btn absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-full text-gray-300 hover:bg-red-50 hover:text-red-500 transition" data-id="${t.id}">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>

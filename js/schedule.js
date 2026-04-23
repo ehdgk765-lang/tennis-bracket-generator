@@ -672,6 +672,7 @@ const Schedule = {
     });
 
     // 카드 빈 영역 클릭 → 스코어 입력 (멤버 선택 중이면 해제)
+    const isMember = !App.isAdmin && !!App.memberName;
     cards.forEach(card => {
       card.onclick = () => {
         if (selectedPlayer) {
@@ -681,6 +682,8 @@ const Schedule = {
         }
         const match = allMatches.find(m => m.id === card.dataset.matchId);
         if (!match) return;
+        // 멤버는 본인 매치만 입력 가능
+        if (isMember && !this._isMyMatch(match)) return;
         Results.showScoreModal(match, { setCount: 1, allowDraw: true, isTeamMode: tournament.isTeamMode, isCustom: tournament.isCustom }, (result) => {
           match.scores = result.scores;
           match.winner = result.winner;
@@ -924,11 +927,21 @@ const Schedule = {
     </div>`;
   },
 
+  // 매치에 멤버 본인 이름이 포함되어 있는지 확인
+  _isMyMatch(match) {
+    const name = App.memberName;
+    if (!name) return false;
+    const check = (pStr) => pStr && pStr.split(' / ').includes(name);
+    return check(match.player1) || check(match.player2);
+  },
+
   // 매치 카드 HTML
   renderMatchCard(match, slotIdx, matchIdx) {
     const cfg = match.gameType ? SCHEDULE_GAME_TYPES[match.gameType] : null;
     const hasResult = !!match.winner || !!match.scores;
     const isDraw = match.winner === 'draw';
+    const isMember = !App.isAdmin && !!App.memberName;
+    const isMyMatch = this._isMyMatch(match);
     const t1Names = match.player1.split(' / ');
     const t2Names = match.player2.split(' / ');
     const t1Html = t1Names.map((n, p) => this.renderSwapPlayer(n, slotIdx, matchIdx, 1, p)).join(' <span class="text-gray-300">/</span> ');
@@ -957,9 +970,12 @@ const Schedule = {
     const s1Class = isDraw ? 'text-yellow-600' : (isWin1 ? 'text-green-600' : 'text-gray-500');
     const s2Class = isDraw ? 'text-yellow-600' : (isWin2 ? 'text-green-600' : 'text-gray-500');
 
+    const myMatchClass = isMember && isMyMatch ? 'my-match' : '';
+    const myBorderColor = isMember && isMyMatch ? 'border-blue-400 ring-2 ring-blue-200' : borderColor;
+
     return `
-      <div class="schedule-match-card relative bg-white border ${borderColor} rounded-xl p-3 cursor-pointer hover:shadow-md transition"
-           draggable="true" data-match-id="${match.id}" data-slot-idx="${slotIdx}" data-match-idx="${matchIdx}">
+      <div class="schedule-match-card ${myMatchClass} relative bg-white border ${myBorderColor} rounded-xl p-3 cursor-pointer hover:shadow-md transition"
+           draggable="true" data-match-id="${match.id}" data-slot-idx="${slotIdx}" data-match-idx="${matchIdx}" data-my-match="${isMember && isMyMatch}">
         <button type="button" class="delete-match-btn absolute -top-2 -right-2 w-6 h-6 flex items-center justify-center rounded-full bg-white border border-gray-200 text-gray-400 hover:bg-red-50 hover:border-red-300 hover:text-red-500 shadow-sm transition z-10" data-slot-idx="${slotIdx}" data-match-idx="${matchIdx}">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>

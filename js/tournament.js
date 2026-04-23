@@ -92,12 +92,21 @@ const Tournament = {
     }
   },
 
+  // 매치에 멤버 본인 이름이 포함되어 있는지 확인
+  _isMyMatch(match) {
+    const name = App.memberName;
+    if (!name) return false;
+    const check = (pStr) => pStr && pStr.split(' / ').includes(name);
+    return check(match.player1) || check(match.player2);
+  },
+
   // 토너먼트 뷰 렌더링
   render(container, tournament) {
     const rounds = tournament.rounds;
     const totalRounds = rounds.length;
     const roundNames = this.getRoundNames(totalRounds);
     const isComplete = rounds[totalRounds - 1][0].winner !== null;
+    const isMember = !App.isAdmin && !!App.memberName;
 
     // 멤버→팀 매핑
     const _teamMap = {};
@@ -138,14 +147,16 @@ const Tournament = {
           <div class="flex flex-col justify-around flex-1 gap-2">`;
 
       for (const match of rounds[r]) {
-        const canEdit = match.player1 && match.player2 && !match.winner;
+        const isMyMatch = this._isMyMatch(match);
+        const canEdit = match.player1 && match.player2 && !match.winner && (!isMember || isMyMatch);
         const hasResult = match.winner !== null;
         const isBye = match.scores && match.scores.length === 0;
+        const highlightClass = isMember && isMyMatch ? 'my-match' : '';
 
         html += `
-          <div class="bracket-match mx-2 ${canEdit ? 'cursor-pointer hover:shadow-md active:scale-[0.98]' : ''} ${hasResult ? 'completed' : ''}"
+          <div class="bracket-match mx-2 ${highlightClass} ${canEdit ? 'cursor-pointer hover:shadow-md active:scale-[0.98]' : ''} ${hasResult ? 'completed' : ''}"
                data-match-id="${match.id}" data-round="${r}">
-            <div class="match-card bg-white border ${hasResult ? 'border-green-200' : 'border-gray-200'} rounded-xl overflow-hidden shadow-sm">
+            <div class="match-card bg-white border ${isMember && isMyMatch ? 'border-blue-400 ring-2 ring-blue-200' : (hasResult ? 'border-green-200' : 'border-gray-200')} rounded-xl overflow-hidden shadow-sm">
               <div class="match-player flex items-center justify-between px-3 py-2 ${match.winner === match.player1 && match.player1 ? 'bg-green-50 font-semibold text-green-800' : 'text-gray-700'} ${!match.player1 ? 'text-gray-300 italic' : ''} border-b border-gray-100">
                 <div class="flex items-center gap-1 min-w-0">
                   <span class="truncate text-sm">${match.player1 ? Results.escapeHtml(match.player1) : (isBye ? 'BYE' : '대기 중')}</span>
@@ -161,7 +172,7 @@ const Tournament = {
                 ${match.scores && match.scores.length > 0 ? `<span class="text-xs text-gray-500 ml-2 whitespace-nowrap">${match.scores.map(s => s[1]).join(' ')}</span>` : ''}
               </div>
             </div>
-            ${canEdit ? '<div class="text-center mt-1"><span class="text-xs text-green-600 font-medium">클릭하여 결과 입력</span></div>' : ''}
+            ${canEdit ? `<div class="text-center mt-1"><span class="text-xs ${isMember && isMyMatch ? 'text-blue-600' : 'text-green-600'} font-medium">클릭하여 결과 입력</span></div>` : ''}
           </div>`;
       }
 
@@ -194,6 +205,8 @@ const Tournament = {
         const round = parseInt(el.dataset.round);
         const match = rounds[round].find(m => m.id === matchId);
         if (!match || !match.player1 || !match.player2 || match.winner) return;
+        // 멤버는 본인 매치만 입력 가능
+        if (isMember && !this._isMyMatch(match)) return;
 
         Results.showScoreModal(match, tournament, (result) => {
           match.scores = result.scores;

@@ -529,6 +529,22 @@ html.dark .border-green-200 {
   border-color: #166534 !important;
 }
 
+/* 멤버 본인 매치 하이라이트 */
+.my-match .match-card,
+.my-match.schedule-match-card {
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3), 0 2px 8px rgba(59, 130, 246, 0.15);
+}
+html.dark .my-match .match-card,
+html.dark .my-match.schedule-match-card {
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4), 0 2px 8px rgba(59, 130, 246, 0.2) !important;
+  border-color: #3b82f6 !important;
+}
+/* 대진표 목록 카드 하이라이트 (다크 모드) */
+html.dark .tournament-card.ring-2 {
+  --tw-ring-color: rgba(59, 130, 246, 0.4) !important;
+  border-color: #3b82f6 !important;
+}
+
 /* 멤버 교환 선택 */
 html.dark .swap-player:hover {
   background-color: rgba(234, 179, 8, 0.15) !important;
