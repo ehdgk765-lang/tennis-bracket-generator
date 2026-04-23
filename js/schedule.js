@@ -988,7 +988,6 @@ const Schedule = {
             </div>
           </div>
         </div>
-        ${!hasResult ? '<p class="text-xs text-gray-400 text-center mt-1.5">탭하여 스코어 입력</p>' : ''}
       </div>`;
   },
 
