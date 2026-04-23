@@ -1,9 +1,12 @@
 // schedule.js - 시간/코트 기반 대진표 생성 + 렌더링
 const SCHEDULE_GAME_TYPES = {
-  XD: { label: '혼합복식', icon: '👫', badgeClass: 'bg-purple-100 text-purple-700', needM: 2, needF: 2 },
-  MD: { label: '남자복식', icon: '👬', badgeClass: 'bg-blue-100 text-blue-700', needM: 4, needF: 0 },
-  WD: { label: '여자복식', icon: '👭', badgeClass: 'bg-pink-100 text-pink-700', needM: 0, needF: 4 },
-  FD: { label: '섞어복식', icon: '🔀', badgeClass: 'bg-orange-100 text-orange-700', needM: 0, needF: 0, needAny: 4 },
+  XD: { label: '혼합복식', icon: '👫', badgeClass: 'bg-purple-100 text-purple-700', needM: 2, needF: 2, singles: false },
+  MD: { label: '남자복식', icon: '👬', badgeClass: 'bg-blue-100 text-blue-700', needM: 4, needF: 0, singles: false },
+  WD: { label: '여자복식', icon: '👭', badgeClass: 'bg-pink-100 text-pink-700', needM: 0, needF: 4, singles: false },
+  FD: { label: '섞어복식', icon: '🔀', badgeClass: 'bg-orange-100 text-orange-700', needM: 0, needF: 0, needAny: 4, singles: false },
+  MS: { label: '남자단식', icon: '🏃‍♂️', badgeClass: 'bg-blue-100 text-blue-700', needM: 2, needF: 0, singles: true },
+  WS: { label: '여자단식', icon: '🏃‍♀️', badgeClass: 'bg-pink-100 text-pink-700', needM: 0, needF: 2, singles: true },
+  FS: { label: '섞어단식', icon: '🔀', badgeClass: 'bg-orange-100 text-orange-700', needM: 0, needF: 0, needAny: 2, singles: true },
 };
 
 const Schedule = {
@@ -25,12 +28,18 @@ const Schedule = {
   },
 
   // 가용 멤버로 가능한 게임 타입 확인
-  getPossibleTypes(availMales, availFemales, allowMixed) {
+  getPossibleTypes(availMales, availFemales, allowMixed, isSingles) {
     const types = [];
-    if (availMales.length >= 2 && availFemales.length >= 2) types.push('XD');
-    if (availMales.length >= 4) types.push('MD');
-    if (availFemales.length >= 4) types.push('WD');
-    if (allowMixed && (availMales.length + availFemales.length) >= 4) types.push('FD');
+    if (isSingles) {
+      if (availMales.length >= 2) types.push('MS');
+      if (availFemales.length >= 2) types.push('WS');
+      if (allowMixed && (availMales.length + availFemales.length) >= 2) types.push('FS');
+    } else {
+      if (availMales.length >= 2 && availFemales.length >= 2) types.push('XD');
+      if (availMales.length >= 4) types.push('MD');
+      if (availFemales.length >= 4) types.push('WD');
+      if (allowMixed && (availMales.length + availFemales.length) >= 4) types.push('FD');
+    }
     return types;
   },
 
@@ -121,11 +130,16 @@ const Schedule = {
   },
 
   // N개 코트에 대한 모든 게임 타입 조합 생성
-  generatePlans(numCourts, allowMixed) {
-    const types = allowMixed ? ['XD', 'MD', 'WD', 'FD'] : ['XD', 'MD', 'WD'];
+  generatePlans(numCourts, allowMixed, isSingles) {
+    let types;
+    if (isSingles) {
+      types = allowMixed ? ['MS', 'WS', 'FS'] : ['MS', 'WS'];
+    } else {
+      types = allowMixed ? ['XD', 'MD', 'WD', 'FD'] : ['XD', 'MD', 'WD'];
+    }
     if (numCourts === 0) return [[]];
     const result = [];
-    const sub = this.generatePlans(numCourts - 1, allowMixed);
+    const sub = this.generatePlans(numCourts - 1, allowMixed, isSingles);
     for (const t of types) {
       for (const s of sub) {
         result.push([t, ...s]);
@@ -149,11 +163,11 @@ const Schedule = {
   },
 
   // 한 타임슬롯의 매치 생성 (플랜 기반)
-  generateSlotMatches(males, females, courts, gameCounts, allowMixed, usedTeams) {
+  generateSlotMatches(males, females, courts, gameCounts, allowMixed, usedTeams, isSingles) {
     // 코트를 최대한 채우는 유효한 플랜 찾기
     let validPlans = [];
     for (let n = courts; n >= 1; n--) {
-      const plans = this.generatePlans(n, allowMixed);
+      const plans = this.generatePlans(n, allowMixed, isSingles);
       validPlans = plans.filter(p => this.isPlanValid(p, males.length, females.length));
       if (validPlans.length > 0) break;
     }
@@ -170,15 +184,42 @@ const Schedule = {
 
     const matches = [];
 
-    // 성별 지정 타입(XD/MD/WD) 먼저, FD(섞어복식)는 나중에 처리
+    // 성별 지정 타입 먼저, 섞어(FD/FS)는 나중에 처리
     const orderedPlan = plan.map((gameType, idx) => ({ gameType, court: idx + 1 }));
-    orderedPlan.sort((a, b) => (a.gameType === 'FD' ? 1 : 0) - (b.gameType === 'FD' ? 1 : 0));
+    orderedPlan.sort((a, b) => ((a.gameType === 'FD' || a.gameType === 'FS') ? 1 : 0) - ((b.gameType === 'FD' || b.gameType === 'FS') ? 1 : 0));
 
     orderedPlan.forEach(({ gameType, court }) => {
       let team1, team2;
       let displayType = gameType;
 
-      if (gameType === 'FD') {
+      if (gameType === 'FS') {
+        // 섞어단식: 성별 무관, 남은 전체 풀에서 2명 선택
+        let allAvail = this.sortByCountShuffled([...availM, ...availF], gameCounts);
+        const picked = allAvail.slice(0, 2);
+        picked.forEach(p => {
+          let idx = availM.indexOf(p);
+          if (idx >= 0) { availM.splice(idx, 1); return; }
+          idx = availF.indexOf(p);
+          if (idx >= 0) availF.splice(idx, 1);
+        });
+        team1 = [picked[0]];
+        team2 = [picked[1]];
+        picked.forEach(p => gameCounts[p]++);
+
+        const mCount = picked.filter(p => males.includes(p)).length;
+        if (mCount === 2) displayType = 'MS';
+        else if (mCount === 0) displayType = 'WS';
+      } else if (gameType === 'MS') {
+        const picked = availM.splice(0, 2);
+        team1 = [picked[0]];
+        team2 = [picked[1]];
+        picked.forEach(p => gameCounts[p]++);
+      } else if (gameType === 'WS') {
+        const picked = availF.splice(0, 2);
+        team1 = [picked[0]];
+        team2 = [picked[1]];
+        picked.forEach(p => gameCounts[p]++);
+      } else if (gameType === 'FD') {
         // 섞어복식: 성별 무관, 남은 전체 풀에서 4명 선택
         let allAvail = this.sortByCountShuffled([...availM, ...availF], gameCounts);
         const picked = allAvail.slice(0, 4);
@@ -210,9 +251,9 @@ const Schedule = {
         picked.forEach(p => gameCounts[p]++);
       }
 
-      // 사용된 팀 기록
-      this.recordTeam(usedTeams, team1);
-      this.recordTeam(usedTeams, team2);
+      // 사용된 팀 기록 (복식만)
+      if (team1.length >= 2) this.recordTeam(usedTeams, team1);
+      if (team2.length >= 2) this.recordTeam(usedTeams, team2);
 
       matches.push({
         id: Storage.generateId(),
@@ -230,14 +271,14 @@ const Schedule = {
   },
 
   // 대진표 생성
-  generate(males, females, courts, startTime, endTime, allowMixed) {
+  generate(males, females, courts, startTime, endTime, allowMixed, isSingles) {
     const slots = this.calculateTimeSlots(startTime, endTime);
     const gameCounts = {};
     [...males, ...females].forEach(p => { gameCounts[p] = 0; });
     const usedTeams = new Map(); // 팀키 → 횟수
 
     const timeSlots = slots.map(time => {
-      const matches = this.generateSlotMatches(males, females, courts, gameCounts, allowMixed, usedTeams);
+      const matches = this.generateSlotMatches(males, females, courts, gameCounts, allowMixed, usedTeams, isSingles);
       return { time, matches };
     });
 
@@ -1021,10 +1062,11 @@ const Schedule = {
     if (tournament.isTeamMode) {
       Storage.getTeams().forEach(t => (t.members || []).forEach(n => { _teamMap[n] = t.name; }));
     }
+    const isSingles = !!tournament.isSingles;
     const selected = { t1p1: null, t1p2: null, t2p1: null, t2p2: null };
     let selectedCourt = presetCourt || 1;
     let selectedSlot = 0;
-    let selectedGameType = 'XD';
+    let selectedGameType = isSingles ? 'MS' : 'XD';
 
     const modal = document.createElement('div');
     modal.className = 'add-match-modal fixed inset-0 z-50 flex items-end sm:items-center justify-center';
@@ -1068,7 +1110,7 @@ const Schedule = {
               <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">경기 종류</label>
                 <div class="flex gap-1.5 flex-wrap">
-                  ${Object.entries(SCHEDULE_GAME_TYPES).map(([key, cfg]) =>
+                  ${Object.entries(SCHEDULE_GAME_TYPES).filter(([, cfg]) => !!cfg.singles === isSingles).map(([key, cfg]) =>
                     `<label class="cursor-pointer">
                       <input type="radio" name="am-gametype" value="${key}" ${key === selectedGameType ? 'checked' : ''} class="sr-only peer">
                       <div class="px-2.5 py-1.5 rounded-lg text-xs font-medium border-2 border-gray-200 peer-checked:border-green-500 peer-checked:bg-green-50 transition">${cfg.icon} ${cfg.label}</div>
@@ -1091,18 +1133,18 @@ const Schedule = {
             </div>`}
 
             <div>
-              <label class="block text-xs font-semibold text-gray-600 mb-2">팀 1</label>
+              <label class="block text-xs font-semibold text-gray-600 mb-2">${isSingles ? '선수 1' : '팀 1'}</label>
               <div class="space-y-2">
-                ${playerSlot('t1p1', '멤버 1 선택...')}
-                ${playerSlot('t1p2', '멤버 2 선택...')}
+                ${playerSlot('t1p1', isSingles ? '선수 선택...' : '멤버 1 선택...')}
+                ${isSingles ? '' : playerSlot('t1p2', '멤버 2 선택...')}
               </div>
             </div>
 
             <div>
-              <label class="block text-xs font-semibold text-gray-600 mb-2">팀 2</label>
+              <label class="block text-xs font-semibold text-gray-600 mb-2">${isSingles ? '선수 2' : '팀 2'}</label>
               <div class="space-y-2">
-                ${playerSlot('t2p1', '멤버 1 선택...')}
-                ${playerSlot('t2p2', '멤버 2 선택...')}
+                ${playerSlot('t2p1', isSingles ? '선수 선택...' : '멤버 1 선택...')}
+                ${isSingles ? '' : playerSlot('t2p2', '멤버 2 선택...')}
               </div>
             </div>
 
@@ -1134,14 +1176,25 @@ const Schedule = {
 
       modal.querySelector('.am-submit').onclick = () => {
         const { t1p1, t1p2, t2p1, t2p2 } = selected;
-        if (!t1p1 || !t1p2 || !t2p1 || !t2p2) {
-          alert('모든 멤버를 선택해주세요.');
-          return;
-        }
-        const names = [t1p1, t1p2, t2p1, t2p2];
-        if (new Set(names).size !== 4) {
-          alert('중복된 멤버가 있습니다.');
-          return;
+        if (isSingles) {
+          if (!t1p1 || !t2p1) {
+            alert('모든 선수를 선택해주세요.');
+            return;
+          }
+          if (t1p1 === t2p1) {
+            alert('같은 선수를 선택할 수 없습니다.');
+            return;
+          }
+        } else {
+          if (!t1p1 || !t1p2 || !t2p1 || !t2p2) {
+            alert('모든 멤버를 선택해주세요.');
+            return;
+          }
+          const names = [t1p1, t1p2, t2p1, t2p2];
+          if (new Set(names).size !== 4) {
+            alert('중복된 멤버가 있습니다.');
+            return;
+          }
         }
         const slotIdx = tournament.isCustom ? 0 : parseInt(modal.querySelector('#am-slot').value);
         const gameType = tournament.isCustom ? null : modal.querySelector('input[name="am-gametype"]:checked').value;
@@ -1151,8 +1204,8 @@ const Schedule = {
         const newMatch = {
           id: Storage.generateId(),
           court,
-          player1: `${t1p1} / ${t1p2}`,
-          player2: `${t2p1} / ${t2p2}`,
+          player1: isSingles ? t1p1 : `${t1p1} / ${t1p2}`,
+          player2: isSingles ? t2p1 : `${t2p1} / ${t2p2}`,
           scores: null,
           winner: null,
         };
@@ -1290,7 +1343,7 @@ const Schedule = {
         <div class="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-3 sm:hidden"></div>
         <h3 class="text-lg font-bold text-center mb-4">경기 종류 변경</h3>
         <div class="grid grid-cols-2 gap-2 mb-4">
-          ${Object.entries(SCHEDULE_GAME_TYPES).map(([key, cfg]) =>
+          ${Object.entries(SCHEDULE_GAME_TYPES).filter(([, cfg]) => !!cfg.singles === !!tournament.isSingles).map(([key, cfg]) =>
             `<button type="button" class="cgt-option px-3 py-3 rounded-xl text-sm font-medium border-2 transition
               ${match.gameType === key ? 'border-green-500 bg-green-50' : 'border-gray-200 hover:border-gray-300'}"
               data-type="${key}">

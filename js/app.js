@@ -522,6 +522,27 @@ const App = {
             placeholder="미입력 시 날짜로 자동 생성">
         </div>
 
+        <!-- 단식/복식 선택 -->
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">경기 방식</label>
+          <div class="flex gap-3">
+            <label class="flex-1 cursor-pointer">
+              <input type="radio" name="cs-match-type" value="doubles" checked class="sr-only peer">
+              <div class="border-2 border-gray-200 rounded-xl py-2.5 text-center peer-checked:border-green-500 peer-checked:bg-green-50 transition">
+                <span class="font-semibold text-gray-800">복식</span>
+                <div class="text-xs text-gray-500">2 vs 2</div>
+              </div>
+            </label>
+            <label class="flex-1 cursor-pointer">
+              <input type="radio" name="cs-match-type" value="singles" class="sr-only peer">
+              <div class="border-2 border-gray-200 rounded-xl py-2.5 text-center peer-checked:border-green-500 peer-checked:bg-green-50 transition">
+                <span class="font-semibold text-gray-800">단식</span>
+                <div class="text-xs text-gray-500">1 vs 1</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">코트 수</label>
           <div class="grid grid-cols-4 gap-2">
@@ -547,6 +568,7 @@ const App = {
 
       const courts = parseInt(container.querySelector('input[name="cs-courts"]:checked').value);
       const isTeamMode = container.querySelector('#cs-team-mode')?.checked || false;
+      const isSingles = container.querySelector('input[name="cs-match-type"]:checked')?.value === 'singles';
 
       const today = new Date().toISOString().slice(0, 10);
       const customName = container.querySelector('#cs-name').value.trim();
@@ -555,6 +577,7 @@ const App = {
         name: customName || `${today} 대진표`,
         format: 'schedule',
         isCustom: true,
+        isSingles,
         isTeamMode,
         setCount: 1,
         courts,
@@ -583,10 +606,10 @@ const App = {
     const _teamMap = {};
     Storage.getTeams().forEach(t => (t.members || []).forEach(n => { _teamMap[n] = t.name; }));
 
-    if (allPlayers.length < 4) {
+    if (allPlayers.length < 2) {
       morphHTML(container, `
         <div class="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-center">
-          <p class="text-yellow-800 font-medium mb-2">복식 경기를 위해 최소 4명의 멤버가 필요합니다.</p>
+          <p class="text-yellow-800 font-medium mb-2">최소 2명의 멤버가 필요합니다.</p>
           <p class="text-yellow-700 text-sm mb-3">현재: 남 ${males.length}명, 여 ${females.length}명</p>
           <button onclick="App.navigate('players')" class="text-green-600 font-semibold hover:underline">멤버 관리로 이동</button>
         </div>`);
@@ -601,8 +624,29 @@ const App = {
         </label>
         <label class="flex items-center gap-1.5 cursor-pointer">
           <input type="checkbox" id="allow-mixed" class="w-3.5 h-3.5 text-green-600 rounded border-gray-300 focus:ring-green-500">
-          <span class="text-xs text-gray-500">섞어복식 허용</span>
+          <span id="allow-mixed-label" class="text-xs text-gray-500">섞어복식 허용</span>
         </label>
+      </div>
+
+      <!-- 단식/복식 선택 -->
+      <div class="mb-5">
+        <label class="block text-sm font-semibold text-gray-700 mb-2">경기 방식</label>
+        <div class="flex gap-3">
+          <label class="flex-1 cursor-pointer">
+            <input type="radio" name="sch-match-type" value="doubles" checked class="sr-only peer">
+            <div class="border-2 border-gray-200 rounded-xl py-2.5 text-center peer-checked:border-green-500 peer-checked:bg-green-50 transition">
+              <span class="font-semibold text-gray-800">복식</span>
+              <div class="text-xs text-gray-500">2 vs 2</div>
+            </div>
+          </label>
+          <label class="flex-1 cursor-pointer">
+            <input type="radio" name="sch-match-type" value="singles" class="sr-only peer">
+            <div class="border-2 border-gray-200 rounded-xl py-2.5 text-center peer-checked:border-green-500 peer-checked:bg-green-50 transition">
+              <span class="font-semibold text-gray-800">단식</span>
+              <div class="text-xs text-gray-500">1 vs 1</div>
+            </div>
+          </label>
+        </div>
       </div>
 
       <form id="schedule-form" class="space-y-5">
@@ -772,6 +816,15 @@ const App = {
       allowMixedCb.onchange = () => this.updateSchedulePreview(container);
     }
 
+    // 단식/복식 전환 시 라벨 업데이트
+    container.querySelectorAll('input[name="sch-match-type"]').forEach(r => {
+      r.onchange = () => {
+        const label = container.querySelector('#allow-mixed-label');
+        if (label) label.textContent = r.value === 'singles' ? '섞어단식 허용' : '섞어복식 허용';
+        this.updateSchedulePreview(container);
+      };
+    });
+
     container.querySelector('#schedule-form').onsubmit = (e) => {
       e.preventDefault();
 
@@ -780,6 +833,7 @@ const App = {
       const courts = parseInt(container.querySelector('input[name="courts"]:checked').value);
       const selectedMales = Array.from(container.querySelectorAll('.male-cb:checked')).map(cb => cb.value);
       const selectedFemales = Array.from(container.querySelectorAll('.female-cb:checked')).map(cb => cb.value);
+      const isSingles = container.querySelector('input[name="sch-match-type"]:checked')?.value === 'singles';
 
       if (startTime >= endTime) {
         alert('종료 시간은 시작 시간보다 뒤여야 합니다.');
@@ -787,21 +841,26 @@ const App = {
       }
 
       const totalPlayers = selectedMales.length + selectedFemales.length;
-      if (totalPlayers < 4) {
-        alert('최소 4명의 멤버를 선택해주세요.');
+      const minPlayers = isSingles ? 2 : 4;
+      if (totalPlayers < minPlayers) {
+        alert(`최소 ${minPlayers}명의 멤버를 선택해주세요.`);
         return;
       }
 
       const allowMixed = container.querySelector('#allow-mixed')?.checked || false;
       const isTeamMode = container.querySelector('#sch-team-mode')?.checked || false;
 
-      const possibleTypes = Schedule.getPossibleTypes(selectedMales, selectedFemales, allowMixed);
+      const possibleTypes = Schedule.getPossibleTypes(selectedMales, selectedFemales, allowMixed, isSingles);
       if (possibleTypes.length === 0) {
-        alert('선택한 멤버 구성으로 복식 경기를 만들 수 없습니다.\n혼합복식: 남2+여2, 남자복식: 남4, 여자복식: 여4 이상 필요\n또는 섞어복식 허용을 체크해주세요.');
+        if (isSingles) {
+          alert('선택한 멤버 구성으로 단식 경기를 만들 수 없습니다.\n남자단식: 남2명, 여자단식: 여2명 이상 필요\n또는 섞어단식 허용을 체크해주세요.');
+        } else {
+          alert('선택한 멤버 구성으로 복식 경기를 만들 수 없습니다.\n혼합복식: 남2+여2, 남자복식: 남4, 여자복식: 여4 이상 필요\n또는 섞어복식 허용을 체크해주세요.');
+        }
         return;
       }
 
-      const timeSlots = Schedule.generate(selectedMales, selectedFemales, courts, startTime, endTime, allowMixed);
+      const timeSlots = Schedule.generate(selectedMales, selectedFemales, courts, startTime, endTime, allowMixed, isSingles);
 
       if (timeSlots.length === 0) {
         alert('시간이 부족합니다. 최소 30분 이상 설정해주세요.');
@@ -814,6 +873,7 @@ const App = {
         id: Storage.generateId(),
         name: customName || `${today} ${startTime} 대진표`,
         format: 'schedule',
+        isSingles,
         isTeamMode,
         setCount: 1,
         courts,
@@ -861,13 +921,21 @@ const App = {
     timeInfo.className = 'text-xs text-gray-500 mt-1';
 
     const allowMixed = container.querySelector('#allow-mixed')?.checked || false;
+    const isSingles = container.querySelector('input[name="sch-match-type"]:checked')?.value === 'singles';
     const possibleTypes = [];
-    if (maleCount >= 2 && femaleCount >= 2) possibleTypes.push('혼합복식');
-    if (maleCount >= 4) possibleTypes.push('남자복식');
-    if (femaleCount >= 4) possibleTypes.push('여자복식');
-    if (allowMixed && (maleCount + femaleCount) >= 4) possibleTypes.push('섞어복식');
+    if (isSingles) {
+      if (maleCount >= 2) possibleTypes.push('남자단식');
+      if (femaleCount >= 2) possibleTypes.push('여자단식');
+      if (allowMixed && (maleCount + femaleCount) >= 2) possibleTypes.push('섞어단식');
+    } else {
+      if (maleCount >= 2 && femaleCount >= 2) possibleTypes.push('혼합복식');
+      if (maleCount >= 4) possibleTypes.push('남자복식');
+      if (femaleCount >= 4) possibleTypes.push('여자복식');
+      if (allowMixed && (maleCount + femaleCount) >= 4) possibleTypes.push('섞어복식');
+    }
+    const minPlayers = isSingles ? 2 : 4;
 
-    if (maleCount + femaleCount >= 4 && possibleTypes.length > 0) {
+    if (maleCount + femaleCount >= minPlayers && possibleTypes.length > 0) {
       preview.classList.remove('hidden');
       morphHTML(preview, `
         <div class="space-y-1">
