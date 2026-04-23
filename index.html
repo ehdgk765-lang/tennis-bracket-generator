@@ -77,12 +77,12 @@
             <span class="header-logo-bg inline-flex w-9 h-9 rounded-lg flex-shrink-0"></span>
             <span>Happy Tennis Life</span>
           </h1>
-          <!-- 우측: 역할 배지 + 관리자 설정 + 테마 -->
+          <!-- 우측: 역할 배지 + 멤버 계정 관리 + 테마 -->
           <div class="absolute right-0 flex items-center gap-1">
             <span id="role-badge" class="text-[10px] font-bold px-2 py-0.5 rounded-full hidden"></span>
-            <button id="admin-settings-btn" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-green-50 transition hidden" title="관리자 비밀번호 재설정" aria-label="관리자 비밀번호 재설정">
+            <button id="member-mgmt-btn" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-green-50 transition hidden" title="멤버 계정 관리" aria-label="멤버 계정 관리">
               <svg class="w-[18px] h-[18px] text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
               </svg>
             </button>
             <button id="theme-toggle" title="테마 전환" aria-label="테마 전환">
@@ -169,9 +169,9 @@
       Auth.logout();
     });
 
-    // 관리자 비밀번호 재설정 버튼
-    document.getElementById('admin-settings-btn').addEventListener('click', function() {
-      Auth.showResetAdminPwModal();
+    // 멤버 계정 관리 버튼
+    document.getElementById('member-mgmt-btn').addEventListener('click', function() {
+      App.showMemberAccountModal();
     });
 
     // 앱 시작 (Auth가 제어)

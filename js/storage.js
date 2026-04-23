@@ -6,6 +6,21 @@ const Storage = {
     TEAMS: 'tennis_teams',
   },
 
+  // 멤버 모드 지원
+  _adminUID: null,
+  _isMemberMode: false,
+
+  _getDataUID() {
+    if (this._adminUID) return this._adminUID;
+    const user = fbAuth.currentUser;
+    return user ? user.uid : null;
+  },
+
+  resetMemberMode() {
+    this._adminUID = null;
+    this._isMemberMode = false;
+  },
+
   get(key) {
     try {
       const data = localStorage.getItem(key);
@@ -32,6 +47,7 @@ const Storage = {
   },
 
   savePlayers(players) {
+    if (this._isMemberMode) return false;
     const result = this.set(this.KEYS.PLAYERS, players);
     this.syncToFirestore('players', players);
     return result;
@@ -43,6 +59,7 @@ const Storage = {
   },
 
   saveTeams(teams) {
+    if (this._isMemberMode) return false;
     const result = this.set(this.KEYS.TEAMS, teams);
     this.syncToFirestore('teams', teams);
     return result;
@@ -76,6 +93,7 @@ const Storage = {
   },
 
   deleteTournament(id) {
+    if (this._isMemberMode) return;
     const tournaments = this.getTournaments().filter(t => t.id !== id);
     this.saveTournaments(tournaments);
   },
@@ -93,19 +111,21 @@ const Storage = {
 
   // localStorage → Firestore (JSON 문자열로 직렬화하여 저장)
   syncToFirestore(docName, data) {
-    const user = fbAuth.currentUser;
-    if (!user) return;
-    fbDb.collection('users').doc(user.uid).collection('data').doc(docName)
+    const uid = this._getDataUID();
+    if (!uid) return;
+    // 멤버 모드에서는 대회(스코어 입력)만 쓰기 허용
+    if (this._isMemberMode && docName !== 'tournaments') return;
+    fbDb.collection('users').doc(uid).collection('data').doc(docName)
       .set({ json: JSON.stringify(data || []) })
       .catch(err => console.error('Firestore sync error:', err));
   },
 
-  // Firestore → localStorage (로그인 시 호출)
+  // Firestore → localStorage (관리자 로그인 시)
   async loadFromFirestore() {
-    const user = fbAuth.currentUser;
-    if (!user) return;
+    const uid = this._getDataUID();
+    if (!uid) return;
     try {
-      const base = fbDb.collection('users').doc(user.uid).collection('data');
+      const base = fbDb.collection('users').doc(uid).collection('data');
       const [pDoc, tDoc, teamsDoc] = await Promise.all([
         base.doc('players').get(),
         base.doc('tournaments').get(),
@@ -116,7 +136,6 @@ const Storage = {
         const d = pDoc.data();
         const remote = d.json ? JSON.parse(d.json) : (d.items || []);
         const local = this.getPlayers();
-        // 로컬에만 있는 멤버(아직 서버 미동기)를 병합
         const remoteNames = new Set(remote.map(p => p.name));
         const localOnly = local.filter(p => !remoteNames.has(p.name));
         const merged = [...remote, ...localOnly];
@@ -131,7 +150,6 @@ const Storage = {
         const d = tDoc.data();
         const remote = d.json ? JSON.parse(d.json) : (d.items || []);
         const local = this.getTournaments();
-        // 로컬에만 있는 대회(아직 서버 미동기)를 병합
         const remoteIds = new Set(remote.map(t => t.id));
         const localOnly = local.filter(t => !remoteIds.has(t.id));
         const merged = [...remote, ...localOnly];
@@ -160,16 +178,46 @@ const Storage = {
     }
   },
 
+  // Firestore → localStorage (멤버 로그인 시: 관리자 데이터 읽기 전용)
+  async loadFromFirestoreAsAdmin(adminUID) {
+    this._adminUID = adminUID;
+    this._isMemberMode = true;
+    try {
+      const base = fbDb.collection('users').doc(adminUID).collection('data');
+      const [pDoc, tDoc, teamsDoc] = await Promise.all([
+        base.doc('players').get(),
+        base.doc('tournaments').get(),
+        base.doc('teams').get()
+      ]);
+
+      if (pDoc.exists) {
+        const d = pDoc.data();
+        const items = d.json ? JSON.parse(d.json) : (d.items || []);
+        localStorage.setItem(this.KEYS.PLAYERS, JSON.stringify(items));
+      }
+      if (tDoc.exists) {
+        const d = tDoc.data();
+        const items = d.json ? JSON.parse(d.json) : (d.items || []);
+        localStorage.setItem(this.KEYS.TOURNAMENTS, JSON.stringify(items));
+      }
+      if (teamsDoc.exists) {
+        const d = teamsDoc.data();
+        const items = d.json ? JSON.parse(d.json) : (d.items || []);
+        localStorage.setItem(this.KEYS.TEAMS, JSON.stringify(items));
+      }
+    } catch (err) {
+      console.error('Member Firestore load error:', err);
+    }
+  },
+
   // ─── 실시간 동기화 (onSnapshot) ───
 
   startRealtimeSync() {
-    const user = fbAuth.currentUser;
-    if (!user) return;
-    const base = fbDb.collection('users').doc(user.uid).collection('data');
+    const uid = this._getDataUID();
+    if (!uid) return;
+    const base = fbDb.collection('users').doc(uid).collection('data');
 
-    // 멤버 데이터 실시간 리스너
     this._unsubPlayers = base.doc('players').onSnapshot((doc) => {
-      // 내가 쓴 변경이 서버 반영 전이면 무시 (localStorage에 이미 있음)
       if (doc.metadata.hasPendingWrites) return;
       if (!doc.exists) return;
       const d = doc.data();
@@ -178,14 +226,12 @@ const Storage = {
       const newJson = JSON.stringify(items);
       if (current !== newJson) {
         localStorage.setItem(this.KEYS.PLAYERS, newJson);
-        // console.log('실시간 동기화: 멤버 데이터 업데이트');
         this._onRemoteChange();
       }
     }, (err) => {
       console.error('Players realtime sync error:', err);
     });
 
-    // 대회 데이터 실시간 리스너
     this._unsubTournaments = base.doc('tournaments').onSnapshot((doc) => {
       if (doc.metadata.hasPendingWrites) return;
       if (!doc.exists) return;
@@ -195,14 +241,12 @@ const Storage = {
       const newJson = JSON.stringify(items);
       if (current !== newJson) {
         localStorage.setItem(this.KEYS.TOURNAMENTS, newJson);
-        // console.log('실시간 동기화: 대회 데이터 업데이트');
         this._onRemoteChange();
       }
     }, (err) => {
       console.error('Tournaments realtime sync error:', err);
     });
 
-    // 팀 데이터 실시간 리스너
     this._unsubTeams = base.doc('teams').onSnapshot((doc) => {
       if (doc.metadata.hasPendingWrites) return;
       if (!doc.exists) return;
@@ -217,8 +261,6 @@ const Storage = {
     }, (err) => {
       console.error('Teams realtime sync error:', err);
     });
-
-    // console.log('실시간 동기화 시작');
   },
 
   stopRealtimeSync() {
@@ -234,7 +276,6 @@ const Storage = {
       this._unsubTeams();
       this._unsubTeams = null;
     }
-    // console.log('실시간 동기화 중지');
   },
 
   // 원격 변경 시 UI 갱신

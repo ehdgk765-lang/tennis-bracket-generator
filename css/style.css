@@ -730,3 +730,56 @@ html.dark #auth-theme-toggle {
 html.dark #auth-theme-toggle:hover {
   background-color: rgba(71, 85, 105, 0.6) !important;
 }
+html.dark #auth-container .shadow-blue-200 {
+  --tw-shadow-color: rgba(37, 99, 235, 0.15) !important;
+}
+
+/* 멤버 이름 선택 모달 다크 모드 */
+html.dark #member-name-modal > div {
+  background-color: rgba(30, 41, 59, 0.95) !important;
+}
+html.dark #member-name-modal .border-gray-100 {
+  border-color: #334155 !important;
+}
+html.dark #member-name-modal .member-name-option {
+  border-color: #1e293b !important;
+}
+html.dark #member-name-modal .member-name-option:hover {
+  background-color: rgba(37, 99, 235, 0.1) !important;
+}
+html.dark #member-name-modal h3 {
+  color: #e2e8f0 !important;
+}
+html.dark #member-name-modal .text-gray-500 {
+  color: #94a3b8 !important;
+}
+html.dark #member-name-modal .text-gray-800 {
+  color: #e2e8f0 !important;
+}
+
+/* 멤버 계정 관리 모달 다크 모드 */
+html.dark #member-account-modal > div {
+  background-color: rgba(30, 41, 59, 0.95) !important;
+}
+html.dark #member-account-modal h3 {
+  color: #e2e8f0 !important;
+}
+html.dark #member-account-modal .text-gray-500 {
+  color: #94a3b8 !important;
+}
+html.dark #member-account-modal input {
+  background-color: #0f172a !important;
+  border-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+html.dark #member-account-modal input:focus {
+  background-color: #1e293b !important;
+}
+html.dark #member-account-modal .bg-blue-50 {
+  background-color: rgba(37, 99, 235, 0.1) !important;
+  border-color: rgba(37, 99, 235, 0.3) !important;
+}
+html.dark #member-account-modal .bg-gray-100 {
+  background-color: #334155 !important;
+  color: #e2e8f0 !important;
+}

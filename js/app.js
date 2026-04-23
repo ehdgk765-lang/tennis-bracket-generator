@@ -9,6 +9,7 @@ const GAME_TYPES = {
 
 const App = {
   isAdmin: false,
+  memberName: null,
   currentTab: 'players',
   currentTournamentId: null,
   _createSubTab: 'custom-bracket',
@@ -28,8 +29,8 @@ const App = {
         tab.style.display = this.isAdmin ? '' : 'none';
       }
     });
-    const adminBtn = document.getElementById('admin-settings-btn');
-    if (adminBtn) adminBtn.classList.toggle('hidden', !this.isAdmin);
+    const memberMgmtBtn = document.getElementById('member-mgmt-btn');
+    if (memberMgmtBtn) memberMgmtBtn.classList.toggle('hidden', !this.isAdmin);
   },
 
   bindTabs() {
@@ -1033,6 +1034,146 @@ const App = {
     } else {
       League.render(viewContainer, tournament);
     }
+  },
+
+  // ─── 멤버 계정 관리 (관리자용) ───
+
+  showMemberAccountModal() {
+    const user = fbAuth.currentUser;
+    if (!user || !this.isAdmin) return;
+
+    const existing = document.getElementById('member-account-modal');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'member-account-modal';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4';
+    modal.innerHTML = '<div class="bg-white/95 backdrop-blur-md rounded-t-2xl sm:rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center"><p class="text-gray-400">로딩 중...</p></div>';
+    document.body.appendChild(modal);
+
+    // 현재 관리자의 멤버 계정 조회
+    fbDb.collection('memberAccounts').where('adminUID', '==', user.uid).get().then(snapshot => {
+      let existingId = null;
+      let existingPw = null;
+      if (!snapshot.empty) {
+        const doc = snapshot.docs[0];
+        existingId = doc.id;
+        existingPw = doc.data().password;
+      }
+
+      modal.innerHTML = `
+        <div class="bg-white/95 backdrop-blur-md rounded-t-2xl sm:rounded-2xl shadow-2xl max-w-sm w-full p-6 max-h-[90vh] overflow-y-auto">
+          <div class="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-3 sm:hidden"></div>
+          <div class="text-center mb-5">
+            <div class="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <svg class="w-7 h-7 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            </div>
+            <h3 class="text-lg font-bold text-gray-800">멤버 계정 관리</h3>
+            <p class="text-sm text-gray-500 mt-1">멤버들이 로그인할 계정을 설정합니다</p>
+          </div>
+          <div class="space-y-3 mb-5">
+            <div>
+              <label class="block text-xs font-semibold text-gray-500 mb-1 ml-1">로그인 ID</label>
+              <input type="text" id="ma-login-id" value="${existingId || ''}" autocomplete="off"
+                class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white transition"
+                placeholder="멤버 로그인 ID" ${existingId ? 'readonly style="background:#f0f0f0;color:#888;"' : ''}>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-500 mb-1 ml-1">비밀번호</label>
+              <input type="text" id="ma-password" value="${existingPw || ''}" autocomplete="off"
+                class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white transition"
+                placeholder="멤버 비밀번호">
+            </div>
+            <p id="ma-error" class="text-sm text-red-500 text-center hidden"></p>
+          </div>
+          ${existingId ? `
+          <div class="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4 text-center">
+            <p class="text-xs text-gray-500 mb-1">멤버에게 공유할 정보</p>
+            <p class="text-sm font-mono font-bold text-blue-700">ID: ${existingId} / PW: ${existingPw}</p>
+            <button id="ma-copy-btn" class="mt-2 text-xs text-blue-600 hover:underline">복사하기</button>
+          </div>` : ''}
+          <div class="space-y-2">
+            <button id="ma-save-btn"
+              class="w-full py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl hover:from-blue-600 hover:to-indigo-700 active:scale-[0.98] transition-all font-bold shadow-md shadow-blue-200">
+              ${existingId ? '비밀번호 변경' : '멤버 계정 생성'}
+            </button>
+            ${existingId ? '<button id="ma-delete-btn" class="w-full py-3 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition font-medium">계정 삭제</button>' : ''}
+            <button id="ma-cancel-btn" class="w-full py-3 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition font-medium">닫기</button>
+          </div>
+        </div>`;
+
+      const errorEl = modal.querySelector('#ma-error');
+
+      // 저장
+      modal.querySelector('#ma-save-btn').onclick = async () => {
+        const loginId = modal.querySelector('#ma-login-id').value.trim();
+        const password = modal.querySelector('#ma-password').value.trim();
+        errorEl.classList.add('hidden');
+
+        if (!loginId) { errorEl.textContent = '로그인 ID를 입력해주세요.'; errorEl.classList.remove('hidden'); return; }
+        if (!password) { errorEl.textContent = '비밀번호를 입력해주세요.'; errorEl.classList.remove('hidden'); return; }
+
+        try {
+          // 다른 관리자가 사용 중인 ID인지 확인
+          if (!existingId) {
+            const check = await fbDb.collection('memberAccounts').doc(loginId).get();
+            if (check.exists) {
+              errorEl.textContent = '이미 사용 중인 ID입니다.';
+              errorEl.classList.remove('hidden');
+              return;
+            }
+          }
+
+          await fbDb.collection('memberAccounts').doc(existingId || loginId).set({
+            password,
+            adminUID: user.uid,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          modal.remove();
+          alert(existingId ? '비밀번호가 변경되었습니다.' : '멤버 계정이 생성되었습니다.');
+        } catch (e) {
+          errorEl.textContent = '저장 중 오류가 발생했습니다.';
+          errorEl.classList.remove('hidden');
+        }
+      };
+
+      // 복사
+      const copyBtn = modal.querySelector('#ma-copy-btn');
+      if (copyBtn) {
+        copyBtn.onclick = () => {
+          const text = 'ID: ' + existingId + ' / PW: ' + existingPw;
+          navigator.clipboard.writeText(text).then(() => {
+            copyBtn.textContent = '복사됨!';
+            setTimeout(() => { copyBtn.textContent = '복사하기'; }, 2000);
+          }).catch(() => {
+            prompt('아래 내용을 복사하세요:', text);
+          });
+        };
+      }
+
+      // 삭제
+      const deleteBtn = modal.querySelector('#ma-delete-btn');
+      if (deleteBtn) {
+        deleteBtn.onclick = async () => {
+          if (!confirm('멤버 계정을 삭제하시겠습니까?\n멤버들이 더 이상 로그인할 수 없습니다.')) return;
+          try {
+            await fbDb.collection('memberAccounts').doc(existingId).delete();
+            modal.remove();
+            alert('멤버 계정이 삭제되었습니다.');
+          } catch (e) {
+            errorEl.textContent = '삭제 중 오류가 발생했습니다.';
+            errorEl.classList.remove('hidden');
+          }
+        };
+      }
+
+      // 닫기
+      modal.querySelector('#ma-cancel-btn').onclick = () => modal.remove();
+      modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+    }).catch(() => {
+      modal.remove();
+      alert('멤버 계정 정보를 불러올 수 없습니다.');
+    });
   },
 };
 
