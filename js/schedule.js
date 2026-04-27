@@ -928,7 +928,7 @@ const Schedule = {
     const pd = allPlayers.find(p => p.name === name);
     const isCustom = this._tournament?.isCustom;
     const ntrpHtml = !App.isAdmin ? '' : `<span class="text-yellow-600 text-xs">${(pd?.ntrp || 2.5).toFixed(1)}</span>`;
-    const genderHtml = isCustom && pd ? `<span class="text-xs ${pd.gender === 'M' ? 'text-blue-600' : 'text-pink-600'}">${pd.gender === 'M' ? '남' : '여'}</span>` : '';
+    const genderHtml = pd ? `<span class="text-xs ${pd.gender === 'M' ? 'text-blue-600' : 'text-pink-600'}">${pd.gender === 'M' ? '남' : '여'}</span>` : '';
     return `<span class="swap-player cursor-pointer hover:bg-yellow-100 rounded px-0.5 transition inline-flex items-center gap-0.5"
       data-slot-idx="${slotIdx}" data-match-idx="${matchIdx}" data-team="${team}" data-pos="${pos}"
       data-name="${Results.escapeHtml(name)}">${Results.escapeHtml(name)}${genderHtml}${ntrpHtml}</span>`;
