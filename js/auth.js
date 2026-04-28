@@ -136,11 +136,11 @@ const Auth = {
               <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
           </div>
-          <div id="auth-help-content" class="px-5 py-4 overflow-y-auto text-sm text-gray-600 dark:text-gray-300 leading-relaxed space-y-3">
-            <p><strong class="text-gray-700 dark:text-gray-200">Happy Tennis Life</strong> 는 무료로 누구나 이용하실 수 있는 <br>대진표 생성/공유 웹앱입니다.</p>
-            <p>호스트로 계정을 생성하면 대진표 생성이 가능하고, 멤버 계정을 <br>생성해서 다른 사람과 대진표를 공유할 수 있습니다.</p>
-            <p>멤버는 호스트가 생성한 계정으로 로그인 후, <br>호스트가 등록한 멤버의 이름을 확인하여 로그인할 수 있습니다.</p>
-            <p>멤버 등록, 팀 등록, 대진표 생성, PDF 내보내기 등 <br>다양한 기능을 이용하실 수 있습니다.</p>
+          <div id="auth-help-content" class="px-5 py-4 overflow-y-auto text-sm text-gray-600 dark:text-gray-300 leading-relaxed space-y-3" style="word-break:keep-all">
+            <p><strong class="text-gray-700 dark:text-gray-200">Happy Tennis Life</strong>는 무료로 누구나 이용하실 수 있는 대진표 생성/공유 웹앱입니다.</p>
+            <p>호스트로 계정을 생성하면 대진표 생성이 가능하고, 멤버 계정을 생성해서 다른 사람과 대진표를 공유할 수 있습니다.</p>
+            <p>멤버는 호스트가 생성한 계정으로 로그인 후, 호스트가 등록한 멤버의 이름을 확인하여 로그인할 수 있습니다.</p>
+            <p>멤버 등록, 팀 등록, 대진표 생성, PDF 내보내기 등 다양한 기능을 이용하실 수 있습니다.</p>
             <div class="bg-green-50 dark:bg-slate-700/50 rounded-xl p-3 space-y-1.5">
               <p class="font-semibold text-gray-700 dark:text-gray-200 text-xs">사용 예시</p>
               <ol class="list-decimal list-inside space-y-1 text-gray-500 dark:text-gray-400 text-xs">
@@ -150,7 +150,7 @@ const Auth = {
                 <li>결과는 실시간으로 집계되고, 생성한 대진이 종료되면 결과도 표시됩니다.</li>
               </ol>
             </div>
-            <p class="text-xs text-gray-400 dark:text-gray-500">추가로 궁금하신 사항이나 건의사항은 화면 하단의 개발자에게 <br>편하게 문의해 주세요.</p>
+            <p class="text-xs text-gray-400 dark:text-gray-500">추가로 궁금하신 사항이나 건의사항은 화면 하단의 개발자에게 편하게 문의해 주세요.</p>
           </div>
         </div>
       </div>
