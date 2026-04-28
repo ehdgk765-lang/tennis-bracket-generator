@@ -119,6 +119,42 @@ const Auth = {
   renderLogin() {
     const container = document.getElementById('auth-container');
     morphHTML(container, `
+      <!-- 도움말 버튼 -->
+      <button id="auth-help-btn" class="absolute top-4 left-4 w-10 h-10 flex items-center justify-center rounded-xl bg-white/30 backdrop-blur-sm border border-white/40 hover:bg-white/50 transition-all" title="도움말" aria-label="도움말">
+        <svg class="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+      </button>
+
+      <!-- 도움말 모달 -->
+      <div id="auth-help-modal" class="fixed inset-0 z-[60] flex items-center justify-center p-4" style="display:none">
+        <div id="auth-help-backdrop" class="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
+        <div class="relative bg-white/90 dark:bg-slate-800/95 backdrop-blur-md rounded-2xl shadow-2xl max-w-sm w-full max-h-[80vh] flex flex-col border border-white/60 dark:border-slate-700/60">
+          <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-slate-700 flex-shrink-0">
+            <h3 class="text-lg font-bold text-gray-800 dark:text-gray-100">도움말</h3>
+            <button id="auth-help-close" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-slate-700 transition text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <div id="auth-help-content" class="px-5 py-4 overflow-y-auto text-sm text-gray-600 dark:text-gray-300 leading-relaxed space-y-3">
+            <p><strong class="text-gray-700 dark:text-gray-200">Happy Tennis Life</strong> 는 무료로 누구나 이용하실 수 있는 <br>대진표 생성/공유 웹앱입니다.</p>
+            <p>호스트로 계정을 생성하면 대진표 생성이 가능하고, 멤버 계정을 <br>생성해서 다른 사람과 대진표를 공유할 수 있습니다.</p>
+            <p>멤버는 호스트가 생성한 계정으로 로그인 후, <br>호스트가 등록한 멤버의 이름을 확인하여 로그인할 수 있습니다.</p>
+            <p>멤버 등록, 팀 등록, 대진표 생성, PDF 내보내기 등 <br>다양한 기능을 이용하실 수 있습니다.</p>
+            <div class="bg-green-50 dark:bg-slate-700/50 rounded-xl p-3 space-y-1.5">
+              <p class="font-semibold text-gray-700 dark:text-gray-200 text-xs">사용 예시</p>
+              <ol class="list-decimal list-inside space-y-1 text-gray-500 dark:text-gray-400 text-xs">
+                <li>호스트 계정 생성, 로그인 후 멤버를 등록하고 대진표를 생성합니다.</li>
+                <li>우측 상단 버튼을 통해 멤버 계정을 생성하고 멤버들에게 계정을 공유해 주세요.</li>
+                <li>멤버는 전달받은 계정으로 로그인 후, 본인 이름을 입력하여 접속합니다. 호스트가 생성해둔 대진표를 확인, 게임 후 스코어를 입력합니다.</li>
+                <li>결과는 실시간으로 집계되고, 생성한 대진이 종료되면 결과도 표시됩니다.</li>
+              </ol>
+            </div>
+            <p class="text-xs text-gray-400 dark:text-gray-500">추가로 궁금하신 사항이나 건의사항은 화면 하단의 개발자에게 <br>편하게 문의해 주세요.</p>
+          </div>
+        </div>
+      </div>
+
       <!-- 테마 토글 -->
       <button id="auth-theme-toggle" class="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-xl bg-white/30 backdrop-blur-sm border border-white/40 hover:bg-white/50 transition-all" title="테마 전환" aria-label="테마 전환">
         <svg class="auth-icon-sun w-5 h-5 text-gray-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -213,7 +249,23 @@ const Auth = {
           </form>
           <p class="text-center text-sm text-gray-400 mt-4">관리자에게 ID와 비밀번호를 문의하세요</p>
         </div>
+
+        <!-- 인스타그램 링크 -->
+        <div class="mt-8 pb-6 text-center">
+          <span class="text-sm text-gray-400">Created by</span><br>
+          <a href="https://www.instagram.com/happy_tennis_life" target="_blank" rel="noopener noreferrer"
+             class="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-pink-500 dark:text-gray-500 dark:hover:text-pink-400 transition-colors">
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
+            @happy_tennis_life
+          </a>
+        </div>
       </div>`);
+
+    // 도움말 모달
+    const helpModal = container.querySelector('#auth-help-modal');
+    container.querySelector('#auth-help-btn').onclick = () => helpModal.style.display = '';
+    container.querySelector('#auth-help-close').onclick = () => helpModal.style.display = 'none';
+    container.querySelector('#auth-help-backdrop').onclick = () => helpModal.style.display = 'none';
 
     // 테마 토글
     const authThemeToggle = container.querySelector('#auth-theme-toggle');
