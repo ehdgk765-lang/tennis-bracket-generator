@@ -301,10 +301,10 @@ const App = {
     const searchInput = section.querySelector('#player-search');
     const playerItems = section.querySelectorAll('.player-item');
     searchInput.oninput = () => {
-      const query = searchInput.value.trim().toLowerCase();
+      const query = searchInput.value.trim();
       playerItems.forEach(item => {
         const name = item.dataset.name;
-        item.style.display = (!query || name.includes(query)) ? '' : 'none';
+        item.style.display = (!query || matchesKoreanSearch(name, query)) ? '' : 'none';
       });
     };
 
@@ -382,9 +382,9 @@ const App = {
       const allBtn = section.querySelector(`#${prefix}-all-btn`);
 
       search.oninput = () => {
-        const q = search.value.trim().toLowerCase();
+        const q = search.value.trim();
         items.forEach(item => {
-          item.style.display = (!q || item.dataset.name.includes(q)) ? '' : 'none';
+          item.style.display = (!q || matchesKoreanSearch(item.dataset.name, q)) ? '' : 'none';
         });
       };
 
@@ -781,9 +781,9 @@ const App = {
       if (!search || !allBtn) return;
 
       search.oninput = () => {
-        const q = search.value.trim().toLowerCase();
+        const q = search.value.trim();
         items.forEach(item => {
-          item.style.display = (!q || item.dataset.name.includes(q)) ? '' : 'none';
+          item.style.display = (!q || matchesKoreanSearch(item.dataset.name, q)) ? '' : 'none';
         });
       };
 

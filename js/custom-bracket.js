@@ -361,9 +361,9 @@ const CustomBracket = {
     searchInput.focus();
 
     searchInput.oninput = () => {
-      const q = searchInput.value.trim().toLowerCase();
+      const q = searchInput.value.trim();
       picker.querySelectorAll('.cb-pick-option').forEach(opt => {
-        opt.style.display = (!q || opt.dataset.name.toLowerCase().includes(q)) ? '' : 'none';
+        opt.style.display = (!q || matchesKoreanSearch(opt.dataset.name, q)) ? '' : 'none';
       });
     };
 
@@ -433,7 +433,7 @@ const CustomBracket = {
 
           <div class="mb-3">
             <div class="flex gap-2">
-              <input type="text" id="cb-doubles-search" placeholder="이름 검색 또는 직접 입력..."
+              <input type="text" autocomplete="off" id="cb-doubles-search" placeholder="이름 검색 또는 직접 입력..."
                 class="cb-picker-search flex-1 px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500">
               <button type="button" id="cb-doubles-custom-add"
                 class="px-4 py-2 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 transition whitespace-nowrap">추가</button>
@@ -485,9 +485,9 @@ const CustomBracket = {
       if (searchInput) searchInput.focus();
 
       searchInput.oninput = () => {
-        const q = searchInput.value.trim().toLowerCase();
+        const q = searchInput.value.trim();
         picker.querySelectorAll('.cb-pick-option').forEach(opt => {
-          opt.style.display = (!q || opt.dataset.name.toLowerCase().includes(q)) ? '' : 'none';
+          opt.style.display = (!q || matchesKoreanSearch(opt.dataset.name, q)) ? '' : 'none';
         });
       };
 

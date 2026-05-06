@@ -129,7 +129,7 @@ const Players = {
 
     const indexed = allPlayers.map((p, i) => ({ player: p, num: i + 1 }));
     const filtered = isSearching
-      ? indexed.filter(item => item.player.name.toLowerCase().includes(lowerQuery))
+      ? indexed.filter(item => matchesKoreanSearch(item.player.name, query))
       : indexed;
 
     const hasMore = !isSearching && filtered.length > this._VISIBLE_LIMIT;
