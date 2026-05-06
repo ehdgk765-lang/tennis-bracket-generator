@@ -1254,13 +1254,37 @@ const Schedule = {
       Storage.getTeams().forEach(t => (t.members || []).forEach(n => { _teamMap[n] = t.name; }));
     }
 
+    // 팀 모드: 허용/제외 팀 결정
+    let allowedTeam = null, excludedTeam = null;
+    if (this._tournament?.isTeamMode) {
+      const isTeam1Side = slotKey.startsWith('t1');
+      const side1Team = _teamMap[selected.t1p1] || _teamMap[selected.t1p2] || null;
+      const side2Team = _teamMap[selected.t2p1] || _teamMap[selected.t2p2] || null;
+      if (isTeam1Side) {
+        if (side1Team) allowedTeam = side1Team;
+        else if (side2Team) excludedTeam = side2Team;
+      } else {
+        if (side2Team) allowedTeam = side2Team;
+        else if (side1Team) excludedTeam = side1Team;
+      }
+    }
+    const visiblePlayers = (allowedTeam || excludedTeam)
+      ? allPlayers.filter(p => {
+          const t = _teamMap[p.name];
+          if (allowedTeam) return t === allowedTeam;
+          if (excludedTeam) return t && t !== excludedTeam;
+          return true;
+        })
+      : allPlayers;
+    const pickerTitle = allowedTeam ? `멤버 선택 — ${Results.escapeHtml(allowedTeam)}` : '멤버 선택';
+
     const picker = document.createElement('div');
     picker.className = 'am-player-picker fixed inset-0 z-[60] flex items-end sm:items-center justify-center';
     picker.style.backgroundColor = 'rgba(0,0,0,0.5)';
     picker.innerHTML = `
       <div class="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl max-w-sm w-full p-4 max-h-[70vh] flex flex-col">
         <div class="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-3 sm:hidden"></div>
-        <h3 class="text-lg font-bold text-center mb-3">멤버 선택</h3>
+        <h3 class="text-lg font-bold text-center mb-3">${pickerTitle}</h3>
         <div class="mb-3">
           <div class="flex gap-2">
             <input type="text" autocomplete="off" id="amp-search" placeholder="이름 검색 또는 직접 입력..."
@@ -1269,10 +1293,10 @@ const Schedule = {
               class="px-4 py-2 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 transition whitespace-nowrap">추가</button>
           </div>
         </div>
-        ${allPlayers.length > 0 ? `
+        ${visiblePlayers.length > 0 ? `
           <div class="text-xs text-gray-400 mb-2">등록된 멤버</div>
           <div class="overflow-y-auto flex-1 divide-y divide-gray-50">
-            ${allPlayers.map(p => {
+            ${visiblePlayers.map(p => {
               const isUsed = usedNames.has(p.name);
               const tn = _teamMap[p.name];
               return `
