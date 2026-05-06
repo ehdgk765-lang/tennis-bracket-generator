@@ -752,7 +752,6 @@ const Schedule = {
         const label = `${match.player1} vs ${match.player2}`;
         if (!confirm(`이 대진을 삭제하시겠습니까?\n${label}`)) return;
         tournament.timeSlots[si].matches.splice(mi, 1);
-        tournament.timeSlots[si].matches.forEach((m, i) => m.court = i + 1);
         Storage.updateTournament(tournament);
         this.render(container, tournament);
       };
