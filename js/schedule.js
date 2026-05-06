@@ -650,10 +650,29 @@ const Schedule = {
           // 첫 번째 멤버 선택
           selectedPlayer = { el, ...data };
           el.classList.add('bg-green-200', 'ring-2', 'ring-green-500', 'rounded');
+          // 교체 버튼 삽입 (카드 위 absolute)
+          const card = el.closest('.schedule-match-card');
+          if (card) {
+            const replaceBtn = document.createElement('button');
+            replaceBtn.className = 'replace-player-btn absolute -bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 text-xs bg-blue-500 text-white rounded-full hover:bg-blue-600 shadow-md transition z-10';
+            replaceBtn.textContent = '교체';
+            replaceBtn.onclick = (ev) => {
+              ev.stopPropagation();
+              this._showReplacePlayerPicker(container, tournament, selectedPlayer, () => {
+                if (selectedPlayer) {
+                  selectedPlayer.el.classList.remove('bg-green-200', 'ring-2', 'ring-green-500', 'rounded');
+                }
+                container.querySelectorAll('.replace-player-btn').forEach(b => b.remove());
+                selectedPlayer = null;
+              });
+            };
+            card.appendChild(replaceBtn);
+          }
         } else if (selectedPlayer.slotIdx === data.slotIdx && selectedPlayer.matchIdx === data.matchIdx
           && selectedPlayer.team === data.team && selectedPlayer.pos === data.pos) {
           // 같은 멤버 재탭 → 선택 해제
           selectedPlayer.el.classList.remove('bg-green-200', 'ring-2', 'ring-green-500', 'rounded');
+          container.querySelectorAll('.replace-player-btn').forEach(b => b.remove());
           selectedPlayer = null;
         } else {
           // 두 번째 멤버 탭 → 교환
@@ -666,6 +685,7 @@ const Schedule = {
 
           const clearSel = () => {
             selectedPlayer.el.classList.remove('bg-green-200', 'ring-2', 'ring-green-500', 'rounded');
+            container.querySelectorAll('.replace-player-btn').forEach(b => b.remove());
             selectedPlayer = null;
           };
 
@@ -718,6 +738,7 @@ const Schedule = {
       card.onclick = () => {
         if (selectedPlayer) {
           selectedPlayer.el.classList.remove('bg-green-200', 'ring-2', 'ring-green-500', 'rounded');
+          container.querySelectorAll('.replace-player-btn').forEach(b => b.remove());
           selectedPlayer = null;
           return;
         }
@@ -1349,6 +1370,102 @@ const Schedule = {
         selected[slotKey] = opt.dataset.name;
         picker.remove();
         onDone();
+      };
+    });
+  },
+
+  // 멤버 교체 피커 (매치 카드에서 이름 탭 → 교체 버튼)
+  _showReplacePlayerPicker(container, tournament, playerInfo, onDone) {
+    const existing = document.querySelector('.am-player-picker');
+    if (existing) existing.remove();
+
+    const allPlayers = Storage.getPlayers().sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+    const { slotIdx, matchIdx, team, pos, name: oldName } = playerInfo;
+    const match = tournament.timeSlots[slotIdx]?.matches[matchIdx];
+    if (!match) return;
+
+    const playerKey = team === 1 ? 'player1' : 'player2';
+    const otherKey = team === 1 ? 'player2' : 'player1';
+    const sameMatchNames = new Set([
+      ...match[playerKey].split(' / '),
+      ...match[otherKey].split(' / ')
+    ]);
+    sameMatchNames.delete(oldName);
+
+    const _teamMap = {};
+    if (tournament.isTeamMode) {
+      Storage.getTeams().forEach(t => (t.members || []).forEach(n => { _teamMap[n] = t.name; }));
+    }
+
+    // 팀 모드: 같은 편 멤버의 팀으로 필터링
+    const sideTeam = tournament.isTeamMode
+      ? match[playerKey].split(' / ').map(n => _teamMap[n]).find(Boolean) || null
+      : null;
+    const visiblePlayers = sideTeam
+      ? allPlayers.filter(p => _teamMap[p.name] === sideTeam)
+      : allPlayers;
+    const pickerTitle = sideTeam
+      ? `멤버 교체 — ${Results.escapeHtml(oldName)} (${Results.escapeHtml(sideTeam)})`
+      : `멤버 교체 — ${Results.escapeHtml(oldName)}`;
+
+    const picker = document.createElement('div');
+    picker.className = 'am-player-picker fixed inset-0 z-[60] flex items-end sm:items-center justify-center';
+    picker.style.backgroundColor = 'rgba(0,0,0,0.5)';
+    picker.innerHTML = `
+      <div class="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl max-w-sm w-full p-4 max-h-[70vh] flex flex-col">
+        <div class="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-3 sm:hidden"></div>
+        <h3 class="text-lg font-bold text-center mb-3">${pickerTitle}</h3>
+        <div class="mb-3">
+          <input type="text" autocomplete="off" id="amp-search" placeholder="이름 검색..."
+            class="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+        </div>
+        ${visiblePlayers.length > 0 ? `
+          <div class="text-xs text-gray-400 mb-2">등록된 멤버</div>
+          <div class="overflow-y-auto flex-1 divide-y divide-gray-50">
+            ${visiblePlayers.map(p => {
+              const isDup = sameMatchNames.has(p.name);
+              const isSelf = p.name === oldName;
+              const tn = _teamMap[p.name];
+              return `
+                <div class="amp-option flex items-center px-3 py-2.5 ${isDup || isSelf ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-blue-50'} transition"
+                  data-name="${Results.escapeHtml(p.name)}" data-disabled="${isDup || isSelf}">
+                  <span class="text-sm text-gray-800">${Results.escapeHtml(p.name)}</span>
+                  <span class="ml-2 text-xs px-1.5 py-0.5 rounded font-medium ${p.gender === 'M' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}">${p.gender === 'M' ? '남' : '여'}</span>
+                  ${!App.isAdmin ? '' : `<span class="ml-1 text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">${(p.ntrp || 2.5).toFixed(1)}</span>`}
+                  ${tn ? `<span class="ml-1 text-xs px-1.5 py-0.5 rounded font-medium bg-green-50 text-green-600 border border-green-200">${Results.escapeHtml(tn)}</span>` : ''}
+                  ${isSelf ? '<span class="ml-auto text-xs text-gray-400">현재</span>' : ''}
+                  ${isDup ? '<span class="ml-auto text-xs text-gray-400">같은 경기</span>' : ''}
+                </div>`;
+            }).join('')}
+          </div>
+        ` : '<p class="text-sm text-gray-400 text-center py-4">등록된 멤버가 없습니다.</p>'}
+        <button type="button" class="mt-3 w-full py-2 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition amp-cancel">취소</button>
+      </div>`;
+
+    document.body.appendChild(picker);
+    picker.addEventListener('click', (e) => { if (e.target === picker) picker.remove(); });
+    picker.querySelector('.amp-cancel').onclick = () => { picker.remove(); onDone(); };
+
+    const searchInput = picker.querySelector('#amp-search');
+    searchInput.focus();
+    searchInput.oninput = () => {
+      const q = searchInput.value.trim();
+      picker.querySelectorAll('.amp-option').forEach(opt => {
+        opt.style.display = (!q || matchesKoreanSearch(opt.dataset.name, q)) ? '' : 'none';
+      });
+    };
+
+    picker.querySelectorAll('.amp-option').forEach(opt => {
+      opt.onclick = () => {
+        if (opt.dataset.disabled === 'true') return;
+        const newName = opt.dataset.name;
+        const names = match[playerKey].split(' / ');
+        names[pos] = newName;
+        match[playerKey] = names.join(' / ');
+        Storage.updateTournament(tournament);
+        picker.remove();
+        onDone();
+        this.render(container, tournament);
       };
     });
   },
