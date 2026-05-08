@@ -722,6 +722,26 @@ const Schedule = {
               clearSel();
               return;
             }
+            // 다른 시간대 간 교환: 이동 대상이 해당 시간대의 다른 매치에 이미 있는지 확인
+            if (src.slotIdx !== tgt.slotIdx) {
+              const getNamesInSlot = (si, excludeMatch) => {
+                const names = new Set();
+                (tournament.timeSlots[si]?.matches || []).forEach((m, mi) => {
+                  if (mi === excludeMatch) return;
+                  m.player1.split(' / ').forEach(n => names.add(n));
+                  m.player2.split(' / ').forEach(n => names.add(n));
+                });
+                return names;
+              };
+              const srcSlotOthers = getNamesInSlot(src.slotIdx, src.matchIdx);
+              const tgtSlotOthers = getNamesInSlot(tgt.slotIdx, tgt.matchIdx);
+              // swap 후: tgt.name → srcSlot, src.name → tgtSlot
+              if (srcSlotOthers.has(tgt.name) || tgtSlotOthers.has(src.name)) {
+                alert('같은 시간대에 동일 멤버가 중복됩니다.');
+                clearSel();
+                return;
+              }
+            }
             srcMatch[srcKey] = srcTeam.join(' / ');
             tgtMatch[tgtKey] = tgtTeam.join(' / ');
           }
@@ -1217,6 +1237,20 @@ const Schedule = {
           }
         }
         const slotIdx = tournament.isCustom ? 0 : parseInt(modal.querySelector('#am-slot').value);
+
+        // 같은 시간대 멤버 중복 검사
+        const newNames = isSingles ? [t1p1, t2p1] : [t1p1, t1p2, t2p1, t2p2];
+        const slotExisting = new Set();
+        (tournament.timeSlots[slotIdx]?.matches || []).forEach(m => {
+          m.player1.split(' / ').forEach(n => slotExisting.add(n));
+          m.player2.split(' / ').forEach(n => slotExisting.add(n));
+        });
+        const dupInSlot = newNames.filter(n => slotExisting.has(n));
+        if (dupInSlot.length > 0) {
+          alert(`같은 시간대에 이미 배치된 멤버가 있습니다:\n${dupInSlot.join(', ')}`);
+          return;
+        }
+
         const gameType = tournament.isCustom ? null : modal.querySelector('input[name="am-gametype"]:checked').value;
         const courtEl = modal.querySelector('input[name="am-court"]:checked');
         const court = courtEl ? parseInt(courtEl.value) : selectedCourt;
@@ -1386,11 +1420,13 @@ const Schedule = {
 
     const playerKey = team === 1 ? 'player1' : 'player2';
     const otherKey = team === 1 ? 'player2' : 'player1';
-    const sameMatchNames = new Set([
-      ...match[playerKey].split(' / '),
-      ...match[otherKey].split(' / ')
-    ]);
-    sameMatchNames.delete(oldName);
+    // 같은 시간대 전체 매치에서 사용 중인 멤버 수집 (본인 제외)
+    const slotBusyNames = new Set();
+    (tournament.timeSlots[slotIdx]?.matches || []).forEach(m => {
+      m.player1.split(' / ').forEach(n => slotBusyNames.add(n));
+      m.player2.split(' / ').forEach(n => slotBusyNames.add(n));
+    });
+    slotBusyNames.delete(oldName);
 
     const _teamMap = {};
     if (tournament.isTeamMode) {
@@ -1423,7 +1459,7 @@ const Schedule = {
           <div class="text-xs text-gray-400 mb-2">등록된 멤버</div>
           <div class="overflow-y-auto flex-1 divide-y divide-gray-50">
             ${visiblePlayers.map(p => {
-              const isDup = sameMatchNames.has(p.name);
+              const isDup = slotBusyNames.has(p.name);
               const isSelf = p.name === oldName;
               const tn = _teamMap[p.name];
               return `
@@ -1434,7 +1470,7 @@ const Schedule = {
                   ${!App.isAdmin ? '' : `<span class="ml-1 text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">${(p.ntrp || 2.5).toFixed(1)}</span>`}
                   ${tn ? `<span class="ml-1 text-xs px-1.5 py-0.5 rounded font-medium bg-green-50 text-green-600 border border-green-200">${Results.escapeHtml(tn)}</span>` : ''}
                   ${isSelf ? '<span class="ml-auto text-xs text-gray-400">현재</span>' : ''}
-                  ${isDup ? '<span class="ml-auto text-xs text-gray-400">같은 경기</span>' : ''}
+                  ${isDup ? '<span class="ml-auto text-xs text-gray-400">같은 시간대</span>' : ''}
                 </div>`;
             }).join('')}
           </div>
