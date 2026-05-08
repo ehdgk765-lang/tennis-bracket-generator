@@ -468,6 +468,9 @@ const Schedule = {
               return `
               <div class="schedule-slot" data-slot="${si}">
                 <div class="flex items-center gap-2 mb-2">
+                  <span class="slot-drag-handle cursor-pointer text-gray-300 flex-shrink-0" data-slot-idx="${si}" style="display:none">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h10M7 16h10"/></svg>
+                  </span>
                   <span class="text-sm font-bold text-gray-700 bg-gray-100 px-3 py-1 rounded-full">${slot.time}</span>
                   <div class="flex-1 border-t border-gray-200"></div>
                 </div>
@@ -857,15 +860,21 @@ const Schedule = {
       };
     });
 
-    // 데스크톱: HTML5 Drag and Drop (매치 카드 위치 교환)
+    // ── 드래그 (관리자 전용) ──
+    if (App.isAdmin) {
+    let _dragType = null; // 'card'
+
+    // ── 매치 카드 교환 (데스크톱 DnD) ──
     cards.forEach(card => {
       card.ondragstart = (e) => {
+        _dragType = 'card';
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', `${card.dataset.slotIdx},${card.dataset.matchIdx}`);
         requestAnimationFrame(() => card.style.opacity = '0.4');
       };
-      card.ondragend = () => { card.style.opacity = ''; };
+      card.ondragend = () => { card.style.opacity = ''; _dragType = null; };
       card.ondragover = (e) => {
+        if (_dragType !== 'card') return;
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
         card.classList.add('ring-2', 'ring-green-500');
@@ -874,6 +883,7 @@ const Schedule = {
       card.ondrop = (e) => {
         e.preventDefault();
         card.classList.remove('ring-2', 'ring-green-500');
+        if (_dragType !== 'card') return;
         const [si, mi] = e.dataTransfer.getData('text/plain').split(',').map(Number);
         const tSI = +card.dataset.slotIdx, tMI = +card.dataset.matchIdx;
         if (si === tSI && mi === tMI) return;
@@ -900,7 +910,6 @@ const Schedule = {
           const tgtMatchNames = getNames(tgtSlot.matches[tMI]);
           const srcSlotOthers = getNamesInSlot(srcSlot, mi);
           const tgtSlotOthers = getNamesInSlot(tgtSlot, tMI);
-          // 교환 후: srcMatch → tgtSlot, tgtMatch → srcSlot
           const dupInTgt = [...srcMatchNames].filter(n => tgtSlotOthers.has(n));
           const dupInSrc = [...tgtMatchNames].filter(n => srcSlotOthers.has(n));
           if (dupInTgt.length > 0 || dupInSrc.length > 0) {
@@ -910,7 +919,6 @@ const Schedule = {
           }
         }
 
-        // 코트 번호는 위치에 귀속 (교환 전 저장)
         const srcCourt = srcSlot.matches[mi].court;
         const tgtCourt = tgtSlot.matches[tMI].court;
         [srcSlot.matches[mi], tgtSlot.matches[tMI]] = [tgtSlot.matches[tMI], srcSlot.matches[mi]];
@@ -920,6 +928,74 @@ const Schedule = {
         this.render(container, tournament);
       };
     });
+
+    // ── 시간대 통째로 교환 (데스크톱 DnD + 모바일 터치) ──
+    const slotEls = container.querySelectorAll('.schedule-slot');
+    const handles = container.querySelectorAll('.slot-drag-handle');
+
+    // 시간대 교환 실행
+    const swapSlots = (srcIdx, tgtIdx) => {
+      if (srcIdx === tgtIdx) return;
+      const srcMatches = tournament.timeSlots[srcIdx].matches;
+      const tgtMatches = tournament.timeSlots[tgtIdx].matches;
+      tournament.timeSlots[srcIdx].matches = tgtMatches;
+      tournament.timeSlots[tgtIdx].matches = srcMatches;
+      Storage.updateTournament(tournament);
+      this.render(container, tournament);
+    };
+
+    handles.forEach(handle => {
+      if (App.isAdmin) handle.style.display = '';
+    });
+
+    // 모바일/데스크톱 공용: 시간대 핸들 탭으로 교환
+    let _slotSelected = null; // 선택된 시간대 인덱스
+    handles.forEach(handle => {
+      handle.onclick = (e) => {
+        e.stopPropagation();
+        const idx = parseInt(handle.dataset.slotIdx);
+
+        if (_slotSelected === null) {
+          // 첫 번째 탭: 선택
+          _slotSelected = idx;
+          const srcSlotEl = handle.closest('.schedule-slot');
+          srcSlotEl.classList.add('ring-2', 'ring-green-500', 'rounded-xl', 'bg-green-50');
+          handle.querySelector('svg').classList.replace('text-gray-300', 'text-green-600');
+          // 다른 시간대에 힌트
+          slotEls.forEach(el => {
+            if (parseInt(el.dataset.slot) !== idx) {
+              el.querySelector('.slot-drag-handle svg')?.classList.add('text-green-400');
+              el.classList.add('ring-1', 'ring-dashed', 'ring-green-300', 'rounded-xl');
+            }
+          });
+        } else if (_slotSelected === idx) {
+          // 같은 시간대 재탭: 선택 해제
+          clearSlotSelection();
+        } else {
+          // 두 번째 탭: 교환 실행
+          const srcIdx = _slotSelected;
+          clearSlotSelection();
+          swapSlots(srcIdx, idx);
+        }
+      };
+    });
+
+    const clearSlotSelection = () => {
+      slotEls.forEach(el => {
+        el.classList.remove('ring-2', 'ring-1', 'ring-green-500', 'ring-dashed', 'ring-green-300', 'rounded-xl', 'bg-green-50');
+        const svg = el.querySelector('.slot-drag-handle svg');
+        if (svg) { svg.classList.remove('text-green-600', 'text-green-400'); svg.classList.add('text-gray-300'); }
+      });
+      _slotSelected = null;
+    };
+
+    // 빈 영역 클릭 시 선택 해제
+    container.addEventListener('click', (e) => {
+      if (_slotSelected !== null && !e.target.closest('.slot-drag-handle')) {
+        clearSlotSelection();
+      }
+    });
+    } // end if (App.isAdmin) - 드래그
   },
 
   // PDF 내보내기 (타임슬롯 단위 캡처, 페이지당 4개)
@@ -1145,7 +1221,7 @@ const Schedule = {
 
     return `
       <div class="schedule-match-card ${myMatchClass} relative bg-white border ${myBorderColor} rounded-xl p-3 cursor-pointer hover:shadow-md transition"
-           draggable="true" data-match-id="${match.id}" data-slot-idx="${slotIdx}" data-match-idx="${matchIdx}" data-my-match="${isMember && isMyMatch}">
+           ${App.isAdmin ? 'draggable="true"' : ''} data-match-id="${match.id}" data-slot-idx="${slotIdx}" data-match-idx="${matchIdx}" data-my-match="${isMember && isMyMatch}">
         <button type="button" class="delete-match-btn absolute -top-2 -right-2 w-6 h-6 flex items-center justify-center rounded-full bg-white border border-gray-200 text-gray-400 hover:bg-red-50 hover:border-red-300 hover:text-red-500 shadow-sm transition z-10" data-slot-idx="${slotIdx}" data-match-idx="${matchIdx}">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
