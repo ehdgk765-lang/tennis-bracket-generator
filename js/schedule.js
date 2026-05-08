@@ -428,10 +428,6 @@ const Schedule = {
             ${tournament.isCustom ? '' : `${tournament.startTime} ~ ${tournament.endTime} · `}코트 ${maxCourts}면 · ${playerInfo}
           </p>
           <div class="flex items-center gap-2 mt-3">
-            ${tournament.isCustom ? '' : `<button id="add-match-btn" class="text-sm px-3 py-1.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 active:scale-[0.98] transition-all font-medium flex items-center gap-1 shadow-sm shadow-green-200/50">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-              대진 추가
-            </button>`}
             <button id="pdf-download-btn" class="text-sm px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 transition font-medium flex items-center gap-1">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
               PDF
@@ -458,9 +454,28 @@ const Schedule = {
                 <div class="flex-1 border-t border-gray-200"></div>
               </div>
               <div class="grid gap-2 schedule-grid" style="grid-template-columns: repeat(${tournament.courts}, 1fr)">
-                ${slot.matches.length > 0
-                  ? slot.matches.map((match, mi) => this.renderMatchCard(match, si, mi)).join('')
-                  : `<div class="col-span-full text-center py-3 text-sm text-gray-300 italic border border-dashed border-gray-200 rounded-xl">대진 없음</div>`}
+                ${(() => {
+                  const courtSlots = Array.from({length: tournament.courts}, () => null);
+                  slot.matches.forEach((match, mi) => {
+                    const ci = (match.court || 1) - 1;
+                    if (ci >= 0 && ci < tournament.courts) courtSlots[ci] = { match, mi };
+                  });
+                  return courtSlots.map((item, ci) => {
+                    if (item) return this.renderMatchCard(item.match, si, item.mi);
+                    return `<button type="button" class="slot-add-match-btn py-2.5 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-400 hover:border-green-400 hover:text-green-600 hover:bg-green-50/50 transition flex items-center justify-center gap-1" data-slot-idx="${si}" data-court="${ci + 1}" style="display:none">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                      대진 추가
+                    </button>`;
+                  }).join('');
+                })()}
+              </div>
+              <div class="grid gap-2 mt-2" style="grid-template-columns: repeat(${tournament.courts}, 1fr)">
+                ${Array.from({length: tournament.courts}, (_, ci) => `
+                  <button type="button" class="slot-add-extra-btn py-1.5 border-2 border-dashed border-gray-200 rounded-xl text-xs text-gray-400 hover:border-green-400 hover:text-green-600 hover:bg-green-50/50 transition flex items-center justify-center gap-1" data-slot-idx="${si}" data-court="${ci + 1}" style="display:none">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    코트${ci + 1}
+                  </button>
+                `).join('')}
               </div>
             </div>
           `).join('')}
@@ -603,13 +618,31 @@ const Schedule = {
     }
 
     if (App.isAdmin) {
-      // 대진 추가
-      const addMatchBtn = container.querySelector('#add-match-btn');
-      if (addMatchBtn) {
-        addMatchBtn.onclick = () => this.showAddMatchModal(container, tournament);
-      }
+      // 슬롯별 대진 추가 버튼 - 빈 코트 자리 (시간/코트 모드)
+      container.querySelectorAll('.slot-add-match-btn').forEach(btn => {
+        btn.style.display = '';
+        btn.onclick = () => {
+          const slotIdx = parseInt(btn.dataset.slotIdx);
+          const court = parseInt(btn.dataset.court);
+          this.showAddMatchModal(container, tournament, court, slotIdx);
+        };
+      });
 
-      // 코트별 대진 추가 버튼
+      // 슬롯별 하단 코트별 대진 추가 버튼 (시간/코트 모드) - 해당 코트에 대진이 있을 때만 표시
+      container.querySelectorAll('.slot-add-extra-btn').forEach(btn => {
+        const slotIdx = parseInt(btn.dataset.slotIdx);
+        const court = parseInt(btn.dataset.court);
+        const slotMatches = tournament.timeSlots[slotIdx]?.matches || [];
+        const hasCourt = slotMatches.some(m => m.court === court);
+        if (hasCourt) {
+          btn.style.display = '';
+        }
+        btn.onclick = () => {
+          this.showAddMatchModal(container, tournament, court, slotIdx);
+        };
+      });
+
+      // 코트별 대진 추가 버튼 (커스텀 모드)
       container.querySelectorAll('.court-add-match-btn').forEach(btn => {
         btn.onclick = () => {
           const court = parseInt(btn.dataset.court);
@@ -1093,7 +1126,7 @@ const Schedule = {
   },
 
   // 커스텀 대진 추가 모달
-  showAddMatchModal(container, tournament, presetCourt) {
+  showAddMatchModal(container, tournament, presetCourt, presetSlot) {
     const existing = document.querySelector('.add-match-modal');
     if (existing) existing.remove();
 
@@ -1105,7 +1138,7 @@ const Schedule = {
     const isSingles = !!tournament.isSingles;
     const selected = { t1p1: null, t1p2: null, t2p1: null, t2p2: null };
     let selectedCourt = presetCourt || 1;
-    let selectedSlot = 0;
+    let selectedSlot = (presetSlot != null) ? presetSlot : 0;
     let selectedGameType = isSingles ? 'MS' : 'XD';
 
     const modal = document.createElement('div');
@@ -1138,29 +1171,37 @@ const Schedule = {
           <div class="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-3 sm:hidden"></div>
           <h3 class="text-lg font-bold text-center mb-4">대진 추가</h3>
           <div class="space-y-4">
-            ${tournament.isCustom ? '' : `<div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-xs font-semibold text-gray-600 mb-1">시간대</label>
-                <select id="am-slot" class="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-green-500">
-                  ${tournament.timeSlots.map((s, i) =>
-                    `<option value="${i}" ${i === selectedSlot ? 'selected' : ''}>${s.time}</option>`
-                  ).join('')}
-                </select>
-              </div>
-              <div>
-                <label class="block text-xs font-semibold text-gray-600 mb-1">경기 종류</label>
-                <div class="flex gap-1.5 flex-wrap">
-                  ${Object.entries(SCHEDULE_GAME_TYPES).filter(([, cfg]) => !!cfg.singles === isSingles).map(([key, cfg]) =>
-                    `<label class="cursor-pointer">
-                      <input type="radio" name="am-gametype" value="${key}" ${key === selectedGameType ? 'checked' : ''} class="sr-only peer">
-                      <div class="px-2.5 py-1.5 rounded-lg text-xs font-medium border-2 border-gray-200 peer-checked:border-green-500 peer-checked:bg-green-50 transition">${cfg.icon} ${cfg.label}</div>
-                    </label>`
-                  ).join('')}
-                </div>
-              </div>
-            </div>`}
+            ${tournament.isCustom ? '' : (presetSlot != null
+              ? `<div class="flex items-center gap-2 text-sm text-gray-600">
+                  <span class="font-medium bg-gray-100 px-3 py-1.5 rounded-lg">${tournament.timeSlots[selectedSlot].time}</span>
+                  <span>·</span>
+                  <span class="font-medium">코트 ${selectedCourt}번</span>
+                  <input type="hidden" id="am-slot" value="${selectedSlot}">
+                </div>`
+              : `<div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">시간대</label>
+                    <select id="am-slot" class="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-green-500">
+                      ${tournament.timeSlots.map((s, i) =>
+                        `<option value="${i}" ${i === selectedSlot ? 'selected' : ''}>${s.time}</option>`
+                      ).join('')}
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">경기 종류</label>
+                    <div class="flex gap-1.5 flex-wrap">
+                      ${Object.entries(SCHEDULE_GAME_TYPES).filter(([, cfg]) => !!cfg.singles === isSingles).map(([key, cfg]) =>
+                        `<label class="cursor-pointer">
+                          <input type="radio" name="am-gametype" value="${key}" ${key === selectedGameType ? 'checked' : ''} class="sr-only peer">
+                          <div class="px-2.5 py-1.5 rounded-lg text-xs font-medium border-2 border-gray-200 peer-checked:border-green-500 peer-checked:bg-green-50 transition">${cfg.icon} ${cfg.label}</div>
+                        </label>`
+                      ).join('')}
+                    </div>
+                  </div>
+                </div>`)
+            }
 
-            ${presetCourt && tournament.isCustom ? '' : `<div>
+            ${presetCourt && (tournament.isCustom || presetSlot != null) ? '' : `<div>
               <label class="block text-xs font-semibold text-gray-600 mb-1">코트 번호</label>
               <div class="flex gap-2">
                 ${Array.from({length: tournament.courts}, (_, i) => `
@@ -1251,7 +1292,30 @@ const Schedule = {
           return;
         }
 
-        const gameType = tournament.isCustom ? null : modal.querySelector('input[name="am-gametype"]:checked').value;
+        let gameType;
+        if (presetSlot != null) {
+          // 성별 기반 경기 종류 자동 감지
+          const getGender = (name) => { const p = allPlayers.find(pl => pl.name === name); return p ? p.gender : null; };
+          if (isSingles) {
+            const g1 = getGender(t1p1), g2 = getGender(t2p1);
+            if (g1 === 'M' && g2 === 'M') gameType = 'MS';
+            else if (g1 === 'F' && g2 === 'F') gameType = 'WS';
+            else gameType = 'FS';
+          } else {
+            const genders = [t1p1, t1p2, t2p1, t2p2].map(getGender);
+            const allM = genders.every(g => g === 'M');
+            const allF = genders.every(g => g === 'F');
+            const mixedPairs = (genders[0] !== genders[1]) && (genders[2] !== genders[3])
+              && genders.filter(g => g === 'M').length === 2 && genders.filter(g => g === 'F').length === 2;
+            if (allM) gameType = 'MD';
+            else if (allF) gameType = 'WD';
+            else if (mixedPairs) gameType = 'XD';
+            else gameType = 'FD';
+          }
+        } else {
+          const gtEl = modal.querySelector('input[name="am-gametype"]:checked');
+          gameType = tournament.isCustom ? null : (gtEl ? gtEl.value : null);
+        }
         const courtEl = modal.querySelector('input[name="am-court"]:checked');
         const court = courtEl ? parseInt(courtEl.value) : selectedCourt;
 
@@ -1278,7 +1342,16 @@ const Schedule = {
       modal.querySelectorAll('.am-player-slot').forEach(slot => {
         slot.onclick = (e) => {
           if (e.target.closest('.am-remove-player')) return;
-          this._showPlayerPickerForSlot(modal, allPlayers, selected, slot.dataset.key, refreshModal);
+          // 같은 시간대 기존 멤버 수집 (비활성화용)
+          const curSlotIdx = presetSlot != null ? selectedSlot : parseInt(modal.querySelector('#am-slot')?.value || '0');
+          const slotBusyNames = new Set();
+          if (!tournament.isCustom) {
+            (tournament.timeSlots[curSlotIdx]?.matches || []).forEach(m => {
+              m.player1.split(' / ').forEach(n => slotBusyNames.add(n));
+              m.player2.split(' / ').forEach(n => slotBusyNames.add(n));
+            });
+          }
+          this._showPlayerPickerForSlot(modal, allPlayers, selected, slot.dataset.key, refreshModal, slotBusyNames);
         };
       });
 
@@ -1299,11 +1372,12 @@ const Schedule = {
   },
 
   // 멤버 선택 피커 (대진 추가용)
-  _showPlayerPickerForSlot(parentModal, allPlayers, selected, slotKey, onDone) {
+  _showPlayerPickerForSlot(parentModal, allPlayers, selected, slotKey, onDone, slotBusyNames) {
     const existing = document.querySelector('.am-player-picker');
     if (existing) existing.remove();
 
     const usedNames = new Set(Object.values(selected).filter(Boolean));
+    const busyNames = slotBusyNames || new Set();
     const _teamMap = {};
     if (this._tournament?.isTeamMode) {
       Storage.getTeams().forEach(t => (t.members || []).forEach(n => { _teamMap[n] = t.name; }));
@@ -1353,15 +1427,18 @@ const Schedule = {
           <div class="overflow-y-auto flex-1 divide-y divide-gray-50">
             ${visiblePlayers.map(p => {
               const isUsed = usedNames.has(p.name);
+              const isBusy = !isUsed && busyNames.has(p.name);
+              const isDisabled = isUsed || isBusy;
               const tn = _teamMap[p.name];
               return `
-                <div class="amp-option flex items-center px-3 py-2.5 ${isUsed ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-green-50'} transition"
-                  data-name="${Results.escapeHtml(p.name)}" data-used="${isUsed}">
+                <div class="amp-option flex items-center px-3 py-2.5 ${isDisabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-green-50'} transition"
+                  data-name="${Results.escapeHtml(p.name)}" data-used="${isDisabled}">
                   <span class="text-sm text-gray-800">${Results.escapeHtml(p.name)}</span>
                   <span class="ml-2 text-xs px-1.5 py-0.5 rounded font-medium ${p.gender === 'M' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}">${p.gender === 'M' ? '남' : '여'}</span>
                   ${!App.isAdmin ? '' : `<span class="ml-1 text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">${(p.ntrp || 2.5).toFixed(1)}</span>`}
                   ${tn ? `<span class="ml-1 text-xs px-1.5 py-0.5 rounded font-medium bg-green-50 text-green-600 border border-green-200">${Results.escapeHtml(tn)}</span>` : ''}
                   ${isUsed ? '<span class="ml-auto text-xs text-gray-400">선택됨</span>' : ''}
+                  ${isBusy ? '<span class="ml-auto text-xs text-gray-400">같은 시간대</span>' : ''}
                 </div>`;
             }).join('')}
           </div>
@@ -1388,6 +1465,7 @@ const Schedule = {
       const val = searchInput.value.trim();
       if (!val) return;
       if (usedNames.has(val)) { alert('이미 선택된 멤버입니다.'); return; }
+      if (busyNames.has(val)) { alert('같은 시간대에 이미 배치된 멤버입니다.'); return; }
       selected[slotKey] = val;
       picker.remove();
       onDone();
