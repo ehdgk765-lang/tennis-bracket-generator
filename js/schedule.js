@@ -390,6 +390,14 @@ const Schedule = {
   // 대진표 렌더링
   render(container, tournament) {
     this._tournament = tournament;
+
+    // 코트 수에 따라 메인 컨테이너 너비 확장
+    const mainEl = document.getElementById('main-content');
+    if (mainEl) {
+      mainEl.classList.remove('max-w-5xl', 'max-w-6xl', 'max-w-7xl');
+      if (tournament.courts >= 7) mainEl.classList.replace('max-w-4xl', 'max-w-7xl');
+      else if (tournament.courts >= 5) mainEl.classList.replace('max-w-4xl', 'max-w-6xl');
+    }
     const allMatches = this.getAllMatches(tournament);
     const totalMatches = allMatches.length;
     const completedMatches = allMatches.filter(m => m.winner || m.scores).length;
@@ -1066,8 +1074,13 @@ const Schedule = {
     const isMyMatch = this._isMyMatch(match);
     const t1Names = match.player1.split(' / ');
     const t2Names = match.player2.split(' / ');
-    const t1Html = t1Names.map((n, p) => this.renderSwapPlayer(n, slotIdx, matchIdx, 1, p)).join(' <span class="text-gray-300">/</span> ');
-    const t2Html = t2Names.map((n, p) => this.renderSwapPlayer(n, slotIdx, matchIdx, 2, p)).join(' <span class="text-gray-300">/</span> ');
+    const isDoubles = t1Names.length > 1;
+    const t1Html = isDoubles
+      ? t1Names.map((n, p) => `<div class="text-center">${this.renderSwapPlayer(n, slotIdx, matchIdx, 1, p)}</div>`).join('')
+      : this.renderSwapPlayer(t1Names[0], slotIdx, matchIdx, 1, 0);
+    const t2Html = isDoubles
+      ? t2Names.map((n, p) => `<div class="text-center">${this.renderSwapPlayer(n, slotIdx, matchIdx, 2, p)}</div>`).join('')
+      : this.renderSwapPlayer(t2Names[0], slotIdx, matchIdx, 2, 0);
 
     // 팀전 모드: 팀 이름
     let t1TeamName = '', t2TeamName = '';
@@ -1105,12 +1118,10 @@ const Schedule = {
           <span class="change-gametype-btn text-xs px-2 py-0.5 rounded-full font-medium ${cfg.badgeClass} cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-green-400 transition" data-match-id="${match.id}">${cfg.label}</span>
         </div>` : ''}
         <div class="space-y-0.5">
-          <div class="${t1Bg} rounded-lg px-2 ${t1TeamName ? 'pt-1.5 pb-2' : 'py-2.5'}">
+          <div class="${t1Bg} rounded-lg px-2 ${t1TeamName ? 'pt-1.5 pb-2' : 'py-2'}">
             ${t1TeamName ? `<div class="text-center mb-1"><span class="inline-block text-[10px] leading-tight px-1.5 py-0.5 rounded bg-green-50 text-green-600 border border-green-200 font-medium">${t1TeamName}</span></div>` : ''}
-            <div class="flex items-center justify-center gap-1 flex-wrap">
-              <span class="text-xs font-medium ${t1TextClass} text-center" style="min-width:0">
-                ${isWin1 ? '🏆 ' : ''}${isDraw ? '🤝 ' : ''}${t1Html}
-              </span>
+            <div class="text-sm sm:text-xs font-medium ${t1TextClass} text-center">
+              ${isWin1 ? '🏆 ' : ''}${isDraw ? '🤝 ' : ''}${t1Html}
             </div>
           </div>
           ${hasResult && match.scores
@@ -1120,12 +1131,10 @@ const Schedule = {
                 <span class="match-score text-sm font-bold ${s2Class} px-2 py-0.5 rounded-md min-w-[1.5rem] text-center">${match.scores[0][1]}</span>
               </div>`
             : `<div class="text-center text-xs text-gray-300 leading-tight">vs</div>`}
-          <div class="${t2Bg} rounded-lg px-2 ${t2TeamName ? 'pt-1.5 pb-2' : 'py-2.5'}">
+          <div class="${t2Bg} rounded-lg px-2 ${t2TeamName ? 'pt-1.5 pb-2' : 'py-2'}">
             ${t2TeamName ? `<div class="text-center mb-1"><span class="inline-block text-[10px] leading-tight px-1.5 py-0.5 rounded bg-green-50 text-green-600 border border-green-200 font-medium">${t2TeamName}</span></div>` : ''}
-            <div class="flex items-center justify-center gap-1 flex-wrap">
-              <span class="text-xs font-medium ${t2TextClass} text-center" style="min-width:0">
-                ${isWin2 ? '🏆 ' : ''}${isDraw ? '🤝 ' : ''}${t2Html}
-              </span>
+            <div class="text-sm sm:text-xs font-medium ${t2TextClass} text-center">
+              ${isWin2 ? '🏆 ' : ''}${isDraw ? '🤝 ' : ''}${t2Html}
             </div>
           </div>
         </div>

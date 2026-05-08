@@ -58,6 +58,10 @@ const App = {
 
     const content = document.getElementById('main-content');
 
+    // 대진표에서 확장된 컨테이너 너비 복원
+    content.classList.remove('max-w-5xl', 'max-w-6xl', 'max-w-7xl');
+    if (!content.classList.contains('max-w-4xl')) content.classList.add('max-w-4xl');
+
     switch (tabName) {
       case 'players':
         Players.render(content);
