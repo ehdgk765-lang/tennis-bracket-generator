@@ -447,38 +447,46 @@ const Schedule = {
 
         <!-- 시간표 -->
         <div class="space-y-4 mb-6">
-          ${tournament.isCustom ? this._renderCourtLayout(tournament) : tournament.timeSlots.map((slot, si) => `
-            <div class="schedule-slot" data-slot="${si}">
-              <div class="flex items-center gap-2 mb-2">
-                <span class="text-sm font-bold text-gray-700 bg-gray-100 px-3 py-1 rounded-full">${slot.time}</span>
-                <div class="flex-1 border-t border-gray-200"></div>
-              </div>
-              <div class="grid gap-2 schedule-grid" style="grid-template-columns: repeat(${tournament.courts}, 1fr)">
-                ${(() => {
-                  const courtSlots = Array.from({length: tournament.courts}, () => null);
-                  slot.matches.forEach((match, mi) => {
-                    const ci = (match.court || 1) - 1;
-                    if (ci >= 0 && ci < tournament.courts) courtSlots[ci] = { match, mi };
-                  });
-                  return courtSlots.map((item, ci) => {
-                    if (item) return this.renderMatchCard(item.match, si, item.mi);
-                    return `<button type="button" class="slot-add-match-btn py-2.5 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-400 hover:border-green-400 hover:text-green-600 hover:bg-green-50/50 transition flex items-center justify-center gap-1" data-slot-idx="${si}" data-court="${ci + 1}" style="display:none">
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                      대진 추가
-                    </button>`;
-                  }).join('');
-                })()}
-              </div>
-              <div class="grid gap-2 mt-2" style="grid-template-columns: repeat(${tournament.courts}, 1fr)">
-                ${Array.from({length: tournament.courts}, (_, ci) => `
-                  <button type="button" class="slot-add-extra-btn py-1.5 border-2 border-dashed border-gray-200 rounded-xl text-xs text-gray-400 hover:border-green-400 hover:text-green-600 hover:bg-green-50/50 transition flex items-center justify-center gap-1" data-slot-idx="${si}" data-court="${ci + 1}" style="display:none">
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                    코트${ci + 1}
-                  </button>
-                `).join('')}
-              </div>
-            </div>
-          `).join('')}
+          ${tournament.isCustom ? this._renderCourtLayout(tournament) : (() => {
+            const courtCount = tournament.courts;
+            const gridCols = courtCount <= 1 ? 'grid-cols-1' : `grid-cols-2${courtCount > 2 ? ` sm:grid-cols-${courtCount}` : ''}`;
+            return tournament.timeSlots.map((slot, si) => {
+              const courtMap = {};
+              for (let c = 1; c <= courtCount; c++) courtMap[c] = null;
+              slot.matches.forEach((match, mi) => {
+                const c = match.court || 1;
+                if (c >= 1 && c <= courtCount) courtMap[c] = { match, mi };
+              });
+              return `
+              <div class="schedule-slot" data-slot="${si}">
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="text-sm font-bold text-gray-700 bg-gray-100 px-3 py-1 rounded-full">${slot.time}</span>
+                  <div class="flex-1 border-t border-gray-200"></div>
+                </div>
+                <div class="grid gap-3 ${gridCols}">
+                  ${Array.from({length: courtCount}, (_, ci) => {
+                    const c = ci + 1;
+                    const item = courtMap[c];
+                    return `<div>
+                      <div class="text-xs font-semibold text-gray-500 mb-1 pl-1">코트 ${c}</div>
+                      ${item
+                        ? `<div class="space-y-2">
+                            ${this.renderMatchCard(item.match, si, item.mi)}
+                            <button type="button" class="slot-add-extra-btn w-full py-1.5 border-2 border-dashed border-gray-200 rounded-xl text-xs text-gray-400 hover:border-green-400 hover:text-green-600 hover:bg-green-50/50 transition flex items-center justify-center gap-1" data-slot-idx="${si}" data-court="${c}" style="display:none">
+                              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                              코트${c}
+                            </button>
+                          </div>`
+                        : `<button type="button" class="slot-add-match-btn w-full py-2.5 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-400 hover:border-green-400 hover:text-green-600 hover:bg-green-50/50 transition flex items-center justify-center gap-1" data-slot-idx="${si}" data-court="${c}" style="display:none">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                            대진 추가
+                          </button>`}
+                    </div>`;
+                  }).join('')}
+                </div>
+              </div>`;
+            }).join('');
+          })()}
         </div>
 
         ${tournament.isTeamMode ? (() => {
@@ -1093,15 +1101,14 @@ const Schedule = {
         <button type="button" class="delete-match-btn absolute -top-2 -right-2 w-6 h-6 flex items-center justify-center rounded-full bg-white border border-gray-200 text-gray-400 hover:bg-red-50 hover:border-red-300 hover:text-red-500 shadow-sm transition z-10" data-slot-idx="${slotIdx}" data-match-idx="${matchIdx}">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
-        ${cfg ? `<div class="flex items-center justify-between mb-2 pr-5">
+        ${cfg ? `<div class="flex items-center mb-2 pr-5">
           <span class="change-gametype-btn text-xs px-2 py-0.5 rounded-full font-medium ${cfg.badgeClass} cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-green-400 transition" data-match-id="${match.id}">${cfg.label}</span>
-          <span class="text-xs text-gray-400">코트 ${match.court}</span>
         </div>` : ''}
         <div class="space-y-0.5">
           <div class="${t1Bg} rounded-lg px-2 ${t1TeamName ? 'pt-1.5 pb-2' : 'py-2.5'}">
             ${t1TeamName ? `<div class="text-center mb-1"><span class="inline-block text-[10px] leading-tight px-1.5 py-0.5 rounded bg-green-50 text-green-600 border border-green-200 font-medium">${t1TeamName}</span></div>` : ''}
             <div class="flex items-center justify-center gap-1 flex-wrap">
-              <span class="text-xs sm:text-sm font-medium ${t1TextClass} text-center" style="min-width:0">
+              <span class="text-xs font-medium ${t1TextClass} text-center" style="min-width:0">
                 ${isWin1 ? '🏆 ' : ''}${isDraw ? '🤝 ' : ''}${t1Html}
               </span>
             </div>
@@ -1116,7 +1123,7 @@ const Schedule = {
           <div class="${t2Bg} rounded-lg px-2 ${t2TeamName ? 'pt-1.5 pb-2' : 'py-2.5'}">
             ${t2TeamName ? `<div class="text-center mb-1"><span class="inline-block text-[10px] leading-tight px-1.5 py-0.5 rounded bg-green-50 text-green-600 border border-green-200 font-medium">${t2TeamName}</span></div>` : ''}
             <div class="flex items-center justify-center gap-1 flex-wrap">
-              <span class="text-xs sm:text-sm font-medium ${t2TextClass} text-center" style="min-width:0">
+              <span class="text-xs font-medium ${t2TextClass} text-center" style="min-width:0">
                 ${isWin2 ? '🏆 ' : ''}${isDraw ? '🤝 ' : ''}${t2Html}
               </span>
             </div>
@@ -1279,17 +1286,19 @@ const Schedule = {
         }
         const slotIdx = tournament.isCustom ? 0 : parseInt(modal.querySelector('#am-slot').value);
 
-        // 같은 시간대 멤버 중복 검사
-        const newNames = isSingles ? [t1p1, t2p1] : [t1p1, t1p2, t2p1, t2p2];
-        const slotExisting = new Set();
-        (tournament.timeSlots[slotIdx]?.matches || []).forEach(m => {
-          m.player1.split(' / ').forEach(n => slotExisting.add(n));
-          m.player2.split(' / ').forEach(n => slotExisting.add(n));
-        });
-        const dupInSlot = newNames.filter(n => slotExisting.has(n));
-        if (dupInSlot.length > 0) {
-          alert(`같은 시간대에 이미 배치된 멤버가 있습니다:\n${dupInSlot.join(', ')}`);
-          return;
+        // 같은 시간대 멤버 중복 검사 (커스텀 대진표는 시간대 없으므로 제외)
+        if (!tournament.isCustom) {
+          const newNames = isSingles ? [t1p1, t2p1] : [t1p1, t1p2, t2p1, t2p2];
+          const slotExisting = new Set();
+          (tournament.timeSlots[slotIdx]?.matches || []).forEach(m => {
+            m.player1.split(' / ').forEach(n => slotExisting.add(n));
+            m.player2.split(' / ').forEach(n => slotExisting.add(n));
+          });
+          const dupInSlot = newNames.filter(n => slotExisting.has(n));
+          if (dupInSlot.length > 0) {
+            alert(`같은 시간대에 이미 배치된 멤버가 있습니다:\n${dupInSlot.join(', ')}`);
+            return;
+          }
         }
 
         let gameType;

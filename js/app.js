@@ -676,9 +676,9 @@ const App = {
         <!-- 코트 수 -->
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">코트 수</label>
-          <div class="flex gap-2">
-            ${[1, 2, 3, 4].map(n => `
-              <label class="flex-1 cursor-pointer">
+          <div class="grid grid-cols-4 gap-2">
+            ${[1, 2, 3, 4, 5, 6, 7, 8].map(n => `
+              <label class="cursor-pointer">
                 <input type="radio" name="courts" value="${n}" ${n === 2 ? 'checked' : ''} class="sr-only peer">
                 <div class="border-2 border-gray-200 rounded-xl py-2.5 text-center peer-checked:border-green-500 peer-checked:bg-green-50 transition">
                   <span class="font-semibold text-gray-800">${n}면</span>
