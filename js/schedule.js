@@ -878,9 +878,44 @@ const Schedule = {
         const tSI = +card.dataset.slotIdx, tMI = +card.dataset.matchIdx;
         if (si === tSI && mi === tMI) return;
         const srcSlot = tournament.timeSlots[si], tgtSlot = tournament.timeSlots[tSI];
+
+        // 다른 시간대 간 교환: 멤버 중복 검사
+        if (si !== tSI) {
+          const getNames = (m) => {
+            const names = new Set();
+            m.player1.split(' / ').forEach(n => names.add(n));
+            m.player2.split(' / ').forEach(n => names.add(n));
+            return names;
+          };
+          const getNamesInSlot = (slot, excludeIdx) => {
+            const names = new Set();
+            slot.matches.forEach((m, i) => {
+              if (i === excludeIdx) return;
+              m.player1.split(' / ').forEach(n => names.add(n));
+              m.player2.split(' / ').forEach(n => names.add(n));
+            });
+            return names;
+          };
+          const srcMatchNames = getNames(srcSlot.matches[mi]);
+          const tgtMatchNames = getNames(tgtSlot.matches[tMI]);
+          const srcSlotOthers = getNamesInSlot(srcSlot, mi);
+          const tgtSlotOthers = getNamesInSlot(tgtSlot, tMI);
+          // 교환 후: srcMatch → tgtSlot, tgtMatch → srcSlot
+          const dupInTgt = [...srcMatchNames].filter(n => tgtSlotOthers.has(n));
+          const dupInSrc = [...tgtMatchNames].filter(n => srcSlotOthers.has(n));
+          if (dupInTgt.length > 0 || dupInSrc.length > 0) {
+            const dups = [...new Set([...dupInTgt, ...dupInSrc])];
+            alert(`같은 시간대에 동일 멤버가 중복됩니다:\n${dups.join(', ')}`);
+            return;
+          }
+        }
+
+        // 코트 번호는 위치에 귀속 (교환 전 저장)
+        const srcCourt = srcSlot.matches[mi].court;
+        const tgtCourt = tgtSlot.matches[tMI].court;
         [srcSlot.matches[mi], tgtSlot.matches[tMI]] = [tgtSlot.matches[tMI], srcSlot.matches[mi]];
-        srcSlot.matches.forEach((m, i) => m.court = i + 1);
-        if (si !== tSI) tgtSlot.matches.forEach((m, i) => m.court = i + 1);
+        srcSlot.matches[mi].court = srcCourt;
+        tgtSlot.matches[tMI].court = tgtCourt;
         Storage.updateTournament(tournament);
         this.render(container, tournament);
       };
