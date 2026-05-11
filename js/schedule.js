@@ -299,15 +299,14 @@ const Schedule = {
   // 멤버별 통계 계산
   calcPlayerStats(tournament) {
     const stats = {};
-    const allPlayers = [...(tournament.males || []), ...(tournament.females || [])];
-    allPlayers.forEach(p => { stats[p] = { name: p, games: 0, wins: 0, losses: 0, draws: 0, matchPoints: 0, scorePoints: 0 }; });
+    const ensure = (p) => { if (!stats[p]) stats[p] = { name: p, games: 0, wins: 0, losses: 0, draws: 0, matchPoints: 0, scorePoints: 0 }; };
 
     for (const slot of tournament.timeSlots) {
       for (const m of slot.matches) {
         const t1 = m.player1.split(' / ');
         const t2 = m.player2.split(' / ');
         [...t1, ...t2].forEach(p => {
-          if (!stats[p]) stats[p] = { name: p, games: 0, wins: 0, losses: 0, draws: 0, matchPoints: 0, scorePoints: 0 };
+          ensure(p);
           stats[p].games++;
         });
         if (m.winner === 'draw') {
