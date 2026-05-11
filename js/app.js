@@ -523,7 +523,14 @@ const App = {
           </div>
           <input type="text" autocomplete="off" id="cs-name" maxlength="30"
             class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500"
-            placeholder="미입력 시 날짜로 자동 생성">
+            placeholder="미입력 시 게임 날짜로 자동 생성">
+        </div>
+
+        <!-- 게임 날짜 -->
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">게임 날짜</label>
+          <input type="date" id="cs-date" value="${new Date().toISOString().slice(0, 10)}"
+            class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500">
         </div>
 
         <!-- 단식/복식 선택 -->
@@ -574,13 +581,14 @@ const App = {
       const isTeamMode = container.querySelector('#cs-team-mode')?.checked || false;
       const isSingles = container.querySelector('input[name="cs-match-type"]:checked')?.value === 'singles';
 
-      const today = new Date().toISOString().slice(0, 10);
+      const gameDate = container.querySelector('#cs-date').value || new Date().toISOString().slice(0, 10);
       const customName = container.querySelector('#cs-name').value.trim();
       const tournament = {
         id: Storage.generateId(),
-        name: customName || `${today} 대진표`,
+        name: customName || `${gameDate} 커스텀 대진표`,
         format: 'schedule',
         isCustom: true,
+        gameDate,
         isSingles,
         isTeamMode,
         setCount: 1,
@@ -659,7 +667,14 @@ const App = {
           <label class="block text-sm font-semibold text-gray-700 mb-2">대진표 이름</label>
           <input type="text" id="schedule-name" maxlength="30"
             class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500"
-            placeholder="미입력 시 날짜+시간으로 자동 생성">
+            placeholder="미입력 시 게임 날짜로 자동 생성">
+        </div>
+
+        <!-- 게임 날짜 -->
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">게임 날짜</label>
+          <input type="date" id="schedule-date" value="${new Date().toISOString().slice(0, 10)}"
+            class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500">
         </div>
 
         <!-- 시간 설정 -->
@@ -871,11 +886,11 @@ const App = {
         return;
       }
 
-      const today = new Date().toISOString().slice(0, 10);
+      const gameDate = container.querySelector('#schedule-date').value || new Date().toISOString().slice(0, 10);
       const customName = container.querySelector('#schedule-name').value.trim();
       const tournament = {
         id: Storage.generateId(),
-        name: customName || `${today} ${startTime} 대진표`,
+        name: customName || `${gameDate} ${startTime} 대진표`,
         format: 'schedule',
         isSingles,
         isTeamMode,
@@ -884,6 +899,7 @@ const App = {
         startTime,
         endTime,
         allowMixed,
+        gameDate,
         males: selectedMales,
         females: selectedFemales,
         players: [...selectedMales, ...selectedFemales],
@@ -977,95 +993,156 @@ const App = {
       return;
     }
 
+    // 게임 날짜 기준 정렬 (최신순), 없으면 createdAt 사용
+    const getGameDate = (t) => t.gameDate || (t.createdAt ? t.createdAt.slice(0, 10) : '');
+    const sorted = [...tournaments].sort((a, b) => getGameDate(b).localeCompare(getGameDate(a)));
+
+    // 월별 그룹핑
+    const monthGroups = {};
+    sorted.forEach(t => {
+      const d = getGameDate(t);
+      const monthKey = d ? d.slice(0, 7) : 'unknown'; // "2026-05"
+      if (!monthGroups[monthKey]) monthGroups[monthKey] = [];
+      monthGroups[monthKey].push(t);
+    });
+
+    const monthKeys = Object.keys(monthGroups);
+    // 이번 달만 펼침, 나머지는 항상 접힘 (이번 달만 수동 토글 상태 유지)
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    if (!this._monthCollapsed) this._monthCollapsed = {};
+    monthKeys.forEach(key => {
+      if (key === currentMonth) {
+        if (!(key in this._monthCollapsed)) this._monthCollapsed[key] = false;
+      } else {
+        this._monthCollapsed[key] = true;
+      }
+    });
+
+    const renderCard = (t) => {
+      const isMember = !App.isAdmin && !!App.memberName;
+      let hasMyName = false;
+      if (isMember) {
+        const mn = App.memberName;
+        if (t.format === 'schedule') {
+          hasMyName = Schedule.getAllMatches(t).some(m =>
+            (m.player1 && m.player1.split(' / ').includes(mn)) || (m.player2 && m.player2.split(' / ').includes(mn)));
+        } else if (t.players) {
+          hasMyName = t.players.some(p => p && p.split(' / ').includes(mn));
+        }
+      }
+      const myCardClass = isMember && hasMyName ? 'border-blue-400 ring-2 ring-blue-200 shadow-blue-100/50' : 'border-white/60';
+
+      if (t.format === 'schedule') {
+        const allMatches = Schedule.getAllMatches(t);
+        const completed = allMatches.filter(m => m.winner).length;
+        const playerNames = new Set();
+        allMatches.forEach(m => {
+          if (m.player1) m.player1.split(' / ').forEach(n => playerNames.add(n.trim()));
+          if (m.player2) m.player2.split(' / ').forEach(n => playerNames.add(n.trim()));
+        });
+        const regPlayers = Storage.getPlayers();
+        let mCount = 0, fCount = 0;
+        playerNames.forEach(name => {
+          const p = regPlayers.find(rp => rp.name === name);
+          if (p) { if (p.gender === 'M') mCount++; else fCount++; }
+        });
+        return `
+          <div class="tournament-card relative bg-white/80 backdrop-blur-sm border ${myCardClass} rounded-2xl p-4 cursor-pointer hover:shadow-lg hover:shadow-green-100/50 hover:border-green-200 transition-all shadow-sm shadow-green-50/30"
+               data-id="${t.id}">
+            <button type="button" class="delete-tournament-btn absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-full text-gray-300 hover:bg-red-50 hover:text-red-500 transition" data-id="${t.id}">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+            <div class="flex items-center justify-between mb-2 pr-6">
+              <h3 class="font-bold text-gray-800">${Results.escapeHtml(t.name)}</h3>
+              <div class="flex items-center gap-1.5">
+                ${t.status === 'completed'
+                  ? '<span class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-500">완료</span>'
+                  : '<span class="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700">진행중</span>'}
+                ${t.isTeamMode ? '<span class="text-xs px-2 py-1 rounded-full bg-green-50 text-green-600 border border-green-200">팀전</span>' : ''}
+                <span class="text-xs px-2 py-1 rounded-full bg-orange-100 text-orange-700">대진표</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-4 text-sm text-gray-500">
+              <span>남${mCount} · 여${fCount}</span>
+              ${t.isCustom ? `<span>코트 ${t.courts}면</span>` : `<span>${t.startTime}~${t.endTime}</span>`}
+              <span>${completed}/${allMatches.length}경기</span>
+            </div>
+          </div>`;
+      }
+
+      const dateStr = new Date(t.createdAt).toLocaleDateString('ko-KR');
+      const gameLabel = t.gameTypeLabel || (t.gameType ? GAME_TYPES[t.gameType]?.label : '');
+      const isDoubles = t.gameType ? GAME_TYPES[t.gameType]?.doubles : false;
+      const countLabel = isDoubles ? `${t.players.length}팀` : `${t.players.length}명`;
+      return `
+        <div class="tournament-card relative bg-white/80 backdrop-blur-sm border ${myCardClass} rounded-2xl p-4 cursor-pointer hover:shadow-lg hover:shadow-green-100/50 hover:border-green-200 transition-all shadow-sm shadow-green-50/30"
+             data-id="${t.id}">
+          <button type="button" class="delete-tournament-btn absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-full text-gray-300 hover:bg-red-50 hover:text-red-500 transition" data-id="${t.id}">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+          <div class="flex items-center justify-between mb-2 pr-6">
+            <h3 class="font-bold text-gray-800">${Results.escapeHtml(t.name)}</h3>
+            <div class="flex items-center gap-1.5">
+              ${t.status === 'completed'
+                ? '<span class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-500">완료</span>'
+                : '<span class="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700">진행중</span>'}
+              ${gameLabel ? `<span class="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700">${gameLabel}</span>` : ''}
+              <span class="text-xs px-2 py-1 rounded-full ${t.format === 'tournament' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}">
+                ${t.format === 'tournament' ? '토너먼트' : '리그'}
+              </span>
+            </div>
+          </div>
+          <div class="flex items-center gap-4 text-sm text-gray-500">
+            <span>${countLabel}</span>
+            <span>${dateStr}</span>
+            ${t.status === 'completed' && t.format === 'tournament' ?
+              `<span class="text-yellow-600 font-medium">우승: ${Results.escapeHtml(t.rounds[t.rounds.length - 1][0].winner || '-')}</span>` : ''}
+          </div>
+        </div>`;
+    };
+
     morphHTML(container, `
       <div class="max-w-lg mx-auto">
         <h2 class="text-2xl font-bold text-gray-800 mb-6">대진표</h2>
-        <div class="space-y-3">
-          ${tournaments.map(t => {
-            const dateStr = new Date(t.createdAt).toLocaleDateString('ko-KR');
-            const isMember = !App.isAdmin && !!App.memberName;
-            // 멤버 본인이 참가한 대진표인지 확인
-            let hasMyName = false;
-            if (isMember) {
-              const mn = App.memberName;
-              if (t.format === 'schedule') {
-                hasMyName = Schedule.getAllMatches(t).some(m =>
-                  (m.player1 && m.player1.split(' / ').includes(mn)) || (m.player2 && m.player2.split(' / ').includes(mn)));
-              } else if (t.players) {
-                hasMyName = t.players.some(p => p && p.split(' / ').includes(mn));
-              }
+        <div class="space-y-4">
+          ${monthKeys.map(key => {
+            const items = monthGroups[key];
+            const collapsed = !!this._monthCollapsed[key];
+            let label;
+            if (key === 'unknown') {
+              label = '날짜 미지정';
+            } else {
+              const [y, m] = key.split('-');
+              label = `${y}년 ${parseInt(m)}월`;
             }
-            const myCardClass = isMember && hasMyName ? 'border-blue-400 ring-2 ring-blue-200 shadow-blue-100/50' : 'border-white/60';
-
-            if (t.format === 'schedule') {
-              const allMatches = Schedule.getAllMatches(t);
-              const completed = allMatches.filter(m => m.winner).length;
-              const playerNames = new Set();
-              allMatches.forEach(m => {
-                if (m.player1) m.player1.split(' / ').forEach(n => playerNames.add(n.trim()));
-                if (m.player2) m.player2.split(' / ').forEach(n => playerNames.add(n.trim()));
-              });
-              const regPlayers = Storage.getPlayers();
-              let mCount = 0, fCount = 0;
-              playerNames.forEach(name => {
-                const p = regPlayers.find(rp => rp.name === name);
-                if (p) { if (p.gender === 'M') mCount++; else fCount++; }
-              });
-              return `
-                <div class="tournament-card relative bg-white/80 backdrop-blur-sm border ${myCardClass} rounded-2xl p-4 cursor-pointer hover:shadow-lg hover:shadow-green-100/50 hover:border-green-200 transition-all shadow-sm shadow-green-50/30"
-                     data-id="${t.id}">
-                  <button type="button" class="delete-tournament-btn absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-full text-gray-300 hover:bg-red-50 hover:text-red-500 transition" data-id="${t.id}">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                  </button>
-                  <div class="flex items-center justify-between mb-2 pr-6">
-                    <h3 class="font-bold text-gray-800">${Results.escapeHtml(t.name)}</h3>
-                    <div class="flex items-center gap-1.5">
-                      ${t.status === 'completed'
-                        ? '<span class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-500">완료</span>'
-                        : '<span class="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700">진행중</span>'}
-                      ${t.isTeamMode ? '<span class="text-xs px-2 py-1 rounded-full bg-green-50 text-green-600 border border-green-200">팀전</span>' : ''}
-                      <span class="text-xs px-2 py-1 rounded-full bg-orange-100 text-orange-700">대진표</span>
-                    </div>
-                  </div>
-                  <div class="flex items-center gap-4 text-sm text-gray-500">
-                    <span>남${mCount} · 여${fCount}</span>
-                    ${t.isCustom ? `<span>코트 ${t.courts}면</span>` : `<span>${t.startTime}~${t.endTime}</span>`}
-                    <span>${completed}/${allMatches.length}경기</span>
-                  </div>
-                </div>`;
-            }
-
-            const gameLabel = t.gameTypeLabel || (t.gameType ? GAME_TYPES[t.gameType]?.label : '');
-            const isDoubles = t.gameType ? GAME_TYPES[t.gameType]?.doubles : false;
-            const countLabel = isDoubles ? `${t.players.length}팀` : `${t.players.length}명`;
             return `
-              <div class="tournament-card relative bg-white/80 backdrop-blur-sm border ${myCardClass} rounded-2xl p-4 cursor-pointer hover:shadow-lg hover:shadow-green-100/50 hover:border-green-200 transition-all shadow-sm shadow-green-50/30"
-                   data-id="${t.id}">
-                <button type="button" class="delete-tournament-btn absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-full text-gray-300 hover:bg-red-50 hover:text-red-500 transition" data-id="${t.id}">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              <div class="month-group">
+                <button type="button" class="month-toggle w-full flex items-center justify-between px-3 py-2 rounded-xl bg-gray-50 hover:bg-gray-100 transition" data-month="${key}">
+                  <span class="font-semibold text-gray-700 text-sm">${label} <span class="text-gray-400 font-normal">(${items.length})</span></span>
+                  <svg class="w-4 h-4 text-gray-400 transition-transform ${collapsed ? '' : 'rotate-180'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                  </svg>
                 </button>
-                <div class="flex items-center justify-between mb-2 pr-6">
-                  <h3 class="font-bold text-gray-800">${Results.escapeHtml(t.name)}</h3>
-                  <div class="flex items-center gap-1.5">
-                    ${t.status === 'completed'
-                      ? '<span class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-500">완료</span>'
-                      : '<span class="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700">진행중</span>'}
-                    ${gameLabel ? `<span class="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700">${gameLabel}</span>` : ''}
-                    <span class="text-xs px-2 py-1 rounded-full ${t.format === 'tournament' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}">
-                      ${t.format === 'tournament' ? '토너먼트' : '리그'}
-                    </span>
-                  </div>
-                </div>
-                <div class="flex items-center gap-4 text-sm text-gray-500">
-                  <span>${countLabel}</span>
-                  <span>${dateStr}</span>
-                  ${t.status === 'completed' && t.format === 'tournament' ?
-                    `<span class="text-yellow-600 font-medium">우승: ${Results.escapeHtml(t.rounds[t.rounds.length - 1][0].winner || '-')}</span>` : ''}
+                <div class="month-content space-y-3 mt-3 ${collapsed ? 'hidden' : ''}">
+                  ${items.map(t => renderCard(t)).join('')}
                 </div>
               </div>`;
           }).join('')}
         </div>
       </div>`);
+
+    // 월별 접기/펼치기
+    container.querySelectorAll('.month-toggle').forEach(btn => {
+      btn.onclick = () => {
+        const key = btn.dataset.month;
+        this._monthCollapsed[key] = !this._monthCollapsed[key];
+        const content = btn.closest('.month-group').querySelector('.month-content');
+        const arrow = btn.querySelector('svg');
+        content.classList.toggle('hidden');
+        arrow.classList.toggle('rotate-180');
+      };
+    });
 
     // 게스트 모드: 삭제 버튼 숨기기
     if (!this.isAdmin) {
