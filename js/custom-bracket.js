@@ -16,6 +16,7 @@ const CustomBracket = {
       isDoubles: false,
       isTeamMode: false,
       tournamentName: '',
+      gameDate: '',
       placements: {},
     };
   },
@@ -30,6 +31,12 @@ const CustomBracket = {
           <input type="text" id="cb-name" required maxlength="30"
             class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500"
             placeholder="예: 2024년 봄 정기대회" value="${Results.escapeHtml(st.tournamentName)}">
+        </div>
+
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">대회 날짜</label>
+          <input type="date" id="cb-date" value="${st.gameDate || new Date().toISOString().slice(0, 10)}"
+            class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500">
         </div>
 
         <div>
@@ -139,6 +146,7 @@ const CustomBracket = {
     container.querySelector('#custom-bracket-form').onsubmit = (e) => {
       e.preventDefault();
       this._state.tournamentName = container.querySelector('#cb-name').value.trim();
+      this._state.gameDate = container.querySelector('#cb-date').value || new Date().toISOString().slice(0, 10);
       this._state.setCount = parseInt(container.querySelector('input[name="cb-setCount"]:checked').value);
 
       const tournament = this.createTournament();
@@ -577,6 +585,7 @@ const CustomBracket = {
       format: 'tournament',
       setCount,
       isDoubles,
+      gameDate: this._state.gameDate || new Date().toISOString().slice(0, 10),
       players: nonNull,
       status: 'active',
       createdAt: new Date().toISOString(),

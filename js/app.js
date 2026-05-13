@@ -145,6 +145,12 @@ const App = {
         </div>
 
         <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">대회 날짜</label>
+          <input type="date" id="tournament-date" value="${new Date().toISOString().slice(0, 10)}"
+            class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500">
+        </div>
+
+        <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">경기 종류</label>
           <div class="grid grid-cols-3 gap-2 sm:grid-cols-5">
             ${Object.entries(GAME_TYPES).map(([key, cfg], i) => `
@@ -233,6 +239,7 @@ const App = {
         participants = selected;
       }
 
+      const gameDate = container.querySelector('#tournament-date').value || new Date().toISOString().slice(0, 10);
       const tournament = {
         id: Storage.generateId(),
         name,
@@ -240,6 +247,7 @@ const App = {
         gameTypeLabel: config.label,
         format,
         setCount,
+        gameDate,
         players: participants,
         status: 'active',
         createdAt: new Date().toISOString(),
