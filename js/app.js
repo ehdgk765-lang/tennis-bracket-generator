@@ -23,7 +23,7 @@ const App = {
 
   applyRoleUI() {
     document.querySelectorAll('[data-tab]').forEach(tab => {
-      if (tab.dataset.tab === 'active') {
+      if (tab.dataset.tab === 'active' || tab.dataset.tab === 'stats') {
         tab.style.display = '';
       } else {
         tab.style.display = this.isAdmin ? '' : 'none';
@@ -40,8 +40,8 @@ const App = {
   },
 
   navigate(tabName, tournamentId) {
-    // 게스트는 대진표 탭만 허용
-    if (!this.isAdmin && tabName !== 'active') {
+    // 게스트는 대진표/통계 탭만 허용
+    if (!this.isAdmin && tabName !== 'active' && tabName !== 'stats') {
       tabName = 'active';
     }
     this.currentTab = tabName;
@@ -74,6 +74,9 @@ const App = {
         break;
       case 'active':
         this.renderTournamentList(content, tournamentId);
+        break;
+      case 'stats':
+        Stats.render(content);
         break;
     }
   },
