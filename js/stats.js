@@ -236,10 +236,7 @@ const Stats = {
               const genderBadge = '<span class="text-xs px-1 py-0.5 rounded font-medium '
                 + (gender === 'M' ? 'bg-blue-100 text-blue-700' : gender === 'F' ? 'bg-pink-100 text-pink-700' : 'bg-gray-100 text-gray-500')
                 + '">' + (gender === 'M' ? '남' : gender === 'F' ? '여' : '-') + '</span>';
-              const rankClass = idx === 0 ? 'bg-gradient-to-r from-yellow-50/60 to-transparent'
-                : idx === 1 ? 'bg-gradient-to-r from-gray-100/60 to-transparent'
-                : idx === 2 ? 'bg-gradient-to-r from-orange-50/60 to-transparent' : '';
-              return `<tr class="border-b border-gray-50 hover:bg-gray-50 ${rankClass}">
+              return `<tr class="border-b border-gray-50 hover:bg-gray-50">
                 <td class="text-center px-2 py-2 text-gray-400 font-bold">${idx + 1}</td>
                 <td class="px-3 py-2 font-medium text-gray-800">${Results.escapeHtml(m.name)} ${genderBadge}</td>
                 <td class="text-center px-2 py-2 font-bold text-yellow-600">${m.gold || '-'}</td>
@@ -268,9 +265,6 @@ const Stats = {
               <th class="text-left px-3 py-2">멤버</th>
               <th class="text-center px-2 py-2">참여</th>
               <th class="text-center px-2 py-2">경기</th>
-              <th class="text-center px-2 py-2">승</th>
-              <th class="text-center px-2 py-2">무</th>
-              <th class="text-center px-2 py-2">패</th>
             </tr>
           </thead>
           <tbody>
@@ -285,9 +279,6 @@ const Stats = {
                 <td class="px-3 py-2 font-medium text-gray-800">${Results.escapeHtml(s.name)} ${genderBadge}</td>
                 <td class="text-center px-2 py-2 text-gray-600">${s.tournamentCount}</td>
                 <td class="text-center px-2 py-2 text-gray-600">${s.games}</td>
-                <td class="text-center px-2 py-2 text-green-600 font-medium">${s.wins}</td>
-                <td class="text-center px-2 py-2 text-gray-500">${s.draws}</td>
-                <td class="text-center px-2 py-2 text-red-500">${s.losses}</td>
               </tr>`;
             }).join('')}
           </tbody>
