@@ -459,10 +459,10 @@ const Schedule = {
             const gridCols = courtCount <= 1 ? 'grid-cols-1' : `grid-cols-2${courtCount > 2 ? ` sm:grid-cols-${courtCount}` : ''}`;
             return tournament.timeSlots.map((slot, si) => {
               const courtMap = {};
-              for (let c = 1; c <= courtCount; c++) courtMap[c] = null;
+              for (let c = 1; c <= courtCount; c++) courtMap[c] = [];
               slot.matches.forEach((match, mi) => {
                 const c = match.court || 1;
-                if (c >= 1 && c <= courtCount) courtMap[c] = { match, mi };
+                if (c >= 1 && c <= courtCount) courtMap[c].push({ match, mi });
               });
               return `
               <div class="schedule-slot" data-slot="${si}">
@@ -476,12 +476,12 @@ const Schedule = {
                 <div class="grid gap-3 ${gridCols}">
                   ${Array.from({length: courtCount}, (_, ci) => {
                     const c = ci + 1;
-                    const item = courtMap[c];
+                    const items = courtMap[c];
                     return `<div>
                       <div class="text-xs font-semibold text-gray-500 mb-1 pl-1">코트 ${c}</div>
-                      ${item
+                      ${items.length > 0
                         ? `<div class="space-y-2">
-                            ${this.renderMatchCard(item.match, si, item.mi)}
+                            ${items.map(item => this.renderMatchCard(item.match, si, item.mi)).join('')}
                             <button type="button" class="slot-add-extra-btn w-full py-1.5 border-2 border-dashed border-gray-200 rounded-xl text-xs text-gray-400 hover:border-green-400 hover:text-green-600 hover:bg-green-50/50 transition flex items-center justify-center gap-1" data-slot-idx="${si}" data-court="${c}" style="display:none">
                               <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                               코트${c}
