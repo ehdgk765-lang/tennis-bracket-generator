@@ -779,6 +779,7 @@ const Schedule = {
                 const names = new Set();
                 (tournament.timeSlots[si]?.matches || []).forEach((m, mi) => {
                   if (mi === excludeMatch) return;
+                  if (m.winner) return; // 완료된 매치의 멤버는 재배치 가능
                   m.player1.split(' / ').forEach(n => names.add(n));
                   m.player2.split(' / ').forEach(n => names.add(n));
                 });
@@ -900,6 +901,7 @@ const Schedule = {
             const names = new Set();
             slot.matches.forEach((m, i) => {
               if (i === excludeIdx) return;
+              if (m.winner) return; // 완료된 매치의 멤버는 재배치 가능
               m.player1.split(' / ').forEach(n => names.add(n));
               m.player2.split(' / ').forEach(n => names.add(n));
             });
@@ -1405,11 +1407,12 @@ const Schedule = {
         }
         const slotIdx = tournament.isCustom ? 0 : parseInt(modal.querySelector('#am-slot').value);
 
-        // 같은 시간대 멤버 중복 검사 (커스텀 대진표는 시간대 없으므로 제외)
+        // 같은 시간대 멤버 중복 검사 (커스텀 대진표는 시간대 없으므로 제외, 완료된 매치 제외)
         if (!tournament.isCustom) {
           const newNames = isSingles ? [t1p1, t2p1] : [t1p1, t1p2, t2p1, t2p2];
           const slotExisting = new Set();
           (tournament.timeSlots[slotIdx]?.matches || []).forEach(m => {
+            if (m.winner) return; // 완료된 매치의 멤버는 재배치 가능
             m.player1.split(' / ').forEach(n => slotExisting.add(n));
             m.player2.split(' / ').forEach(n => slotExisting.add(n));
           });
@@ -1470,11 +1473,12 @@ const Schedule = {
       modal.querySelectorAll('.am-player-slot').forEach(slot => {
         slot.onclick = (e) => {
           if (e.target.closest('.am-remove-player')) return;
-          // 같은 시간대 기존 멤버 수집 (비활성화용)
+          // 같은 시간대 기존 멤버 수집 (비활성화용, 완료된 매치 제외)
           const curSlotIdx = presetSlot != null ? selectedSlot : parseInt(modal.querySelector('#am-slot')?.value || '0');
           const slotBusyNames = new Set();
           if (!tournament.isCustom) {
             (tournament.timeSlots[curSlotIdx]?.matches || []).forEach(m => {
+              if (m.winner) return; // 완료된 매치의 멤버는 재배치 가능
               m.player1.split(' / ').forEach(n => slotBusyNames.add(n));
               m.player2.split(' / ').forEach(n => slotBusyNames.add(n));
             });
@@ -1626,9 +1630,10 @@ const Schedule = {
 
     const playerKey = team === 1 ? 'player1' : 'player2';
     const otherKey = team === 1 ? 'player2' : 'player1';
-    // 같은 시간대 전체 매치에서 사용 중인 멤버 수집 (본인 제외)
+    // 같은 시간대 전체 매치에서 사용 중인 멤버 수집 (본인 제외, 완료된 매치 제외)
     const slotBusyNames = new Set();
     (tournament.timeSlots[slotIdx]?.matches || []).forEach(m => {
+      if (m.winner) return; // 완료된 매치의 멤버는 재배치 가능
       m.player1.split(' / ').forEach(n => slotBusyNames.add(n));
       m.player2.split(' / ').forEach(n => slotBusyNames.add(n));
     });
