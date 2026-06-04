@@ -444,6 +444,7 @@ const Auth = {
       </div>`;
 
     document.body.appendChild(modal);
+    lockScroll();
 
     const nameInput = modal.querySelector('#member-name-input');
     const errorEl = modal.querySelector('#member-name-error');
@@ -465,7 +466,7 @@ const Auth = {
       }
       App.memberName = inputName;
       sessionStorage.setItem('memberName', inputName);
-      modal.remove();
+      modal.remove(); unlockScroll();
       onComplete();
     };
 
@@ -476,7 +477,7 @@ const Auth = {
     nameInput.oninput = () => errorEl.classList.add('hidden');
 
     closeBtn.onclick = () => {
-      modal.remove();
+      modal.remove(); unlockScroll();
       sessionStorage.removeItem('memberName');
       App.memberName = null;
       this.loginMode = null;

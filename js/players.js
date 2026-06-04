@@ -751,9 +751,11 @@ const Players = {
       </div>`;
 
     document.body.appendChild(modal);
+    lockScroll();
 
-    modal.querySelector('#team-pick-cancel').onclick = () => modal.remove();
-    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+    const closeModal = () => { modal.remove(); unlockScroll(); };
+    modal.querySelector('#team-pick-cancel').onclick = closeModal;
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
 
     modal.querySelector('#team-pick-save').onclick = () => {
       const selected = Array.from(modal.querySelectorAll('.team-pick-cb:checked')).map(cb => cb.dataset.name);
@@ -763,7 +765,7 @@ const Players = {
         team.members = selected;
         Storage.saveTeams(teams);
       }
-      modal.remove();
+      closeModal();
       this.renderTeams(subContent, container);
     };
   },

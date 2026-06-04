@@ -1356,7 +1356,7 @@ const Schedule = {
     };
 
     const bindModalEvents = () => {
-      modal.querySelector('.am-cancel').onclick = () => modal.remove();
+      modal.querySelector('.am-cancel').onclick = () => { modal.remove(); unlockScroll(); };
 
       // 코트/시간대/경기종류 선택 상태 추적
       modal.querySelectorAll('input[name="am-court"]').forEach(r => {
@@ -1450,7 +1450,7 @@ const Schedule = {
           tournament.completedAt = null;
         }
         Storage.updateTournament(tournament);
-        modal.remove();
+        modal.remove(); unlockScroll();
         this.render(container, tournament);
       };
 
@@ -1484,7 +1484,8 @@ const Schedule = {
 
     modal.innerHTML = renderModal();
     document.body.appendChild(modal);
-    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+    lockScroll();
+    modal.addEventListener('click', (e) => { if (e.target === modal) { modal.remove(); unlockScroll(); } });
     bindModalEvents();
   },
 
@@ -1561,8 +1562,10 @@ const Schedule = {
       </div>`;
 
     document.body.appendChild(picker);
-    picker.addEventListener('click', (e) => { if (e.target === picker) picker.remove(); });
-    picker.querySelector('.amp-cancel').onclick = () => picker.remove();
+    lockScroll();
+    const closePicker = () => { picker.remove(); unlockScroll(); };
+    picker.addEventListener('click', (e) => { if (e.target === picker) closePicker(); });
+    picker.querySelector('.amp-cancel').onclick = closePicker;
 
     const searchInput = picker.querySelector('#amp-search');
     searchInput.focus();
@@ -1581,7 +1584,7 @@ const Schedule = {
       if (usedNames.has(val)) { alert('이미 선택된 멤버입니다.'); return; }
       if (busyNames.has(val)) { alert('같은 시간대에 이미 배치된 멤버입니다.'); return; }
       selected[slotKey] = val;
-      picker.remove();
+      closePicker();
       onDone();
     };
     picker.querySelector('#amp-custom-add').onclick = addCustom;
@@ -1594,7 +1597,7 @@ const Schedule = {
       opt.onclick = () => {
         if (opt.dataset.used === 'true') return;
         selected[slotKey] = opt.dataset.name;
-        picker.remove();
+        closePicker();
         onDone();
       };
     });
@@ -1669,8 +1672,10 @@ const Schedule = {
       </div>`;
 
     document.body.appendChild(picker);
-    picker.addEventListener('click', (e) => { if (e.target === picker) picker.remove(); });
-    picker.querySelector('.amp-cancel').onclick = () => { picker.remove(); onDone(); };
+    lockScroll();
+    const closePicker2 = () => { picker.remove(); unlockScroll(); };
+    picker.addEventListener('click', (e) => { if (e.target === picker) { closePicker2(); onDone(); } });
+    picker.querySelector('.amp-cancel').onclick = () => { closePicker2(); onDone(); };
 
     const searchInput = picker.querySelector('#amp-search');
     searchInput.focus();
@@ -1689,7 +1694,7 @@ const Schedule = {
         names[pos] = newName;
         match[playerKey] = names.join(' / ');
         Storage.updateTournament(tournament);
-        picker.remove();
+        closePicker2();
         onDone();
         this.render(container, tournament);
       };
@@ -1722,14 +1727,16 @@ const Schedule = {
       </div>`;
 
     document.body.appendChild(modal);
-    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
-    modal.querySelector('.cgt-cancel').onclick = () => modal.remove();
+    lockScroll();
+    const closeGtModal = () => { modal.remove(); unlockScroll(); };
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeGtModal(); });
+    modal.querySelector('.cgt-cancel').onclick = closeGtModal;
 
     modal.querySelectorAll('.cgt-option').forEach(btn => {
       btn.onclick = () => {
         match.gameType = btn.dataset.type;
         Storage.updateTournament(tournament);
-        modal.remove();
+        closeGtModal();
         this.render(container, tournament);
       };
     });

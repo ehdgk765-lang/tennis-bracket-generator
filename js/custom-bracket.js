@@ -307,7 +307,7 @@ const CustomBracket = {
   _commitPick(slotIndex, value, previewContainer) {
     this._state.placements[slotIndex] = value;
     const existing = document.querySelector('.cb-player-picker');
-    if (existing) existing.remove();
+    if (existing) { existing.remove(); unlockScroll(); }
     this.renderBracketPreview(previewContainer);
     this._updatePlacementCount(previewContainer.closest('form')?.parentElement || previewContainer.parentElement);
   },
@@ -360,8 +360,9 @@ const CustomBracket = {
       </div>`;
 
     document.body.appendChild(picker);
-    picker.addEventListener('click', (e) => { if (e.target === picker) picker.remove(); });
-    picker.querySelector('.cb-picker-cancel').onclick = () => picker.remove();
+    lockScroll();
+    picker.addEventListener('click', (e) => { if (e.target === picker) { picker.remove(); unlockScroll(); } });
+    picker.querySelector('.cb-picker-cancel').onclick = () => { picker.remove(); unlockScroll(); };
 
     const searchInput = picker.querySelector('#cb-custom-name');
     searchInput.focus();
@@ -484,7 +485,7 @@ const CustomBracket = {
     };
 
     const bindPickerEvents = () => {
-      picker.querySelector('.cb-picker-cancel').onclick = () => picker.remove();
+      picker.querySelector('.cb-picker-cancel').onclick = () => { picker.remove(); unlockScroll(); };
 
       const searchInput = picker.querySelector('#cb-doubles-search');
       if (searchInput) searchInput.focus();
@@ -536,7 +537,8 @@ const CustomBracket = {
 
     picker.innerHTML = renderPickerContent();
     document.body.appendChild(picker);
-    picker.addEventListener('click', (e) => { if (e.target === picker) picker.remove(); });
+    lockScroll();
+    picker.addEventListener('click', (e) => { if (e.target === picker) { picker.remove(); unlockScroll(); } });
     bindPickerEvents();
   },
 

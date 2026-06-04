@@ -40,6 +40,35 @@ function buildTeamMap() {
   return map;
 }
 
+// ── 모달 배경 스크롤 잠금 ──
+let _scrollLockCount = 0;
+let _savedScrollY = 0;
+
+function lockScroll() {
+  if (_scrollLockCount === 0) {
+    _savedScrollY = window.scrollY;
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${_savedScrollY}px`;
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+    document.body.style.overflow = 'hidden';
+  }
+  _scrollLockCount++;
+}
+
+function unlockScroll() {
+  _scrollLockCount--;
+  if (_scrollLockCount <= 0) {
+    _scrollLockCount = 0;
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.left = '';
+    document.body.style.right = '';
+    document.body.style.overflow = '';
+    window.scrollTo(0, _savedScrollY);
+  }
+}
+
 // ── 성별 뱃지 HTML ──
 function genderBadge(gender, style) {
   if (style === 'text') {

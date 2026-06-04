@@ -79,10 +79,12 @@ const Results = {
       </div>`;
 
     document.body.appendChild(modal);
+    lockScroll();
 
-    modal.querySelector('#score-cancel').onclick = () => modal.remove();
+    const closeModal = () => { modal.remove(); unlockScroll(); };
+    modal.querySelector('#score-cancel').onclick = closeModal;
     modal.addEventListener('click', (e) => {
-      if (e.target === modal) modal.remove();
+      if (e.target === modal) closeModal();
     });
 
     modal.querySelector('#score-save').onclick = () => {
@@ -119,7 +121,7 @@ const Results = {
         setsWon: result.setsWon,
       });
 
-      modal.remove();
+      closeModal();
     };
 
     // 첫 번째 입력에 포커스

@@ -1215,6 +1215,7 @@ const App = {
     modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4';
     modal.innerHTML = '<div class="bg-white/95 backdrop-blur-md rounded-t-2xl sm:rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center"><p class="text-gray-400">로딩 중...</p></div>';
     document.body.appendChild(modal);
+    lockScroll();
 
     // 현재 관리자의 멤버 계정 조회
     fbDb.collection('memberAccounts').where('adminUID', '==', user.uid).get().then(snapshot => {
@@ -1308,7 +1309,7 @@ const App = {
               });
 
               await secondaryAuth.signOut();
-              modal.remove();
+              modal.remove(); unlockScroll();
               alert('멤버 계정이 생성되었습니다.');
             } finally {
               await secondaryApp.delete();
@@ -1330,7 +1331,7 @@ const App = {
               });
 
               await secondaryAuth.signOut();
-              modal.remove();
+              modal.remove(); unlockScroll();
               alert('비밀번호가 변경되었습니다.');
             } finally {
               await secondaryApp.delete();
@@ -1383,7 +1384,7 @@ const App = {
             }
             // Firestore 문서 삭제
             await fbDb.collection('memberAccounts').doc(acctUID).delete();
-            modal.remove();
+            modal.remove(); unlockScroll();
             alert('멤버 계정이 삭제되었습니다.');
           } catch (e) {
             errorEl.textContent = '삭제 중 오류가 발생했습니다.';
@@ -1393,10 +1394,10 @@ const App = {
       }
 
       // 닫기
-      modal.querySelector('#ma-cancel-btn').onclick = () => modal.remove();
-      modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+      modal.querySelector('#ma-cancel-btn').onclick = () => { modal.remove(); unlockScroll(); };
+      modal.onclick = (e) => { if (e.target === modal) { modal.remove(); unlockScroll(); } };
     }).catch(() => {
-      modal.remove();
+      modal.remove(); unlockScroll();
       alert('멤버 계정 정보를 불러올 수 없습니다.');
     });
   },
