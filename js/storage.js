@@ -48,6 +48,7 @@ const Storage = {
 
   savePlayers(players) {
     if (this._isMemberMode) return false;
+    this._writeGuardPlayers++;
     const result = this.set(this.KEYS.PLAYERS, players);
     this.syncToFirestore('players', players);
     return result;
@@ -60,6 +61,7 @@ const Storage = {
 
   saveTeams(teams) {
     if (this._isMemberMode) return false;
+    this._writeGuardTeams++;
     const result = this.set(this.KEYS.TEAMS, teams);
     this.syncToFirestore('teams', teams);
     return result;
@@ -71,7 +73,7 @@ const Storage = {
   },
 
   saveTournaments(tournaments) {
-    this._writeGuard++;
+    this._writeGuardTournaments++;
     const result = this.set(this.KEYS.TOURNAMENTS, tournaments);
     this.syncToFirestore('tournaments', tournaments);
     return result;
@@ -112,7 +114,9 @@ const Storage = {
   _unsubTeams: null,
 
   // 쓰기 가드: 로컬 저장 직후 onSnapshot 자기 수신 차단
-  _writeGuard: 0,
+  _writeGuardPlayers: 0,
+  _writeGuardTournaments: 0,
+  _writeGuardTeams: 0,
 
   // localStorage → Firestore (JSON 문자열로 직렬화하여 저장)
   syncToFirestore(docName, data) {
@@ -125,7 +129,7 @@ const Storage = {
       .catch(err => console.error('Firestore sync error:', err));
   },
 
-  // Firestore → localStorage (관리자 로그인 시)
+  // Firestore → localStorage (관리자 로그인 시: 로컬 우선 병합)
   async loadFromFirestore() {
     const uid = this._getDataUID();
     if (!uid) return;
@@ -137,43 +141,44 @@ const Storage = {
         base.doc('teams').get()
       ]);
 
+      // Players: 로컬 기준, 원격에만 있는 항목 추가
       if (pDoc.exists) {
         const d = pDoc.data();
         const remote = d.json ? JSON.parse(d.json) : (d.items || []);
         const local = this.getPlayers();
-        const remoteNames = new Set(remote.map(p => p.name));
-        const localOnly = local.filter(p => !remoteNames.has(p.name));
-        const merged = [...remote, ...localOnly];
+        const localNames = new Set(local.map(p => p.name));
+        const remoteOnly = remote.filter(p => !localNames.has(p.name));
+        const merged = [...local, ...remoteOnly];
         localStorage.setItem(this.KEYS.PLAYERS, JSON.stringify(merged));
-        if (localOnly.length > 0) this.syncToFirestore('players', merged);
+        this.syncToFirestore('players', merged);
       } else {
         const local = this.getPlayers();
         if (local.length > 0) this.syncToFirestore('players', local);
       }
 
+      // Tournaments: lastModified 기반 병합
       if (tDoc.exists) {
         const d = tDoc.data();
         const remote = d.json ? JSON.parse(d.json) : (d.items || []);
         const local = this.getTournaments();
-        const remoteIds = new Set(remote.map(t => t.id));
-        const localOnly = local.filter(t => !remoteIds.has(t.id));
-        const merged = [...remote, ...localOnly];
+        const merged = this._mergeTournaments(local, remote);
         localStorage.setItem(this.KEYS.TOURNAMENTS, JSON.stringify(merged));
-        if (localOnly.length > 0) this.syncToFirestore('tournaments', merged);
+        this.syncToFirestore('tournaments', merged);
       } else {
         const local = this.getTournaments();
         if (local.length > 0) this.syncToFirestore('tournaments', local);
       }
 
+      // Teams: 로컬 기준, 원격에만 있는 항목 추가
       if (teamsDoc.exists) {
         const d = teamsDoc.data();
         const remote = d.json ? JSON.parse(d.json) : (d.items || []);
         const local = this.getTeams();
-        const remoteIds = new Set(remote.map(t => t.id));
-        const localOnly = local.filter(t => !remoteIds.has(t.id));
-        const merged = [...remote, ...localOnly];
+        const localIds = new Set(local.map(t => t.id));
+        const remoteOnly = remote.filter(t => !localIds.has(t.id));
+        const merged = [...local, ...remoteOnly];
         localStorage.setItem(this.KEYS.TEAMS, JSON.stringify(merged));
-        if (localOnly.length > 0) this.syncToFirestore('teams', merged);
+        this.syncToFirestore('teams', merged);
       } else {
         const local = this.getTeams();
         if (local.length > 0) this.syncToFirestore('teams', local);
@@ -225,6 +230,10 @@ const Storage = {
     this._unsubPlayers = base.doc('players').onSnapshot((doc) => {
       if (doc.metadata.hasPendingWrites) return;
       if (!doc.exists) return;
+      if (this._writeGuardPlayers > 0) {
+        this._writeGuardPlayers--;
+        return;
+      }
       const d = doc.data();
       const items = d.json ? JSON.parse(d.json) : (d.items || []);
       const current = localStorage.getItem(this.KEYS.PLAYERS);
@@ -240,9 +249,8 @@ const Storage = {
     this._unsubTournaments = base.doc('tournaments').onSnapshot((doc) => {
       if (doc.metadata.hasPendingWrites) return;
       if (!doc.exists) return;
-      // 쓰기 가드: 로컬에서 방금 저장한 직후 수신된 응답이면 무시
-      if (this._writeGuard > 0) {
-        this._writeGuard--;
+      if (this._writeGuardTournaments > 0) {
+        this._writeGuardTournaments--;
         return;
       }
       const d = doc.data();
@@ -263,6 +271,10 @@ const Storage = {
     this._unsubTeams = base.doc('teams').onSnapshot((doc) => {
       if (doc.metadata.hasPendingWrites) return;
       if (!doc.exists) return;
+      if (this._writeGuardTeams > 0) {
+        this._writeGuardTeams--;
+        return;
+      }
       const d = doc.data();
       const items = d.json ? JSON.parse(d.json) : (d.items || []);
       const current = localStorage.getItem(this.KEYS.TEAMS);
