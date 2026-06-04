@@ -1,11 +1,4 @@
 // app.js - 앱 초기화, 탭 전환, 대회/대진표 생성
-const GAME_TYPES = {
-  MS: { label: '남자단식', icon: '🏃‍♂️', gender: 'M', doubles: false },
-  WS: { label: '여자단식', icon: '🏃‍♀️', gender: 'F', doubles: false },
-  MD: { label: '남자복식', icon: '👬', gender: 'M', doubles: true },
-  WD: { label: '여자복식', icon: '👭', gender: 'F', doubles: true },
-  XD: { label: '혼합복식', icon: '👫', gender: 'mixed', doubles: true },
-};
 
 const App = {
   isAdmin: false,
@@ -306,7 +299,7 @@ const App = {
             <label class="player-item flex items-center px-4 py-2.5 hover:bg-gray-50 cursor-pointer transition" data-name="${Results.escapeHtml(p.name.toLowerCase())}">
               <input type="checkbox" name="players" value="${Results.escapeHtml(p.name)}" class="player-checkbox w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500">
               <span class="ml-3 text-sm text-gray-800">${Results.escapeHtml(p.name)}</span>
-              <span class="ml-2 text-xs px-1.5 py-0.5 rounded font-medium ${p.gender === 'M' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}">${p.gender === 'M' ? '남' : '여'}</span>
+              <span class="ml-2">${genderBadge(p.gender)}</span>
               <span class="text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">${(p.ntrp || 2.5).toFixed(1)}</span>
             </label>
           `).join('')}
@@ -626,8 +619,7 @@ const App = {
     const allPlayers = Storage.getPlayers();
     const males = allPlayers.filter(p => p.gender === 'M').sort((a, b) => a.name.localeCompare(b.name, 'ko'));
     const females = allPlayers.filter(p => p.gender === 'F').sort((a, b) => a.name.localeCompare(b.name, 'ko'));
-    const _teamMap = {};
-    Storage.getTeams().forEach(t => (t.members || []).forEach(n => { _teamMap[n] = t.name; }));
+    const _teamMap = buildTeamMap();
 
     if (allPlayers.length < 2) {
       morphHTML(container, `

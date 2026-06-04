@@ -1,13 +1,4 @@
 // schedule.js - 시간/코트 기반 대진표 생성 + 렌더링
-const SCHEDULE_GAME_TYPES = {
-  XD: { label: '혼합복식', icon: '👫', badgeClass: 'bg-purple-100 text-purple-700', needM: 2, needF: 2, singles: false },
-  MD: { label: '남자복식', icon: '👬', badgeClass: 'bg-blue-100 text-blue-700', needM: 4, needF: 0, singles: false },
-  WD: { label: '여자복식', icon: '👭', badgeClass: 'bg-pink-100 text-pink-700', needM: 0, needF: 4, singles: false },
-  FD: { label: '섞어복식', icon: '🔀', badgeClass: 'bg-orange-100 text-orange-700', needM: 0, needF: 0, needAny: 4, singles: false },
-  MS: { label: '남자단식', icon: '🏃‍♂️', badgeClass: 'bg-blue-100 text-blue-700', needM: 2, needF: 0, singles: true },
-  WS: { label: '여자단식', icon: '🏃‍♀️', badgeClass: 'bg-pink-100 text-pink-700', needM: 0, needF: 2, singles: true },
-  FS: { label: '섞어단식', icon: '🔀', badgeClass: 'bg-orange-100 text-orange-700', needM: 0, needF: 0, needAny: 2, singles: true },
-};
 
 const Schedule = {
   // 시간 슬롯 계산 (30분 단위)
@@ -337,8 +328,7 @@ const Schedule = {
 
   // 팀별 통계 계산
   calcTeamStats(tournament) {
-    const teamMap = {};
-    Storage.getTeams().forEach(t => (t.members || []).forEach(n => { teamMap[n] = t.name; }));
+    const teamMap = buildTeamMap();
 
     const stats = {};
     const ensureTeam = (name) => {
@@ -563,7 +553,7 @@ const Schedule = {
                   const medalHtml = isComplete && rank < 3 ? '<span style="display:inline-block;width:22px;height:26px;background:url(\'css/medal.png\') no-repeat;background-size:300% auto;background-position:' + medalPos[rank] + ' center;vertical-align:middle;margin-right:2px;"></span>' : '';
                   return '<tr class="border-b border-gray-50 hover:bg-gray-50' + (isComplete && rank < 3 ? ' bg-gradient-to-r' + (rank === 0 ? ' from-yellow-50/60' : rank === 1 ? ' from-gray-50/60' : ' from-orange-50/60') + ' to-transparent' : '') + '">' +
                     '<td class="px-4 py-2 font-medium text-gray-800">' + medalHtml + Results.escapeHtml(s.name) +
-                      ' <span class="text-xs px-1 py-0.5 rounded font-medium ' + (gender === 'M' ? 'bg-blue-100 text-blue-700' : gender === 'F' ? 'bg-pink-100 text-pink-700' : 'bg-gray-100 text-gray-500') + '">' + (gender === 'M' ? '남' : gender === 'F' ? '여' : '-') + '</span>' +
+                      ' ' + genderBadge(gender) +
                       (teamName ? ' <span class="text-xs px-1 py-0.5 rounded font-medium bg-green-50 text-green-600 border border-green-200">' + Results.escapeHtml(teamName) + '</span>' : '') +
                     '</td>' +
                     '<td class="text-center px-2 py-2 text-gray-600">' + s.games + '</td>' +
@@ -606,7 +596,7 @@ const Schedule = {
                 return '<tr class="border-b border-gray-50 hover:bg-gray-50' + (isComplete && rank < 3 ? ' bg-gradient-to-r' + (rank === 0 ? ' from-yellow-50/60' : rank === 1 ? ' from-gray-50/60' : ' from-orange-50/60') + ' to-transparent' : '') + '">' +
                   '<td class="px-4 py-2 font-medium text-gray-800">' +
                     medalHtml + Results.escapeHtml(s.name) +
-                    ' <span class="text-xs px-1 py-0.5 rounded font-medium ' + (gender === 'M' ? 'bg-blue-100 text-blue-700' : gender === 'F' ? 'bg-pink-100 text-pink-700' : 'bg-gray-100 text-gray-500') + '">' + (gender === 'M' ? '남' : gender === 'F' ? '여' : '-') + '</span>' +
+                    ' ' + genderBadge(gender) +
                     (!App.isAdmin ? '' : ' <span class="text-xs px-1 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">' + ntrp.toFixed(1) + '</span>') +
                   '</td>' +
                   '<td class="text-center px-2 py-2 text-gray-600">' + s.games + '</td>' +
@@ -1129,7 +1119,7 @@ const Schedule = {
     const pd = allPlayers.find(p => p.name === name);
     const isCustom = this._tournament?.isCustom;
     const ntrpHtml = !App.isAdmin ? '' : `<span class="text-yellow-600 text-xs">${(pd?.ntrp || 2.5).toFixed(1)}</span>`;
-    const genderHtml = pd ? `<span class="text-xs ${pd.gender === 'M' ? 'text-blue-600' : 'text-pink-600'}">${pd.gender === 'M' ? '남' : '여'}</span>` : '';
+    const genderHtml = pd ? genderBadge(pd.gender, 'text') : '';
     return `<span class="swap-player cursor-pointer hover:bg-yellow-100 rounded px-0.5 transition inline-flex items-center gap-0.5"
       data-slot-idx="${slotIdx}" data-match-idx="${matchIdx}" data-team="${team}" data-pos="${pos}"
       data-name="${Results.escapeHtml(name)}">${Results.escapeHtml(name)}${genderHtml}${ntrpHtml}</span>`;
@@ -1197,8 +1187,7 @@ const Schedule = {
     // 팀전 모드: 팀 이름
     let t1TeamName = '', t2TeamName = '';
     if (this._tournament?.isTeamMode) {
-      const _tm = {};
-      Storage.getTeams().forEach(t => (t.members || []).forEach(n => { _tm[n] = t.name; }));
+      const _tm = buildTeamMap();
       const getTeam = (names) => {
         const tns = [...new Set(names.map(n => _tm[n]).filter(Boolean))];
         return tns.map(tn => Results.escapeHtml(tn)).join(' / ');
@@ -1259,10 +1248,7 @@ const Schedule = {
     if (existing) existing.remove();
 
     const allPlayers = Storage.getPlayers().sort((a, b) => a.name.localeCompare(b.name, 'ko'));
-    const _teamMap = {};
-    if (tournament.isTeamMode) {
-      Storage.getTeams().forEach(t => (t.members || []).forEach(n => { _teamMap[n] = t.name; }));
-    }
+    const _teamMap = tournament.isTeamMode ? buildTeamMap() : {};
     const isSingles = !!tournament.isSingles;
     const selected = { t1p1: null, t1p2: null, t2p1: null, t2p2: null };
     let selectedCourt = presetCourt || 1;
@@ -1282,7 +1268,7 @@ const Schedule = {
           return `<div class="am-player-slot flex items-center justify-between px-3 py-2.5 border border-gray-200 rounded-xl cursor-pointer hover:bg-green-50 transition" data-key="${key}">
             <div class="flex items-center gap-2">
               <span class="text-sm text-gray-800 font-medium">${Results.escapeHtml(name)}</span>
-              ${pd ? `<span class="text-xs px-1.5 py-0.5 rounded font-medium ${pd.gender === 'M' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}">${pd.gender === 'M' ? '남' : '여'}</span>
+              ${pd ? `${genderBadge(pd.gender)}
               ${!App.isAdmin ? '' : `<span class="text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">${(pd.ntrp || 2.5).toFixed(1)}</span>`}` : ''}
               ${tn ? `<span class="text-xs px-1.5 py-0.5 rounded font-medium bg-green-50 text-green-600 border border-green-200">${Results.escapeHtml(tn)}</span>` : ''}
             </div>
@@ -1510,10 +1496,7 @@ const Schedule = {
 
     const usedNames = new Set(Object.values(selected).filter(Boolean));
     const busyNames = slotBusyNames || new Set();
-    const _teamMap = {};
-    if (this._tournament?.isTeamMode) {
-      Storage.getTeams().forEach(t => (t.members || []).forEach(n => { _teamMap[n] = t.name; }));
-    }
+    const _teamMap = this._tournament?.isTeamMode ? buildTeamMap() : {};
 
     // 팀 모드: 허용/제외 팀 결정
     let allowedTeam = null, excludedTeam = null;
@@ -1566,7 +1549,7 @@ const Schedule = {
                 <div class="amp-option flex items-center px-3 py-2.5 ${isDisabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-green-50'} transition"
                   data-name="${Results.escapeHtml(p.name)}" data-used="${isDisabled}">
                   <span class="text-sm text-gray-800">${Results.escapeHtml(p.name)}</span>
-                  <span class="ml-2 text-xs px-1.5 py-0.5 rounded font-medium ${p.gender === 'M' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}">${p.gender === 'M' ? '남' : '여'}</span>
+                  <span class="ml-2">${genderBadge(p.gender)}</span>
                   ${!App.isAdmin ? '' : `<span class="ml-1 text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">${(p.ntrp || 2.5).toFixed(1)}</span>`}
                   ${tn ? `<span class="ml-1 text-xs px-1.5 py-0.5 rounded font-medium bg-green-50 text-green-600 border border-green-200">${Results.escapeHtml(tn)}</span>` : ''}
                   ${isUsed ? '<span class="ml-auto text-xs text-gray-400">선택됨</span>' : ''}
@@ -1639,10 +1622,7 @@ const Schedule = {
     });
     slotBusyNames.delete(oldName);
 
-    const _teamMap = {};
-    if (tournament.isTeamMode) {
-      Storage.getTeams().forEach(t => (t.members || []).forEach(n => { _teamMap[n] = t.name; }));
-    }
+    const _teamMap = tournament.isTeamMode ? buildTeamMap() : {};
 
     // 팀 모드: 같은 편 멤버의 팀으로 필터링
     const sideTeam = tournament.isTeamMode
@@ -1677,7 +1657,7 @@ const Schedule = {
                 <div class="amp-option flex items-center px-3 py-2.5 ${isDup || isSelf ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-blue-50'} transition"
                   data-name="${Results.escapeHtml(p.name)}" data-disabled="${isDup || isSelf}">
                   <span class="text-sm text-gray-800">${Results.escapeHtml(p.name)}</span>
-                  <span class="ml-2 text-xs px-1.5 py-0.5 rounded font-medium ${p.gender === 'M' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}">${p.gender === 'M' ? '남' : '여'}</span>
+                  <span class="ml-2">${genderBadge(p.gender)}</span>
                   ${!App.isAdmin ? '' : `<span class="ml-1 text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">${(p.ntrp || 2.5).toFixed(1)}</span>`}
                   ${tn ? `<span class="ml-1 text-xs px-1.5 py-0.5 rounded font-medium bg-green-50 text-green-600 border border-green-200">${Results.escapeHtml(tn)}</span>` : ''}
                   ${isSelf ? '<span class="ml-auto text-xs text-gray-400">현재</span>' : ''}

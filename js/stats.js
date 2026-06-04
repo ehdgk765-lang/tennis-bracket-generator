@@ -233,13 +233,11 @@ const Stats = {
             ${medalData.map((m, idx) => {
               const pd = allPlayersData.find(p => p.name === m.name);
               const gender = pd?.gender;
-              const genderBadge = '<span class="text-xs px-1 py-0.5 rounded font-medium '
-                + (gender === 'M' ? 'bg-blue-100 text-blue-700' : gender === 'F' ? 'bg-pink-100 text-pink-700' : 'bg-gray-100 text-gray-500')
-                + '">' + (gender === 'M' ? '남' : gender === 'F' ? '여' : '-') + '</span>';
+              const gb = genderBadge(gender);
               const isMe = !App.isAdmin && App.memberName && m.name === App.memberName;
               return `<tr class="border-b border-gray-50 hover:bg-gray-50 ${isMe ? 'bg-blue-50/60' : ''}">
                 <td class="text-center px-2 py-2 text-gray-400 font-bold">${idx + 1}</td>
-                <td class="px-3 py-2 font-medium ${isMe ? 'text-blue-700' : 'text-gray-800'}">${Results.escapeHtml(m.name)} ${genderBadge}</td>
+                <td class="px-3 py-2 font-medium ${isMe ? 'text-blue-700' : 'text-gray-800'}">${Results.escapeHtml(m.name)} ${gb}</td>
                 <td class="text-center px-2 py-2 font-bold text-yellow-600">${m.gold || '-'}</td>
                 <td class="text-center px-2 py-2 font-bold text-gray-400">${m.silver || '-'}</td>
                 <td class="text-center px-2 py-2 font-bold text-orange-600">${m.bronze || '-'}</td>
@@ -272,13 +270,11 @@ const Stats = {
             ${statsData.map((s, idx) => {
               const pd = allPlayersData.find(p => p.name === s.name);
               const gender = pd?.gender;
-              const genderBadge = '<span class="text-xs px-1 py-0.5 rounded font-medium '
-                + (gender === 'M' ? 'bg-blue-100 text-blue-700' : gender === 'F' ? 'bg-pink-100 text-pink-700' : 'bg-gray-100 text-gray-500')
-                + '">' + (gender === 'M' ? '남' : gender === 'F' ? '여' : '-') + '</span>';
+              const gb = genderBadge(gender);
               const isMe = !App.isAdmin && App.memberName && s.name === App.memberName;
               return `<tr class="border-b border-gray-50 hover:bg-gray-50 ${isMe ? 'bg-blue-50/60' : ''}">
                 <td class="text-center px-2 py-2 text-gray-400 font-bold">${idx + 1}</td>
-                <td class="px-3 py-2 font-medium ${isMe ? 'text-blue-700' : 'text-gray-800'}">${Results.escapeHtml(s.name)} ${genderBadge}</td>
+                <td class="px-3 py-2 font-medium ${isMe ? 'text-blue-700' : 'text-gray-800'}">${Results.escapeHtml(s.name)} ${gb}</td>
                 <td class="text-center px-2 py-2 text-gray-600">${s.tournamentCount}</td>
                 <td class="text-center px-2 py-2 text-gray-600">${s.games}</td>
               </tr>`;

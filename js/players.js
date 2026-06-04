@@ -124,8 +124,7 @@ const Players = {
     const lowerQuery = query.toLowerCase();
 
     // 멤버→팀 매핑
-    const teamMap = {};
-    Storage.getTeams().forEach(t => (t.members || []).forEach(n => { teamMap[n] = t.name; }));
+    const teamMap = buildTeamMap();
 
     const indexed = allPlayers.map((p, i) => ({ player: p, num: i + 1 }));
     const filtered = isSearching

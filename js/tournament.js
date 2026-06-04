@@ -109,8 +109,7 @@ const Tournament = {
     const isMember = !App.isAdmin && !!App.memberName;
 
     // 멤버→팀 매핑
-    const _teamMap = {};
-    Storage.getTeams().forEach(t => (t.members || []).forEach(n => { _teamMap[n] = t.name; }));
+    const _teamMap = buildTeamMap();
     const _teamBadge = (playerStr) => {
       if (!playerStr) return '';
       const names = playerStr.split(' / ');

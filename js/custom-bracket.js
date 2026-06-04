@@ -260,8 +260,7 @@ const CustomBracket = {
     if (playerName) {
       let teamBadge = '';
       if (this._state.isTeamMode) {
-        const _teamMap = {};
-        Storage.getTeams().forEach(t => (t.members || []).forEach(n => { _teamMap[n] = t.name; }));
+        const _teamMap = buildTeamMap();
         const names = playerName.split(' / ');
         const tns = [...new Set(names.map(n => _teamMap[n]).filter(Boolean))];
         if (tns.length > 0) {
@@ -319,8 +318,7 @@ const CustomBracket = {
 
     const allPlayers = Storage.getPlayers().sort((a, b) => a.name.localeCompare(b.name, 'ko'));
     const placedNames = this.getPlacedNames();
-    const teamMap = {};
-    Storage.getTeams().forEach(t => (t.members || []).forEach(n => { teamMap[n] = t.name; }));
+    const teamMap = buildTeamMap();
 
     const picker = document.createElement('div');
     picker.className = 'cb-player-picker fixed inset-0 z-50 flex items-end sm:items-center justify-center';
@@ -349,7 +347,7 @@ const CustomBracket = {
                 <div class="cb-pick-option flex items-center px-3 py-2.5 ${isPlaced ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-green-50'} transition"
                   data-name="${Results.escapeHtml(p.name)}" data-placed="${isPlaced}">
                   <span class="text-sm text-gray-800">${Results.escapeHtml(p.name)}</span>
-                  <span class="ml-2 text-xs px-1.5 py-0.5 rounded font-medium ${p.gender === 'M' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}">${p.gender === 'M' ? '남' : '여'}</span>
+                  <span class="ml-2">${genderBadge(p.gender)}</span>
                   <span class="ml-1 text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">${(p.ntrp || 2.5).toFixed(1)}</span>
                   ${tn ? `<span class="ml-1 text-xs px-1.5 py-0.5 rounded font-medium bg-green-50 text-green-600 border border-green-200">${Results.escapeHtml(tn)}</span>` : ''}
                   ${isPlaced ? '<span class="ml-auto text-xs text-gray-400">배치됨</span>' : ''}
@@ -397,8 +395,7 @@ const CustomBracket = {
     if (existing) existing.remove();
 
     const allPlayers = Storage.getPlayers().sort((a, b) => a.name.localeCompare(b.name, 'ko'));
-    const teamMap = {};
-    Storage.getTeams().forEach(t => (t.members || []).forEach(n => { teamMap[n] = t.name; }));
+    const teamMap = buildTeamMap();
     const usedNames = this._getPlacedPlayerNames();
     // 기존 배치에서 현재 슬롯 멤버는 제외 (재선택 가능)
     const currentVal = this._state.placements[slotIndex];
@@ -428,7 +425,7 @@ const CustomBracket = {
                 return `<div class="cb-doubles-slot flex items-center justify-between px-3 py-2 border-2 border-green-400 bg-green-50 rounded-xl" data-idx="${i}">
                   <div class="flex items-center gap-1 min-w-0">
                     <span class="text-sm font-medium text-gray-800 truncate">${Results.escapeHtml(name)}</span>
-                    ${pd ? `<span class="text-xs px-1 py-0.5 rounded font-medium ${pd.gender === 'M' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'} flex-shrink-0">${pd.gender === 'M' ? '남' : '여'}</span>` : ''}
+                    ${pd ? `<span class="flex-shrink-0">${genderBadge(pd.gender)}</span>` : ''}
                   </div>
                   <button type="button" class="cb-doubles-remove ml-1 text-red-400 hover:text-red-600 text-xs flex-shrink-0" data-idx="${i}">✕</button>
                 </div>`;
@@ -458,7 +455,7 @@ const CustomBracket = {
                   <div class="cb-pick-option flex items-center px-3 py-2.5 ${isUsed ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-green-50'} transition"
                     data-name="${Results.escapeHtml(p.name)}" data-used="${isUsed}">
                     <span class="text-sm text-gray-800">${Results.escapeHtml(p.name)}</span>
-                    <span class="ml-2 text-xs px-1.5 py-0.5 rounded font-medium ${p.gender === 'M' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}">${p.gender === 'M' ? '남' : '여'}</span>
+                    <span class="ml-2">${genderBadge(p.gender)}</span>
                     <span class="ml-1 text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">${(p.ntrp || 2.5).toFixed(1)}</span>
                     ${tn ? `<span class="ml-1 text-xs px-1.5 py-0.5 rounded font-medium bg-green-50 text-green-600 border border-green-200">${Results.escapeHtml(tn)}</span>` : ''}
                     ${isUsed ? '<span class="ml-auto text-xs text-gray-400">선택됨</span>' : ''}

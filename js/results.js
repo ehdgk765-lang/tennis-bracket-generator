@@ -19,8 +19,7 @@ const Results = {
     // 팀전 모드: 팀 이름 조회
     let t1Team = '', t2Team = '';
     if (tournament.isTeamMode) {
-      const _tm = {};
-      Storage.getTeams().forEach(t => (t.members || []).forEach(n => { _tm[n] = t.name; }));
+      const _tm = buildTeamMap();
       const getTeam = (pName) => {
         const names = pName.split(' / ');
         const tns = [...new Set(names.map(n => _tm[n]).filter(Boolean))];
@@ -182,9 +181,7 @@ const Results = {
       let badge = '';
       if (isCustom) {
         if (pd) {
-          const gClass = pd.gender === 'M' ? 'text-blue-600' : 'text-pink-600';
-          const gLabel = pd.gender === 'M' ? '남' : '여';
-          badge = `<span class="${gClass} text-xs ml-0.5">${gLabel}</span>`;
+          badge = `<span class="ml-0.5">${genderBadge(pd.gender, 'text')}</span>`;
         }
       } else {
         const ntrp = (pd?.ntrp || 2.5).toFixed(1);
