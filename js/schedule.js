@@ -811,13 +811,12 @@ const Schedule = {
         Results.showScoreModal(match, { setCount: 1, allowDraw: true, isTeamMode: tournament.isTeamMode, isCustom: tournament.isCustom }, (result) => {
           match.scores = result.scores;
           match.winner = result.winner;
-          Storage.updateTournament(tournament);
           const allDone = this.getAllMatches(tournament).every(m => m.winner || m.winner === 'draw');
           if (allDone) {
             tournament.status = 'completed';
             tournament.completedAt = new Date().toISOString();
-            Storage.updateTournament(tournament);
           }
+          Storage.updateTournament(tournament);
           this.render(container, tournament);
         });
       };

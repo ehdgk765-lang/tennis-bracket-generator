@@ -71,6 +71,7 @@ const Storage = {
   },
 
   saveTournaments(tournaments) {
+    this._writeGuard++;
     const result = this.set(this.KEYS.TOURNAMENTS, tournaments);
     this.syncToFirestore('tournaments', tournaments);
     return result;
@@ -82,6 +83,7 @@ const Storage = {
   },
 
   updateTournament(updatedTournament) {
+    updatedTournament.lastModified = Date.now();
     const tournaments = this.getTournaments();
     const index = tournaments.findIndex(t => t.id === updatedTournament.id);
     if (index !== -1) {
@@ -108,6 +110,9 @@ const Storage = {
   _unsubPlayers: null,
   _unsubTournaments: null,
   _unsubTeams: null,
+
+  // 쓰기 가드: 로컬 저장 직후 onSnapshot 자기 수신 차단
+  _writeGuard: 0,
 
   // localStorage → Firestore (JSON 문자열로 직렬화하여 저장)
   syncToFirestore(docName, data) {
@@ -235,10 +240,18 @@ const Storage = {
     this._unsubTournaments = base.doc('tournaments').onSnapshot((doc) => {
       if (doc.metadata.hasPendingWrites) return;
       if (!doc.exists) return;
+      // 쓰기 가드: 로컬에서 방금 저장한 직후 수신된 응답이면 무시
+      if (this._writeGuard > 0) {
+        this._writeGuard--;
+        return;
+      }
       const d = doc.data();
-      const items = d.json ? JSON.parse(d.json) : (d.items || []);
+      const remoteItems = d.json ? JSON.parse(d.json) : (d.items || []);
+      // tournament 단위 병합: lastModified가 더 최신인 쪽을 유지
+      const localItems = this.getTournaments();
+      const merged = this._mergeTournaments(localItems, remoteItems);
       const current = localStorage.getItem(this.KEYS.TOURNAMENTS);
-      const newJson = JSON.stringify(items);
+      const newJson = JSON.stringify(merged);
       if (current !== newJson) {
         localStorage.setItem(this.KEYS.TOURNAMENTS, newJson);
         this._onRemoteChange();
@@ -261,6 +274,25 @@ const Storage = {
     }, (err) => {
       console.error('Teams realtime sync error:', err);
     });
+  },
+
+  // tournament 단위 병합: 각 대회별로 lastModified가 더 최신인 쪽을 사용
+  _mergeTournaments(localList, remoteList) {
+    const localMap = new Map(localList.map(t => [t.id, t]));
+    const remoteMap = new Map(remoteList.map(t => [t.id, t]));
+    const allIds = new Set([...localMap.keys(), ...remoteMap.keys()]);
+    const merged = [];
+    for (const id of allIds) {
+      const local = localMap.get(id);
+      const remote = remoteMap.get(id);
+      if (!local) { merged.push(remote); continue; }
+      if (!remote) { merged.push(local); continue; }
+      // lastModified가 더 큰(최신) 쪽을 유지
+      const lm = local.lastModified || 0;
+      const rm = remote.lastModified || 0;
+      merged.push(lm >= rm ? local : remote);
+    }
+    return merged;
   },
 
   stopRealtimeSync() {
