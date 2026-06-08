@@ -212,28 +212,38 @@ const Tournament = {
         if (isMember && !this._isMyMatch(match)) return;
 
         Results.showScoreModal(match, tournament, (result) => {
-          match.scores = result.scores;
-          match.winner = result.winner;
+          // 최신 대회 데이터를 다시 읽어서 해당 매치만 패치 (동시 접속 데이터 유실 방지)
+          const freshTournament = Storage.getTournamentById(tournament.id);
+          if (!freshTournament) return;
+          const freshRounds = freshTournament.rounds;
+          const freshMatch = freshRounds[round]?.find(m => m.id === matchId);
+          if (!freshMatch) return;
+
+          freshMatch.scores = result.scores;
+          freshMatch.winner = result.winner;
 
           // 다음 라운드에 승자 전파
           if (round < totalRounds - 1) {
-            const nextMatchIndex = Math.floor(match.matchIndex / 2);
-            const nextMatch = rounds[round + 1][nextMatchIndex];
-            if (match.matchIndex % 2 === 0) {
-              nextMatch.player1 = result.winner;
-            } else {
-              nextMatch.player2 = result.winner;
+            const nextMatchIndex = Math.floor(freshMatch.matchIndex / 2);
+            const nextMatch = freshRounds[round + 1]?.[nextMatchIndex];
+            if (nextMatch) {
+              if (freshMatch.matchIndex % 2 === 0) {
+                nextMatch.player1 = result.winner;
+              } else {
+                nextMatch.player2 = result.winner;
+              }
             }
           }
 
           // 대회 완료 체크
-          if (rounds[totalRounds - 1][0].winner) {
-            tournament.status = 'completed';
-            tournament.completedAt = new Date().toISOString();
+          const finalRound = freshRounds[freshRounds.length - 1];
+          if (finalRound && finalRound[0]?.winner) {
+            freshTournament.status = 'completed';
+            freshTournament.completedAt = new Date().toISOString();
           }
 
-          Storage.updateTournament(tournament);
-          this.render(container, tournament);
+          Storage.updateTournament(freshTournament);
+          this.render(container, freshTournament);
         });
       };
     });

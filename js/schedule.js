@@ -808,16 +808,27 @@ const Schedule = {
         if (!match) return;
         // 멤버는 본인 매치만 입력 가능
         if (isMember && !this._isMyMatch(match)) return;
+        const matchId = match.id;
+        const tournamentId = tournament.id;
         Results.showScoreModal(match, { setCount: 1, allowDraw: true, isTeamMode: tournament.isTeamMode, isCustom: tournament.isCustom }, (result) => {
-          match.scores = result.scores;
-          match.winner = result.winner;
-          const allDone = this.getAllMatches(tournament).every(m => m.winner || m.winner === 'draw');
-          if (allDone) {
-            tournament.status = 'completed';
-            tournament.completedAt = new Date().toISOString();
+          // 최신 대회 데이터를 다시 읽어서 해당 매치만 패치 (동시 접속 데이터 유실 방지)
+          const freshTournament = Storage.getTournamentById(tournamentId);
+          if (!freshTournament) return;
+          let freshMatch = null;
+          for (const slot of freshTournament.timeSlots) {
+            freshMatch = slot.matches.find(m => m.id === matchId);
+            if (freshMatch) break;
           }
-          Storage.updateTournament(tournament);
-          this.render(container, tournament);
+          if (!freshMatch) return;
+          freshMatch.scores = result.scores;
+          freshMatch.winner = result.winner;
+          const allDone = this.getAllMatches(freshTournament).every(m => m.winner || m.winner === 'draw');
+          if (allDone) {
+            freshTournament.status = 'completed';
+            freshTournament.completedAt = new Date().toISOString();
+          }
+          Storage.updateTournament(freshTournament);
+          this.render(container, freshTournament);
         });
       };
     });

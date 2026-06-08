@@ -126,7 +126,12 @@ const Storage = {
     if (this._isMemberMode && docName !== 'tournaments') return;
     fbDb.collection('users').doc(uid).collection('data').doc(docName)
       .set({ json: JSON.stringify(data || []) })
-      .catch(err => console.error('Firestore sync error:', err));
+      .catch(err => {
+        console.error('Firestore sync error:', err);
+        // 쓰기 실패 시 writeGuard 카운터 감소 (echo가 오지 않으므로)
+        const guardKey = '_writeGuard' + docName.charAt(0).toUpperCase() + docName.slice(1);
+        if (this[guardKey] > 0) this[guardKey]--;
+      });
   },
 
   // Firestore → localStorage (관리자 로그인 시: 로컬 우선 병합)
@@ -288,7 +293,7 @@ const Storage = {
     });
   },
 
-  // tournament 단위 병합: 각 대회별로 lastModified가 더 최신인 쪽을 사용
+  // tournament 단위 병합: 각 대회별로 매치 단위 스코어 병합
   _mergeTournaments(localList, remoteList) {
     const localMap = new Map(localList.map(t => [t.id, t]));
     const remoteMap = new Map(remoteList.map(t => [t.id, t]));
@@ -299,12 +304,50 @@ const Storage = {
       const remote = remoteMap.get(id);
       if (!local) { merged.push(remote); continue; }
       if (!remote) { merged.push(local); continue; }
-      // lastModified가 더 큰(최신) 쪽을 유지
-      const lm = local.lastModified || 0;
-      const rm = remote.lastModified || 0;
-      merged.push(lm >= rm ? local : remote);
+      merged.push(this._mergeOneTournament(local, remote));
     }
     return merged;
+  },
+
+  // 단일 대회 매치 단위 병합: 스코어가 있는 매치를 우선 보존
+  _mergeOneTournament(local, remote) {
+    const lm = local.lastModified || 0;
+    const rm = remote.lastModified || 0;
+    const base = JSON.parse(JSON.stringify(lm >= rm ? local : remote));
+    const other = lm >= rm ? remote : local;
+
+    // 매치 맵 구축 (other 쪽)
+    const otherMatches = new Map();
+    this._forEachMatch(other, m => { if (m.id) otherMatches.set(m.id, m); });
+
+    // base의 각 매치에 대해: base에 스코어 없고 other에 있으면 other 스코어 적용
+    this._forEachMatch(base, m => {
+      if (!m.id) return;
+      const om = otherMatches.get(m.id);
+      if (!om) return;
+      if (!m.scores && om.scores) {
+        m.scores = om.scores;
+        m.winner = om.winner;
+      }
+    });
+
+    // lastModified는 더 최신 값 사용
+    base.lastModified = Math.max(lm, rm);
+    return base;
+  },
+
+  // 대회 내 모든 매치를 순회하는 헬퍼
+  _forEachMatch(tournament, fn) {
+    if (tournament.timeSlots) {
+      for (const slot of tournament.timeSlots) {
+        if (slot.matches) slot.matches.forEach(fn);
+      }
+    }
+    if (tournament.rounds) {
+      for (const round of tournament.rounds) {
+        if (Array.isArray(round)) round.forEach(fn);
+      }
+    }
   },
 
   stopRealtimeSync() {
