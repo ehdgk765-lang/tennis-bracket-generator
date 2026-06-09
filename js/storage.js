@@ -134,7 +134,7 @@ const Storage = {
       });
   },
 
-  // Firestore → localStorage (관리자 로그인 시: 로컬 우선 병합)
+  // Firestore → localStorage (관리자 로그인 시: 리모트 우선)
   async loadFromFirestore() {
     const uid = this._getDataUID();
     if (!uid) return;
@@ -146,22 +146,17 @@ const Storage = {
         base.doc('teams').get()
       ]);
 
-      // Players: 로컬 기준, 원격에만 있는 항목 추가
+      // Players: 리모트가 있으면 리모트 사용, 없으면 로컬 업로드
       if (pDoc.exists) {
         const d = pDoc.data();
         const remote = d.json ? JSON.parse(d.json) : (d.items || []);
-        const local = this.getPlayers();
-        const localNames = new Set(local.map(p => p.name));
-        const remoteOnly = remote.filter(p => !localNames.has(p.name));
-        const merged = [...local, ...remoteOnly];
-        localStorage.setItem(this.KEYS.PLAYERS, JSON.stringify(merged));
-        this.syncToFirestore('players', merged);
+        localStorage.setItem(this.KEYS.PLAYERS, JSON.stringify(remote));
       } else {
         const local = this.getPlayers();
         if (local.length > 0) this.syncToFirestore('players', local);
       }
 
-      // Tournaments: lastModified 기반 병합
+      // Tournaments: 리모트가 있으면 매치 단위 병합 (스코어 보존), 없으면 로컬 업로드
       if (tDoc.exists) {
         const d = tDoc.data();
         const remote = d.json ? JSON.parse(d.json) : (d.items || []);
@@ -174,16 +169,11 @@ const Storage = {
         if (local.length > 0) this.syncToFirestore('tournaments', local);
       }
 
-      // Teams: 로컬 기준, 원격에만 있는 항목 추가
+      // Teams: 리모트가 있으면 리모트 사용, 없으면 로컬 업로드
       if (teamsDoc.exists) {
         const d = teamsDoc.data();
         const remote = d.json ? JSON.parse(d.json) : (d.items || []);
-        const local = this.getTeams();
-        const localIds = new Set(local.map(t => t.id));
-        const remoteOnly = remote.filter(t => !localIds.has(t.id));
-        const merged = [...local, ...remoteOnly];
-        localStorage.setItem(this.KEYS.TEAMS, JSON.stringify(merged));
-        this.syncToFirestore('teams', merged);
+        localStorage.setItem(this.KEYS.TEAMS, JSON.stringify(remote));
       } else {
         const local = this.getTeams();
         if (local.length > 0) this.syncToFirestore('teams', local);
@@ -293,17 +283,13 @@ const Storage = {
     });
   },
 
-  // tournament 단위 병합: 각 대회별로 매치 단위 스코어 병합
+  // tournament 단위 병합: 리모트 기준, 양쪽 모두 있으면 매치 단위 스코어 병합
   _mergeTournaments(localList, remoteList) {
     const localMap = new Map(localList.map(t => [t.id, t]));
-    const remoteMap = new Map(remoteList.map(t => [t.id, t]));
-    const allIds = new Set([...localMap.keys(), ...remoteMap.keys()]);
     const merged = [];
-    for (const id of allIds) {
-      const local = localMap.get(id);
-      const remote = remoteMap.get(id);
+    for (const remote of remoteList) {
+      const local = localMap.get(remote.id);
       if (!local) { merged.push(remote); continue; }
-      if (!remote) { merged.push(local); continue; }
       merged.push(this._mergeOneTournament(local, remote));
     }
     return merged;
