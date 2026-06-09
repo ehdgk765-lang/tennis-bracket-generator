@@ -119,8 +119,8 @@ const Auth = {
   renderLogin() {
     const container = document.getElementById('auth-container');
     morphHTML(container, `
-      <!-- 도움말 버튼 -->
-      <button id="auth-help-btn" class="absolute top-4 left-4 w-10 h-10 flex items-center justify-center rounded-xl bg-white/30 backdrop-blur-sm border border-white/40 hover:bg-white/50 transition-all" title="도움말" aria-label="도움말">
+      <!-- 도움말 버튼 (fixed: 스크롤해도 고정) -->
+      <button id="auth-help-btn" class="fixed top-4 left-4 z-[60] w-10 h-10 flex items-center justify-center rounded-xl bg-white/30 backdrop-blur-sm border border-white/40 hover:bg-white/50 transition-all" title="도움말" aria-label="도움말">
         <svg class="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
         </svg>
@@ -155,8 +155,8 @@ const Auth = {
         </div>
       </div>
 
-      <!-- 테마 토글 -->
-      <button id="auth-theme-toggle" class="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-xl bg-white/30 backdrop-blur-sm border border-white/40 hover:bg-white/50 transition-all" title="테마 전환" aria-label="테마 전환">
+      <!-- 테마 토글 (fixed: 스크롤해도 고정) -->
+      <button id="auth-theme-toggle" class="fixed top-4 right-4 z-[60] w-10 h-10 flex items-center justify-center rounded-xl bg-white/30 backdrop-blur-sm border border-white/40 hover:bg-white/50 transition-all" title="테마 전환" aria-label="테마 전환">
         <svg class="auth-icon-sun w-5 h-5 text-gray-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
         </svg>
@@ -165,7 +165,8 @@ const Auth = {
         </svg>
       </button>
 
-      <div class="w-full max-w-sm mx-auto px-6">
+      <div class="flex flex-col min-h-full py-10 auth-scroll-content">
+      <div class="w-full max-w-sm mx-auto my-auto px-6">
         <!-- 로고 영역 -->
         <div class="text-center mb-8">
           <div class="relative inline-block mb-4">
@@ -259,6 +260,7 @@ const Auth = {
             @happy_tennis_life
           </a>
         </div>
+      </div>
       </div>`);
 
     // 도움말 모달

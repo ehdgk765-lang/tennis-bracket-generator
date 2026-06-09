@@ -69,6 +69,55 @@ function unlockScroll() {
   }
 }
 
+// ── 모바일 가상 키보드 대응: visual viewport 높이 추적 ──
+(function() {
+  if (!window.visualViewport) return;
+
+  function setVVH() {
+    var vvh = window.visualViewport.height;
+    document.documentElement.style.setProperty('--vvh', vvh + 'px');
+
+    // 로그인 화면: 키보드가 input을 가리면 콘텐츠를 위로 밀어올림 (transform)
+    var wrapper = document.querySelector('#auth-container .auth-scroll-content');
+    if (!wrapper) return;
+
+    var el = document.activeElement;
+    if (!el || (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') || !wrapper.contains(el)) {
+      wrapper.style.transform = '';
+      wrapper.dataset.shift = '0';
+      return;
+    }
+
+    requestAnimationFrame(function() {
+      var currentShift = parseFloat(wrapper.dataset.shift) || 0;
+      // 로그인 버튼까지 보이도록 form 하단 기준으로 계산
+      var form = el.closest('form');
+      var bottom = form ? form.getBoundingClientRect().bottom : el.getBoundingClientRect().bottom;
+      var originalBottom = bottom + currentShift;
+      var gap = originalBottom + 20 - vvh;
+      var newShift = Math.max(0, gap);
+      wrapper.dataset.shift = String(newShift);
+      wrapper.style.transform = newShift > 0 ? ('translateY(-' + newShift + 'px)') : '';
+    });
+  }
+
+  // input 포커스 해제 시 원위치
+  document.addEventListener('focusout', function() {
+    setTimeout(function() {
+      var wrapper = document.querySelector('#auth-container .auth-scroll-content');
+      if (!wrapper) return;
+      var ae = document.activeElement;
+      if (!ae || (ae.tagName !== 'INPUT' && ae.tagName !== 'TEXTAREA') || !wrapper.contains(ae)) {
+        wrapper.style.transform = '';
+        wrapper.dataset.shift = '0';
+      }
+    }, 100);
+  });
+
+  window.visualViewport.addEventListener('resize', setVVH);
+  setVVH();
+})();
+
 // ── 성별 뱃지 HTML ──
 function genderBadge(gender, style) {
   if (style === 'text') {

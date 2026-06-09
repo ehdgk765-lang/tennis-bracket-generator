@@ -20,6 +20,14 @@ input, select, textarea {
   font-size: 16px !important;
 }
 
+/* 모바일 가상 키보드 대응 */
+#member-name-modal,
+#score-modal,
+#member-account-modal {
+  height: var(--vvh, 100%) !important;
+  bottom: auto !important;
+}
+
 /* safe-area 대응 (노치 폰) */
 body {
   padding-bottom: env(safe-area-inset-bottom, 0);
