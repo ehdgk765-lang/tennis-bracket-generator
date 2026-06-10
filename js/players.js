@@ -102,7 +102,24 @@ const Players = {
           <div id="player-list-area">
             ${this._buildListAreaHTML(players)}
           </div>
-        </div>`);
+        </div>
+        ${App.isAdmin ? `
+        <div class="mt-4 bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm shadow-green-50/30 border border-white/60 px-4 py-3">
+          <div class="text-xs font-semibold text-gray-500 mb-2">데이터 백업 / 복원</div>
+          <div class="flex gap-2">
+            <button id="backup-data-btn"
+              class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 active:scale-[0.98] transition-all text-sm font-medium">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+              백업 다운로드
+            </button>
+            <input type="file" id="restore-file-input" accept=".json" class="hidden">
+            <button id="restore-data-btn"
+              class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 active:scale-[0.98] transition-all text-sm font-medium">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m4-8l-4-4m0 0L16 8m4-4v12"/></svg>
+              백업 복원
+            </button>
+          </div>
+        </div>` : ''}`);
 
     this.bindEvents(container);
   },
@@ -395,6 +412,23 @@ const Players = {
       excelInput.value = '';
     };
 
+    // 데이터 백업/복원
+    const backupBtn = container.querySelector('#backup-data-btn');
+    if (backupBtn) {
+      backupBtn.onclick = () => this._exportBackup();
+    }
+    const restoreBtn = container.querySelector('#restore-data-btn');
+    const restoreInput = container.querySelector('#restore-file-input');
+    if (restoreBtn && restoreInput) {
+      restoreBtn.onclick = () => restoreInput.click();
+      restoreInput.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        this._importBackup(file, container);
+        restoreInput.value = '';
+      };
+    }
+
     this._bindListEvents(container);
   },
 
@@ -460,6 +494,53 @@ const Players = {
       }
     };
     reader.readAsArrayBuffer(file);
+  },
+
+  _exportBackup() {
+    const data = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      players: Storage.getPlayers(),
+      tournaments: Storage.getTournaments(),
+      teams: Storage.getTeams(),
+    };
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const now = new Date();
+    const ts = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0') + '_' + String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0');
+    a.href = url;
+    a.download = `tennis_backup_${ts}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+
+  _importBackup(file, container) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        if (!data.players || !data.tournaments) {
+          alert('올바른 백업 파일이 아닙니다.');
+          return;
+        }
+        const pCount = data.players.length;
+        const tCount = data.tournaments.length;
+        const teamsCount = (data.teams || []).length;
+        const exportDate = data.exportedAt ? new Date(data.exportedAt).toLocaleString('ko') : '알 수 없음';
+        if (!confirm(`이 백업을 복원하시겠습니까?\n\n백업 시점: ${exportDate}\n멤버: ${pCount}명\n대진표: ${tCount}개\n팀: ${teamsCount}개\n\n현재 데이터가 모두 덮어써집니다.`)) return;
+        Storage.savePlayers(data.players);
+        Storage.saveTournaments(data.tournaments);
+        Storage.saveTeams(data.teams || []);
+        alert('백업이 복원되었습니다.');
+        this.render(container);
+      } catch (err) {
+        console.error('백업 복원 오류:', err);
+        alert('백업 파일을 읽을 수 없습니다. JSON 파일인지 확인해주세요.');
+      }
+    };
+    reader.readAsText(file);
   },
 
   // 대진표 내 선수 이름 치환 (싱글: "이름", 복식: "이름1 / 이름2" 모두 처리)
