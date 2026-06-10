@@ -44,7 +44,7 @@ const League = {
 
     for (const round of tournament.rounds) {
       for (const match of round) {
-        if (!match.scores) continue;
+        if (!match.scores || !match.player1 || !match.player2) continue;
 
         const p1 = match.player1;
         const p2 = match.player2;
@@ -165,6 +165,7 @@ const League = {
           <div class="divide-y divide-gray-50">`;
 
       for (const match of rounds[r]) {
+        if (!match.player1 || !match.player2) continue;
         const hasResult = !!match.scores;
         const canEdit = !hasResult;
         const isDraw = match.winner === 'draw';

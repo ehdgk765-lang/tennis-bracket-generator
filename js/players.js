@@ -8,7 +8,6 @@ const Players = {
   _subTab: 'members', // 'members' | 'teams'
 
   render(container) {
-    this._syncAllToCurrentMembers();
     const activeSubTab = this._subTab || 'members';
 
     morphHTML(container, `
@@ -552,97 +551,11 @@ const Players = {
         }
       });
 
-      // 매치 데이터 업데이트
-      const updateMatch = (match) => {
-        ['player1', 'player2', 'winner'].forEach(field => {
-          const updated = this._removeNameFromField(match[field], playerName);
-          if (updated !== match[field]) { match[field] = updated; changed = true; }
-        });
-      };
-
-      // 토너먼트/리그: rounds[round][matchIndex]
-      if (t.rounds) {
-        t.rounds.forEach(round => {
-          if (Array.isArray(round)) round.forEach(updateMatch);
-        });
-      }
-
-      // 스케줄: timeSlots[slot].matches[matchIndex]
-      if (t.timeSlots) {
-        t.timeSlots.forEach(slot => {
-          if (slot.matches) slot.matches.forEach(updateMatch);
-        });
-      }
+      // 매치 데이터(player1, player2, winner)는 수정하지 않음
+      // 통계 표시 시 현재 멤버 기준으로 필터링
     });
 
     if (changed) Storage.saveTournaments(tournaments);
-  },
-
-  _syncAllToCurrentMembers() {
-    if (this._synced) return;
-    this._synced = true;
-
-    const currentNames = new Set(Storage.getPlayers().map(p => p.name));
-    const tournaments = Storage.getTournaments();
-    let changed = false;
-
-    tournaments.forEach(t => {
-      // players 배열에서 현재 멤버에 없는 이름 제거
-      if (t.players) {
-        const before = t.players.length;
-        t.players = t.players.map(p => {
-          if (!p) return null;
-          const parts = p.split(' / ').filter(n => currentNames.has(n));
-          return parts.length > 0 ? parts.join(' / ') : null;
-        }).filter(p => p !== null);
-        if (t.players.length !== before) changed = true;
-      }
-
-      // males/females 배열
-      ['males', 'females'].forEach(key => {
-        if (t[key]) {
-          const before = t[key].length;
-          t[key] = t[key].filter(n => currentNames.has(n));
-          if (t[key].length !== before) changed = true;
-        }
-      });
-
-      // 매치 데이터
-      const updateMatch = (match) => {
-        ['player1', 'player2', 'winner'].forEach(field => {
-          if (!match[field] || match[field] === 'draw') return;
-          const parts = match[field].split(' / ').filter(n => currentNames.has(n));
-          const updated = parts.length > 0 ? parts.join(' / ') : null;
-          if (updated !== match[field]) { match[field] = updated; changed = true; }
-        });
-      };
-
-      if (t.rounds) {
-        t.rounds.forEach(round => {
-          if (Array.isArray(round)) round.forEach(updateMatch);
-        });
-      }
-
-      if (t.timeSlots) {
-        t.timeSlots.forEach(slot => {
-          if (slot.matches) slot.matches.forEach(updateMatch);
-        });
-      }
-    });
-
-    if (changed) Storage.saveTournaments(tournaments);
-
-    // 팀에서도 제거
-    const teams = Storage.getTeams();
-    let teamChanged = false;
-    teams.forEach(t => {
-      if (t.members) {
-        const before = t.members.length;
-        t.members = t.members.filter(n => currentNames.has(n));
-        if (t.members.length !== before) teamChanged = true;
-      }
-    });
-    if (teamChanged) Storage.saveTeams(teams);
   },
 
   _syncGenderToTournaments(playerName, newGender) {

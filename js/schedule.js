@@ -365,7 +365,11 @@ const Schedule = {
       s.matchPoints = s.wins * 3 + s.draws * 1;
     });
 
-    return Object.values(stats).sort((a, b) => b.matchPoints - a.matchPoints || b.scorePoints - a.scorePoints || b.wins - a.wins || b.games - a.games);
+    // 현재 멤버 목록에 있는 선수만 표시
+    const currentNames = new Set(Storage.getPlayers().map(p => p.name));
+    const filtered = Object.values(stats).filter(s => currentNames.has(s.name));
+
+    return filtered.sort((a, b) => b.matchPoints - a.matchPoints || b.scorePoints - a.scorePoints || b.wins - a.wins || b.games - a.games);
   },
 
   // 팀별 통계 계산
@@ -1242,6 +1246,7 @@ const Schedule = {
     const isDraw = match.winner === 'draw';
     const isMember = !App.isAdmin && !!App.memberName;
     const isMyMatch = this._isMyMatch(match);
+    if (!match.player1 || !match.player2) return '';
     const t1Names = match.player1.split(' / ');
     const t2Names = match.player2.split(' / ');
     const isDoubles = t1Names.length > 1;
