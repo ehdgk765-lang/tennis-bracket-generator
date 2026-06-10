@@ -259,6 +259,12 @@ const Storage = {
         localStorage.setItem(this.KEYS.TOURNAMENTS, newJson);
         this._onRemoteChange();
       }
+      // 병합으로 로컬 스코어가 추가된 경우 Firestore에도 반영
+      const remoteJson = JSON.stringify(remoteItems);
+      if (newJson !== remoteJson) {
+        this._writeGuardTournaments++;
+        this.syncToFirestore('tournaments', merged);
+      }
     }, (err) => {
       console.error('Tournaments realtime sync error:', err);
     });
