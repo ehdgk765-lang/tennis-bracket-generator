@@ -334,6 +334,7 @@ const Schedule = {
 
     for (const slot of tournament.timeSlots) {
       for (const m of slot.matches) {
+        if (!m.player1 || !m.player2) continue;
         const t1 = m.player1.split(' / ');
         const t2 = m.player2.split(' / ');
         [...t1, ...t2].forEach(p => {
@@ -445,8 +446,8 @@ const Schedule = {
     const allPlayersData = Storage.getPlayers();
     const uniqueNames = new Set();
     allMatches.forEach(m => {
-      m.player1.split(' / ').forEach(n => uniqueNames.add(n));
-      m.player2.split(' / ').forEach(n => uniqueNames.add(n));
+      if (m.player1) m.player1.split(' / ').forEach(n => uniqueNames.add(n));
+      if (m.player2) m.player2.split(' / ').forEach(n => uniqueNames.add(n));
     });
     let maleCount = 0, femaleCount = 0, unknownCount = 0;
     uniqueNames.forEach(name => {
@@ -827,8 +828,8 @@ const Schedule = {
                 (tournament.timeSlots[si]?.matches || []).forEach((m, mi) => {
                   if (mi === excludeMatch) return;
                   if (m.winner) return; // 완료된 매치의 멤버는 재배치 가능
-                  m.player1.split(' / ').forEach(n => names.add(n));
-                  m.player2.split(' / ').forEach(n => names.add(n));
+                  if (m.player1) m.player1.split(' / ').forEach(n => names.add(n));
+                  if (m.player2) m.player2.split(' / ').forEach(n => names.add(n));
                 });
                 return names;
               };
@@ -950,8 +951,8 @@ const Schedule = {
         if (si !== tSI) {
           const getNames = (m) => {
             const names = new Set();
-            m.player1.split(' / ').forEach(n => names.add(n));
-            m.player2.split(' / ').forEach(n => names.add(n));
+            if (m.player1) m.player1.split(' / ').forEach(n => names.add(n));
+            if (m.player2) m.player2.split(' / ').forEach(n => names.add(n));
             return names;
           };
           const getNamesInSlot = (slot, excludeIdx) => {
@@ -959,8 +960,8 @@ const Schedule = {
             slot.matches.forEach((m, i) => {
               if (i === excludeIdx) return;
               if (m.winner) return; // 완료된 매치의 멤버는 재배치 가능
-              m.player1.split(' / ').forEach(n => names.add(n));
-              m.player2.split(' / ').forEach(n => names.add(n));
+              if (m.player1) m.player1.split(' / ').forEach(n => names.add(n));
+              if (m.player2) m.player2.split(' / ').forEach(n => names.add(n));
             });
             return names;
           };
@@ -1466,8 +1467,8 @@ const Schedule = {
           const slotExisting = new Set();
           (tournament.timeSlots[slotIdx]?.matches || []).forEach(m => {
             if (m.winner) return; // 완료된 매치의 멤버는 재배치 가능
-            m.player1.split(' / ').forEach(n => slotExisting.add(n));
-            m.player2.split(' / ').forEach(n => slotExisting.add(n));
+            if (m.player1) m.player1.split(' / ').forEach(n => slotExisting.add(n));
+            if (m.player2) m.player2.split(' / ').forEach(n => slotExisting.add(n));
           });
           const dupInSlot = newNames.filter(n => slotExisting.has(n));
           if (dupInSlot.length > 0) {
@@ -1532,8 +1533,8 @@ const Schedule = {
           if (!tournament.isCustom) {
             (tournament.timeSlots[curSlotIdx]?.matches || []).forEach(m => {
               if (m.winner) return; // 완료된 매치의 멤버는 재배치 가능
-              m.player1.split(' / ').forEach(n => slotBusyNames.add(n));
-              m.player2.split(' / ').forEach(n => slotBusyNames.add(n));
+              if (m.player1) m.player1.split(' / ').forEach(n => slotBusyNames.add(n));
+              if (m.player2) m.player2.split(' / ').forEach(n => slotBusyNames.add(n));
             });
           }
           this._showPlayerPickerForSlot(modal, allPlayers, selected, slot.dataset.key, refreshModal, slotBusyNames);
@@ -1687,8 +1688,8 @@ const Schedule = {
     const slotBusyNames = new Set();
     (tournament.timeSlots[slotIdx]?.matches || []).forEach(m => {
       if (m.winner) return; // 완료된 매치의 멤버는 재배치 가능
-      m.player1.split(' / ').forEach(n => slotBusyNames.add(n));
-      m.player2.split(' / ').forEach(n => slotBusyNames.add(n));
+      if (m.player1) m.player1.split(' / ').forEach(n => slotBusyNames.add(n));
+      if (m.player2) m.player2.split(' / ').forEach(n => slotBusyNames.add(n));
     });
     slotBusyNames.delete(oldName);
 
