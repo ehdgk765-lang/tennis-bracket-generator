@@ -112,7 +112,7 @@ const Stats = {
     const aggregate = {};
     const ensure = (name) => {
       if (!aggregate[name]) {
-        aggregate[name] = { name, games: 0, wins: 0, losses: 0, draws: 0, matchPoints: 0, scorePoints: 0, tournamentCount: 0 };
+        aggregate[name] = { name, games: 0, wins: 0, losses: 0, draws: 0, matchPoints: 0, scorePoints: 0, tournamentCount: 0, byType: {} };
       }
     };
 
@@ -127,6 +127,11 @@ const Stats = {
         aggregate[s.name].draws += s.draws;
         aggregate[s.name].matchPoints += s.matchPoints;
         aggregate[s.name].scorePoints += s.scorePoints;
+        if (s.byType) {
+          Object.entries(s.byType).forEach(([type, count]) => {
+            aggregate[s.name].byType[type] = (aggregate[s.name].byType[type] || 0) + count;
+          });
+        }
         participated.add(s.name);
       });
       participated.forEach(name => { aggregate[name].tournamentCount++; });
@@ -252,11 +257,19 @@ const Stats = {
   _renderParticipationTable(container, statsData) {
     const allPlayersData = Storage.getPlayers();
 
+    // 실제 사용된 게임 타입만 표시
+    const _typeOrder = ['XD', 'MD', 'WD', 'FD', 'MS', 'WS', 'FS'];
+    const _typeLabel = { XD: '혼복', MD: '남복', WD: '여복', FD: '섞복', MS: '남단', WS: '여단', FS: '섞단' };
+    const usedSet = new Set();
+    statsData.forEach(s => { if (s.byType) Object.keys(s.byType).forEach(t => usedSet.add(t)); });
+    const usedTypes = _typeOrder.filter(t => usedSet.has(t));
+
     container.innerHTML = `
       <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm shadow-green-50/30 border border-white/60 overflow-hidden mb-4">
         <div class="px-4 py-3 bg-gray-50/50 border-b border-gray-100">
           <span class="font-semibold text-gray-700 text-sm">참여 순위</span>
         </div>
+        <div class="overflow-x-auto">
         <table class="w-full text-sm standings-table">
           <thead>
             <tr class="border-b border-gray-100 text-gray-500 text-xs">
@@ -264,6 +277,7 @@ const Stats = {
               <th class="text-left px-3 py-2">멤버</th>
               <th class="text-center px-2 py-2">참여</th>
               <th class="text-center px-2 py-2">경기</th>
+              ${usedTypes.map(t => '<th class="text-center px-1.5 py-2 whitespace-nowrap">' + _typeLabel[t] + '</th>').join('')}
             </tr>
           </thead>
           <tbody>
@@ -277,10 +291,12 @@ const Stats = {
                 <td class="px-3 py-2 font-medium ${isMe ? 'text-blue-700' : 'text-gray-800'}">${Results.escapeHtml(s.name)} ${gb}</td>
                 <td class="text-center px-2 py-2 text-gray-600">${s.tournamentCount}</td>
                 <td class="text-center px-2 py-2 text-gray-600">${s.games}</td>
+                ${usedTypes.map(t => '<td class="text-center px-1.5 py-2 text-gray-400">' + (s.byType[t] || 0) + '</td>').join('')}
               </tr>`;
             }).join('')}
           </tbody>
         </table>
+        </div>
       </div>`;
   },
 };
