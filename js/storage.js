@@ -73,8 +73,8 @@ const Storage = {
   },
 
   saveTournaments(tournaments) {
-    this._writeGuardTournaments++;
     const result = this.set(this.KEYS.TOURNAMENTS, tournaments);
+    this._lastSyncedTournamentsJson = JSON.stringify(tournaments);
     this.syncToFirestore('tournaments', tournaments);
     return result;
   },
@@ -115,8 +115,9 @@ const Storage = {
 
   // 쓰기 가드: 로컬 저장 직후 onSnapshot 자기 수신 차단
   _writeGuardPlayers: 0,
-  _writeGuardTournaments: 0,
   _writeGuardTeams: 0,
+  // tournaments는 내용 비교 방식으로 echo 감지 (동시 입력 지원)
+  _lastSyncedTournamentsJson: null,
 
   // localStorage → Firestore (JSON 문자열로 직렬화하여 저장)
   syncToFirestore(docName, data) {
@@ -128,9 +129,14 @@ const Storage = {
       .set({ json: JSON.stringify(data || []) })
       .catch(err => {
         console.error('Firestore sync error:', err);
-        // 쓰기 실패 시 writeGuard 카운터 감소 (echo가 오지 않으므로)
-        const guardKey = '_writeGuard' + docName.charAt(0).toUpperCase() + docName.slice(1);
-        if (this[guardKey] > 0) this[guardKey]--;
+        if (docName === 'tournaments') {
+          // 쓰기 실패 시 echo 비교 대상 초기화
+          this._lastSyncedTournamentsJson = null;
+        } else {
+          // players/teams는 카운터 방식 유지
+          const guardKey = '_writeGuard' + docName.charAt(0).toUpperCase() + docName.slice(1);
+          if (this[guardKey] > 0) this[guardKey]--;
+        }
       });
   },
 
@@ -244,12 +250,15 @@ const Storage = {
     this._unsubTournaments = base.doc('tournaments').onSnapshot((doc) => {
       if (doc.metadata.hasPendingWrites) return;
       if (!doc.exists) return;
-      if (this._writeGuardTournaments > 0) {
-        this._writeGuardTournaments--;
+      const d = doc.data();
+      const remoteJson = d.json || '[]';
+      // 내용 비교로 자기 echo 감지 (카운터 방식 대신)
+      if (this._lastSyncedTournamentsJson && remoteJson === this._lastSyncedTournamentsJson) {
+        this._lastSyncedTournamentsJson = null;
         return;
       }
-      const d = doc.data();
-      const remoteItems = d.json ? JSON.parse(d.json) : (d.items || []);
+      this._lastSyncedTournamentsJson = null;
+      const remoteItems = JSON.parse(remoteJson);
       // tournament 단위 병합: lastModified가 더 최신인 쪽을 유지
       const localItems = this.getTournaments();
       const merged = this._mergeTournaments(localItems, remoteItems);
@@ -260,9 +269,8 @@ const Storage = {
         this._onRemoteChange();
       }
       // 병합으로 로컬 스코어가 추가된 경우 Firestore에도 반영
-      const remoteJson = JSON.stringify(remoteItems);
       if (newJson !== remoteJson) {
-        this._writeGuardTournaments++;
+        this._lastSyncedTournamentsJson = newJson;
         this.syncToFirestore('tournaments', merged);
       }
     }, (err) => {
