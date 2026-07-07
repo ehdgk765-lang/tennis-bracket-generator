@@ -91,7 +91,7 @@ const Stats = {
 
       playerStats.forEach(s => {
         const rank = playerStats.findIndex(p =>
-          p.matchPoints === s.matchPoints && p.scorePoints === s.scorePoints
+          p.scorePoints === s.scorePoints && p.matchPoints === s.matchPoints
         );
         if (rank === 0) {
           ensure(s.name); medals[s.name].gold++; medals[s.name].total++;
@@ -138,7 +138,7 @@ const Stats = {
     });
 
     return Object.values(aggregate).sort((a, b) =>
-      b.games - a.games || b.wins - a.wins || b.matchPoints - a.matchPoints || b.scorePoints - a.scorePoints
+      b.games - a.games || b.wins - a.wins || b.scorePoints - a.scorePoints || b.matchPoints - a.matchPoints
     );
   },
 
@@ -240,7 +240,7 @@ const Stats = {
               const gender = pd?.gender;
               const gb = genderBadge(gender);
               const isMe = !App.isAdmin && App.memberName && m.name === App.memberName;
-              return `<tr class="border-b border-gray-50 hover:bg-gray-50 ${isMe ? 'bg-blue-50/60' : ''}">
+              return `<tr class="border-b border-gray-50 hover:bg-gray-50 ${isMe ? 'bg-blue-50/60' : ''}" ${idx >= 10 ? 'data-expandable="medal" style="display:none"' : ''}>
                 <td class="text-center px-2 py-2 text-gray-400 font-bold">${idx + 1}</td>
                 <td class="px-3 py-2 font-medium ${isMe ? 'text-blue-700' : 'text-gray-800'}">${Results.escapeHtml(m.name)} ${gb}</td>
                 <td class="text-center px-2 py-2 font-bold text-yellow-600">${m.gold || '-'}</td>
@@ -251,7 +251,18 @@ const Stats = {
             }).join('')}
           </tbody>
         </table>
+        ${medalData.length > 10 ? `<button data-toggle="medal" class="w-full py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition border-t border-gray-100">더보기 (${medalData.length - 10}명)</button>` : ''}
       </div>`;
+
+    const toggleBtn = container.querySelector('[data-toggle="medal"]');
+    if (toggleBtn) {
+      toggleBtn.onclick = () => {
+        const rows = container.querySelectorAll('[data-expandable="medal"]');
+        const hidden = rows[0]?.style.display === 'none';
+        rows.forEach(r => r.style.display = hidden ? '' : 'none');
+        toggleBtn.textContent = hidden ? '접기' : `더보기 (${medalData.length - 10}명)`;
+      };
+    }
   },
 
   _renderParticipationTable(container, statsData) {
@@ -286,7 +297,7 @@ const Stats = {
               const gender = pd?.gender;
               const gb = genderBadge(gender);
               const isMe = !App.isAdmin && App.memberName && s.name === App.memberName;
-              return `<tr class="border-b border-gray-50 hover:bg-gray-50 ${isMe ? 'bg-blue-50/60' : ''}">
+              return `<tr class="border-b border-gray-50 hover:bg-gray-50 ${isMe ? 'bg-blue-50/60' : ''}" ${idx >= 10 ? 'data-expandable="participation" style="display:none"' : ''}>
                 <td class="text-center px-2 py-2 text-gray-400 font-bold">${idx + 1}</td>
                 <td class="px-3 py-2 font-medium ${isMe ? 'text-blue-700' : 'text-gray-800'}">${Results.escapeHtml(s.name)} ${gb}</td>
                 <td class="text-center px-2 py-2 text-gray-600">${s.tournamentCount}</td>
@@ -297,6 +308,17 @@ const Stats = {
           </tbody>
         </table>
         </div>
+        ${statsData.length > 10 ? `<button data-toggle="participation" class="w-full py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition border-t border-gray-100">더보기 (${statsData.length - 10}명)</button>` : ''}
       </div>`;
+
+    const toggleBtn = container.querySelector('[data-toggle="participation"]');
+    if (toggleBtn) {
+      toggleBtn.onclick = () => {
+        const rows = container.querySelectorAll('[data-expandable="participation"]');
+        const hidden = rows[0]?.style.display === 'none';
+        rows.forEach(r => r.style.display = hidden ? '' : 'none');
+        toggleBtn.textContent = hidden ? '접기' : `더보기 (${statsData.length - 10}명)`;
+      };
+    }
   },
 };
