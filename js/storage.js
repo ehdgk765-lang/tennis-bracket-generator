@@ -165,11 +165,17 @@ const Storage = {
       // Tournaments: 리모트가 있으면 매치 단위 병합 (스코어 보존), 없으면 로컬 업로드
       if (tDoc.exists) {
         const d = tDoc.data();
-        const remote = d.json ? JSON.parse(d.json) : (d.items || []);
+        const remoteJson = d.json || '[]';
+        const remote = JSON.parse(remoteJson);
         const local = this.getTournaments();
         const merged = this._mergeTournaments(local, remote);
-        localStorage.setItem(this.KEYS.TOURNAMENTS, JSON.stringify(merged));
-        this.syncToFirestore('tournaments', merged);
+        const mergedJson = JSON.stringify(merged);
+        localStorage.setItem(this.KEYS.TOURNAMENTS, mergedJson);
+        // 병합으로 로컬 스코어가 추가된 경우에만 Firestore에 반영 (불필요한 덮어쓰기 방지)
+        if (mergedJson !== remoteJson) {
+          this._lastSyncedTournamentsJson = mergedJson;
+          this.syncToFirestore('tournaments', merged);
+        }
       } else {
         const local = this.getTournaments();
         if (local.length > 0) this.syncToFirestore('tournaments', local);
