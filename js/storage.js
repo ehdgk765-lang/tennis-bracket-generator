@@ -99,7 +99,11 @@ const Storage = {
   deleteTournament(id) {
     if (this._isMemberMode) return;
     const tournaments = this.getTournaments().filter(t => t.id !== id);
-    this.saveTournaments(tournaments);
+    // 삭제는 병합 없이 직접 덮어쓰기 (삭제한 대진표가 remote에서 부활하지 않도록)
+    const result = this.set(this.KEYS.TOURNAMENTS, tournaments);
+    this._lastSyncedTournamentsJson = JSON.stringify(tournaments);
+    this.syncToFirestore('tournaments', tournaments, true);
+    return result;
   },
 
   // 유틸리티
@@ -120,24 +124,47 @@ const Storage = {
   _lastSyncedTournamentsJson: null,
 
   // localStorage → Firestore (JSON 문자열로 직렬화하여 저장)
-  syncToFirestore(docName, data) {
+  syncToFirestore(docName, data, skipMerge) {
     const uid = this._getDataUID();
     if (!uid) return;
     // 멤버 모드에서는 대회(스코어 입력)만 쓰기 허용
     if (this._isMemberMode && docName !== 'tournaments') return;
-    fbDb.collection('users').doc(uid).collection('data').doc(docName)
-      .set({ json: JSON.stringify(data || []) })
-      .catch(err => {
-        console.error('Firestore sync error:', err);
-        if (docName === 'tournaments') {
-          // 쓰기 실패 시 echo 비교 대상 초기화
-          this._lastSyncedTournamentsJson = null;
-        } else {
-          // players/teams는 카운터 방식 유지
-          const guardKey = '_writeGuard' + docName.charAt(0).toUpperCase() + docName.slice(1);
-          if (this[guardKey] > 0) this[guardKey]--;
+
+    const docRef = fbDb.collection('users').doc(uid).collection('data').doc(docName);
+
+    if (docName === 'tournaments' && !skipMerge) {
+      // Transaction으로 병합 쓰기: 동시 쓰기 시 데이터 손실 방지
+      const localData = data;
+      fbDb.runTransaction(async (transaction) => {
+        const doc = await transaction.get(docRef);
+        let finalData = localData;
+        if (doc.exists) {
+          const remote = JSON.parse(doc.data().json || '[]');
+          finalData = this._mergeTournaments(localData, remote);
         }
+        const finalJson = JSON.stringify(finalData || []);
+        transaction.set(docRef, { json: finalJson });
+        return finalJson;
+      }).then(finalJson => {
+        // Transaction 완료 후 실제 기록된 내용으로 echo guard 갱신
+        this._lastSyncedTournamentsJson = finalJson;
+      }).catch(err => {
+        console.error('Firestore transaction error:', err);
+        this._lastSyncedTournamentsJson = null;
       });
+    } else {
+      // players/teams 또는 skipMerge(삭제 등)는 직접 덮어쓰기
+      docRef.set({ json: JSON.stringify(data || []) })
+        .catch(err => {
+          console.error('Firestore sync error:', err);
+          if (docName === 'tournaments') {
+            this._lastSyncedTournamentsJson = null;
+          } else {
+            const guardKey = '_writeGuard' + docName.charAt(0).toUpperCase() + docName.slice(1);
+            if (this[guardKey] > 0) this[guardKey]--;
+          }
+        });
+    }
   },
 
   // Firestore → localStorage (관리자 로그인 시: 리모트 우선)
