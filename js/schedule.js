@@ -301,15 +301,30 @@ const Schedule = {
     return matches;
   },
 
-  // 대진표 생성
-  generate(males, females, courts, startTime, endTime, allowMixed, isSingles) {
+  // 대진표 생성 (lateEntries: { playerName: "HH:MM" } — 해당 시간부터 참여)
+  generate(males, females, courts, startTime, endTime, allowMixed, isSingles, lateEntries) {
     const slots = this.calculateTimeSlots(startTime, endTime);
     const gameCounts = {};
     [...males, ...females].forEach(p => { gameCounts[p] = 0; });
     const usedTeams = new Map(); // 팀키 → 횟수
 
+    // 늦게 참여하는 멤버: 빠지는 슬롯 수만큼 음수로 초기화 → 이후 슬롯에서 우선 배정
+    if (lateEntries) {
+      for (const [player, lateTime] of Object.entries(lateEntries)) {
+        const missedSlots = slots.filter(t => t < lateTime).length;
+        if (missedSlots > 0 && gameCounts.hasOwnProperty(player)) {
+          gameCounts[player] = -missedSlots;
+        }
+      }
+    }
+
     const timeSlots = slots.map(time => {
-      const matches = this.generateSlotMatches(males, females, courts, gameCounts, allowMixed, usedTeams, isSingles);
+      let slotMales = males, slotFemales = females;
+      if (lateEntries) {
+        slotMales = males.filter(p => !lateEntries[p] || lateEntries[p] <= time);
+        slotFemales = females.filter(p => !lateEntries[p] || lateEntries[p] <= time);
+      }
+      const matches = this.generateSlotMatches(slotMales, slotFemales, courts, gameCounts, allowMixed, usedTeams, isSingles);
       return { time, matches };
     });
 
@@ -539,10 +554,89 @@ const Schedule = {
                     </div>`;
                   }).join('')}
                 </div>
+                ${(() => {
+                  const allPlayers = tournament.players || [];
+                  if (allPlayers.length === 0) return '';
+                  const busyNames = new Set();
+                  slot.matches.forEach(m => {
+                    if (m.player1) m.player1.split(' / ').forEach(n => busyNames.add(n));
+                    if (m.player2) m.player2.split(' / ').forEach(n => busyNames.add(n));
+                  });
+                  const resting = allPlayers.filter(n => !busyNames.has(n));
+                  if (resting.length === 0) return '';
+                  return `<div class="resting-players mt-2 text-xs text-gray-400 flex items-center flex-wrap gap-1" style="display:none">
+                    <span class="font-medium text-gray-500 flex-shrink-0">쉬는 멤버:</span>
+                    ${resting.map(n => `<span class="resting-player inline-block px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full cursor-pointer hover:bg-green-100 hover:text-green-700 transition" data-name="${Results.escapeHtml(n)}" data-slot-idx="${si}">${Results.escapeHtml(n)}</span>`).join('')}
+                  </div>`;
+                })()}
               </div>`;
             }).join('');
           })()}
         </div>
+
+        ${!tournament.isCustom && (tournament.players || []).length > 0 ? (() => {
+          const allPlayers = tournament.players;
+          const slots = tournament.timeSlots || [];
+          const slotTimes = slots.map(s => s.time);
+          const savedLate = tournament.lateEntries || {};
+          // 슬롯별 배정 멤버 수집
+          const slotBusyMap = slots.map(slot => {
+            const busy = new Set();
+            slot.matches.forEach(m => {
+              if (m.player1) m.player1.split(' / ').forEach(n => busy.add(n));
+              if (m.player2) m.player2.split(' / ').forEach(n => busy.add(n));
+            });
+            return busy;
+          });
+          // 경기수 계산 및 정렬
+          const playerData = allPlayers.map(name => {
+            const games = slotBusyMap.filter(busy => busy.has(name)).length;
+            return { name, games };
+          }).sort((a, b) => a.games - b.games || a.name.localeCompare(b.name, 'ko'));
+          return `
+          <div class="assignment-overview mb-4" style="display:none">
+            <button type="button" class="assignment-toggle w-full flex items-center justify-between px-4 py-2.5 bg-white/80 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition">
+              <span>배정 현황</span>
+              <svg class="assignment-arrow w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+            <div class="assignment-body hidden mt-2 bg-white/80 backdrop-blur-sm rounded-xl border border-gray-200">
+              <div class="overflow-x-auto">
+              <table class="w-full text-xs">
+                <thead>
+                  <tr class="border-b border-gray-100 text-gray-400">
+                    <th class="text-left px-3 py-2 sticky left-0 bg-white/90 z-10 font-medium">멤버</th>
+                    <th class="text-center px-1 py-2 font-medium assign-start-col" style="display:none">시작</th>
+                    ${slotTimes.map(t => `<th class="text-center px-1.5 py-2 font-medium whitespace-nowrap">${t}</th>`).join('')}
+                    <th class="text-center px-2 py-2 font-medium">경기</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${playerData.map(p => {
+                    const curStart = savedLate[p.name] || slotTimes[0];
+                    return `
+                    <tr class="border-b border-gray-50 hover:bg-gray-50/50">
+                      <td class="px-3 py-1.5 sticky left-0 bg-white/90 z-10 text-gray-700 font-medium whitespace-nowrap">${Results.escapeHtml(p.name)}</td>
+                      <td class="text-center py-1 assign-start-col" style="display:none">
+                        <select class="late-entry-select text-xs border border-gray-200 rounded px-1 py-0.5 bg-white" data-player="${Results.escapeHtml(p.name)}">
+                          ${slotTimes.map(t => `<option value="${t}" ${t === curStart ? 'selected' : ''}>${t}</option>`).join('')}
+                        </select>
+                      </td>
+                      ${slotBusyMap.map(busy => busy.has(p.name)
+                        ? '<td class="text-center py-1.5"><span class="inline-block w-2 h-2 rounded-full bg-green-400"></span></td>'
+                        : '<td class="text-center py-1.5 text-gray-300">-</td>'
+                      ).join('')}
+                      <td class="text-center py-1.5 font-bold ${p.games < playerData[playerData.length - 1].games ? 'text-orange-500' : 'text-gray-600'}">${p.games}</td>
+                    </tr>`;
+                  }).join('')}
+                </tbody>
+              </table>
+              </div>
+              <div class="assign-regen-wrap px-3 py-2 border-t border-gray-100 flex justify-end" style="display:none">
+                <button type="button" class="assign-regen-btn px-4 py-1.5 text-xs font-medium text-white bg-green-500 rounded-lg hover:bg-green-600 transition shadow-sm">대진표 재생성</button>
+              </div>
+            </div>
+          </div>`;
+        })() : ''}
 
         ${tournament.isTeamMode ? (() => {
           const teamStats = this.calcTeamStats(tournament);
@@ -707,6 +801,67 @@ const Schedule = {
     }
 
     if (App.isAdmin) {
+      // 쉬는 멤버 표시
+      container.querySelectorAll('.resting-players').forEach(el => el.style.display = '');
+
+      // 배정 현황 오버뷰 표시 + 토글
+      const overviewEl = container.querySelector('.assignment-overview');
+      if (overviewEl) {
+        overviewEl.style.display = '';
+        // 시작 시간 컬럼 + 재생성 버튼 표시
+        overviewEl.querySelectorAll('.assign-start-col').forEach(el => el.style.display = '');
+        const regenWrap = overviewEl.querySelector('.assign-regen-wrap');
+        if (regenWrap) regenWrap.style.display = '';
+
+        const toggleBtn = overviewEl.querySelector('.assignment-toggle');
+        const body = overviewEl.querySelector('.assignment-body');
+        const arrow = overviewEl.querySelector('.assignment-arrow');
+        if (toggleBtn && body) {
+          toggleBtn.onclick = () => {
+            const isHidden = body.classList.contains('hidden');
+            body.classList.toggle('hidden');
+            if (arrow) arrow.style.transform = isHidden ? 'rotate(180deg)' : '';
+          };
+        }
+
+        // 대진표 재생성 버튼
+        const regenBtn = overviewEl.querySelector('.assign-regen-btn');
+        if (regenBtn) {
+          regenBtn.onclick = () => {
+            // 기존 스코어 확인
+            const hasScores = (tournament.timeSlots || []).some(slot =>
+              slot.matches.some(m => m.scores || m.winner)
+            );
+            if (hasScores && !confirm('입력된 스코어가 초기화됩니다. 계속하시겠습니까?')) return;
+
+            // lateEntries 수집
+            const lateEntries = {};
+            const firstTime = (tournament.timeSlots[0] || {}).time || tournament.startTime;
+            overviewEl.querySelectorAll('.late-entry-select').forEach(sel => {
+              const player = sel.dataset.player;
+              const startTime = sel.value;
+              if (startTime !== firstTime) {
+                lateEntries[player] = startTime;
+              }
+            });
+
+            // 대진표 재생성
+            const newTimeSlots = Schedule.generate(
+              tournament.males, tournament.females, tournament.courts,
+              tournament.startTime, tournament.endTime,
+              tournament.allowMixed, tournament.isSingles,
+              Object.keys(lateEntries).length > 0 ? lateEntries : null
+            );
+
+            tournament.timeSlots = newTimeSlots;
+            tournament.lateEntries = lateEntries;
+            tournament.lastModified = Date.now();
+            Storage.updateTournament(tournament);
+            this.render(container, tournament);
+          };
+        }
+      }
+
       // 슬롯별 대진 추가 버튼 - 빈 코트 자리 (시간/코트 모드)
       container.querySelectorAll('.slot-add-match-btn').forEach(btn => {
         btn.style.display = '';
@@ -757,6 +912,20 @@ const Schedule = {
     const cards = container.querySelectorAll('.schedule-match-card');
     let selectedPlayer = null;
 
+    // 쉬는 멤버 배지 시각 피드백 헬퍼
+    const highlightRestingBadges = (slotIdx) => {
+      container.querySelectorAll('.resting-player').forEach(badge => {
+        if (+badge.dataset.slotIdx === slotIdx) {
+          badge.classList.add('ring-2', 'ring-green-400', 'bg-green-100', 'text-green-700');
+        }
+      });
+    };
+    const unhighlightRestingBadges = () => {
+      container.querySelectorAll('.resting-player').forEach(badge => {
+        badge.classList.remove('ring-2', 'ring-green-400', 'bg-green-100', 'text-green-700');
+      });
+    };
+
     // 멤버 이름 탭 → 선택/교환 (관리자만)
     container.querySelectorAll('.swap-player').forEach(el => {
       if (!App.isAdmin) { el.style.cursor = 'default'; return; }
@@ -790,11 +959,13 @@ const Schedule = {
             };
             card.appendChild(replaceBtn);
           }
+          highlightRestingBadges(data.slotIdx);
         } else if (selectedPlayer.slotIdx === data.slotIdx && selectedPlayer.matchIdx === data.matchIdx
           && selectedPlayer.team === data.team && selectedPlayer.pos === data.pos) {
           // 같은 멤버 재탭 → 선택 해제
           selectedPlayer.el.classList.remove('bg-green-200', 'ring-2', 'ring-green-500', 'rounded');
           container.querySelectorAll('.replace-player-btn').forEach(b => b.remove());
+          unhighlightRestingBadges();
           selectedPlayer = null;
         } else {
           // 두 번째 멤버 탭 → 교환
@@ -875,6 +1046,34 @@ const Schedule = {
       };
     });
 
+    // 쉬는 멤버 배지 클릭 → 선택된 플레이어와 교체 (관리자만)
+    container.querySelectorAll('.resting-player').forEach(badge => {
+      if (!App.isAdmin) return;
+      badge.onclick = (e) => {
+        e.stopPropagation();
+        if (!selectedPlayer) return; // 선택된 플레이어 없으면 무시
+        const restingName = badge.dataset.name;
+        const restingSlot = +badge.dataset.slotIdx;
+
+        // 선택된 플레이어의 매치 정보
+        const src = selectedPlayer;
+        const srcMatch = tournament.timeSlots[src.slotIdx]?.matches[src.matchIdx];
+        if (!srcMatch) return;
+        const srcKey = src.team === 1 ? 'player1' : 'player2';
+
+        // 같은 시간대가 아닌 경우: 쉬는 멤버는 해당 슬롯의 벤치에만 존재
+        if (src.slotIdx !== restingSlot) return;
+
+        // 교체 실행: 선택된 플레이어 → 벤치, 쉬는 멤버 → 매치 투입
+        const names = srcMatch[srcKey].split(' / ');
+        names[src.pos] = restingName;
+        srcMatch[srcKey] = names.join(' / ');
+
+        Storage.updateTournament(tournament);
+        this.render(container, tournament);
+      };
+    });
+
     // 카드 빈 영역 클릭 → 스코어 입력 (멤버 선택 중이면 해제)
     const isMember = !App.isAdmin && !!App.memberName;
     cards.forEach(card => {
@@ -882,6 +1081,7 @@ const Schedule = {
         if (selectedPlayer) {
           selectedPlayer.el.classList.remove('bg-green-200', 'ring-2', 'ring-green-500', 'rounded');
           container.querySelectorAll('.replace-player-btn').forEach(b => b.remove());
+          unhighlightRestingBadges();
           selectedPlayer = null;
           return;
         }

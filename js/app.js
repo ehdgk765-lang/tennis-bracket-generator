@@ -692,6 +692,11 @@ const App = {
               ${this.generateTimeOptions('10:00')}
             </select>
           </div>
+          <div class="flex gap-1.5 mt-2">
+            <button type="button" class="quick-time-btn px-3 py-1 text-xs border border-gray-300 rounded-lg text-gray-600 hover:bg-green-50 hover:border-green-400 hover:text-green-700 transition" data-start="20:00" data-end="22:00">20~22</button>
+            <button type="button" class="quick-time-btn px-3 py-1 text-xs border border-gray-300 rounded-lg text-gray-600 hover:bg-green-50 hover:border-green-400 hover:text-green-700 transition" data-start="18:00" data-end="21:00">18~21</button>
+            <button type="button" class="quick-time-btn px-3 py-1 text-xs border border-gray-300 rounded-lg text-gray-600 hover:bg-green-50 hover:border-green-400 hover:text-green-700 transition" data-start="19:00" data-end="22:00">19~22</button>
+          </div>
           <p id="time-info" class="text-xs text-gray-500 mt-1"></p>
         </div>
 
@@ -827,6 +832,15 @@ const App = {
 
     container.querySelector('#start-time').onchange = () => this.updateSchedulePreview(container);
     container.querySelector('#end-time').onchange = () => this.updateSchedulePreview(container);
+
+    // 빠른 시간 설정 버튼
+    container.querySelectorAll('.quick-time-btn').forEach(btn => {
+      btn.onclick = () => {
+        container.querySelector('#start-time').value = btn.dataset.start;
+        container.querySelector('#end-time').value = btn.dataset.end;
+        this.updateSchedulePreview(container);
+      };
+    });
     container.querySelectorAll('input[name="courts"]').forEach(r => {
       r.onchange = () => this.updateSchedulePreview(container);
     });

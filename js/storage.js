@@ -151,6 +151,12 @@ const Storage = {
       }).catch(err => {
         console.error('Firestore transaction error:', err);
         this._lastSyncedTournamentsJson = null;
+        // Transaction 실패 시 직접 쓰기로 폴백 (데이터 유실 방지)
+        docRef.set({ json: JSON.stringify(localData || []) }).then(() => {
+          this._lastSyncedTournamentsJson = JSON.stringify(localData || []);
+        }).catch(e2 => {
+          console.error('Firestore fallback write error:', e2);
+        });
       });
     } else {
       // players/teams 또는 skipMerge(삭제 등)는 직접 덮어쓰기
@@ -189,16 +195,17 @@ const Storage = {
         if (local.length > 0) this.syncToFirestore('players', local);
       }
 
-      // Tournaments: 리모트가 있으면 매치 단위 병합 (스코어 보존), 없으면 로컬 업로드
+      // Tournaments: 양방향 병합으로 로컬 미동기 항목 보존
       if (tDoc.exists) {
         const d = tDoc.data();
         const remoteJson = d.json || '[]';
         const remote = JSON.parse(remoteJson);
         const local = this.getTournaments();
-        const merged = this._mergeTournaments(local, remote);
+        // localStorage: 양방향 병합 (로컬 전용 항목 보존 — Transaction 미완료 시 유실 방지)
+        const merged = this._mergeTournamentsBoth(local, remote);
         const mergedJson = JSON.stringify(merged);
         localStorage.setItem(this.KEYS.TOURNAMENTS, mergedJson);
-        // 병합으로 로컬 스코어가 추가된 경우에만 Firestore에 반영 (불필요한 덮어쓰기 방지)
+        // Firestore에 병합 결과 반영 (Transaction이 양방향 병합하므로 안전)
         if (mergedJson !== remoteJson) {
           this._lastSyncedTournamentsJson = mergedJson;
           this.syncToFirestore('tournaments', merged);
@@ -292,9 +299,9 @@ const Storage = {
       }
       this._lastSyncedTournamentsJson = null;
       const remoteItems = JSON.parse(remoteJson);
-      // tournament 단위 병합: lastModified가 더 최신인 쪽을 유지
+      // 양방향 병합: 로컬 전용 항목 보존 (Transaction 미완료 시 유실 방지)
       const localItems = this.getTournaments();
-      const merged = this._mergeTournaments(localItems, remoteItems);
+      const merged = this._mergeTournamentsBoth(localItems, remoteItems);
       const current = localStorage.getItem(this.KEYS.TOURNAMENTS);
       const newJson = JSON.stringify(merged);
       if (current !== newJson) {
