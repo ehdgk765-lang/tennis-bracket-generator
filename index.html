@@ -12,7 +12,7 @@
   <link rel="manifest" href="manifest.json">
   <title>Happy-Tennis-Life</title>
   <script>
-    // 앱 버전 — 배포 시 이 값을 변경하면 모바일에서 자동 새로고침
+    // 앱 버전 — 배포 시 이 값만 변경하면 자동 새로고침 + 캐시 무효화
     var APP_VERSION = '1.0.4';
     (function() {
       var prev = localStorage.getItem('app_version');
@@ -22,6 +22,22 @@
         return;
       }
       localStorage.setItem('app_version', APP_VERSION);
+      // data-versioned 속성이 있는 script/link 태그에 ?v= 자동 부여
+      var observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(m) {
+          m.addedNodes.forEach(function(node) {
+            if (node.nodeType !== 1) return;
+            if (node.hasAttribute && node.hasAttribute('data-versioned')) {
+              var attr = node.tagName === 'LINK' ? 'href' : 'src';
+              var val = node.getAttribute(attr);
+              if (val && val.indexOf('?v=') === -1) {
+                node.setAttribute(attr, val + '?v=' + APP_VERSION);
+              }
+            }
+          });
+        });
+      });
+      observer.observe(document.documentElement, { childList: true, subtree: true });
     })();
   </script>
   <script>
@@ -62,7 +78,7 @@
       morphdom(el, tmp, { childrenOnly: true });
     }
   </script>
-  <link rel="stylesheet" href="css/style.css?v=1.0.3">
+  <link rel="stylesheet" href="css/style.css" data-versioned>
 </head>
 <body class="bg-gradient-to-br from-green-50 via-emerald-50/30 to-gray-50 min-h-screen">
 
@@ -148,18 +164,18 @@
   </div>
 
   <!-- JS 모듈 (의존성 순서대로) -->
-  <script src="js/utils.js?v=1.0.3"></script>
-  <script src="js/firebase-config.js?v=1.0.3"></script>
-  <script src="js/storage.js?v=1.0.3"></script>
-  <script src="js/results.js?v=1.0.3"></script>
-  <script src="js/players.js?v=1.0.3"></script>
-  <script src="js/tournament.js?v=1.0.3"></script>
-  <script src="js/league.js?v=1.0.3"></script>
-  <script src="js/schedule.js?v=1.0.3"></script>
-  <script src="js/custom-bracket.js?v=1.0.3"></script>
-  <script src="js/stats.js?v=1.0.3"></script>
-  <script src="js/app.js?v=1.0.3"></script>
-  <script src="js/auth.js?v=1.0.3"></script>
+  <script src="js/utils.js" data-versioned></script>
+  <script src="js/firebase-config.js" data-versioned></script>
+  <script src="js/storage.js" data-versioned></script>
+  <script src="js/results.js" data-versioned></script>
+  <script src="js/players.js" data-versioned></script>
+  <script src="js/tournament.js" data-versioned></script>
+  <script src="js/league.js" data-versioned></script>
+  <script src="js/schedule.js" data-versioned></script>
+  <script src="js/custom-bracket.js" data-versioned></script>
+  <script src="js/stats.js" data-versioned></script>
+  <script src="js/app.js" data-versioned></script>
+  <script src="js/auth.js" data-versioned></script>
   <script>
     // 테마 토글 로직
     (function() {
