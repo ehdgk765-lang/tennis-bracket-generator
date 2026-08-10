@@ -140,7 +140,7 @@ const Storage = {
         let finalData = localData;
         if (doc.exists) {
           const remote = JSON.parse(doc.data().json || '[]');
-          finalData = this._mergeTournaments(localData, remote);
+          finalData = this._mergeTournamentsBoth(localData, remote);
         }
         const finalJson = JSON.stringify(finalData || []);
         transaction.set(docRef, { json: finalJson });
@@ -331,6 +331,7 @@ const Storage = {
   },
 
   // tournament 단위 병합: 리모트 기준, 양쪽 모두 있으면 매치 단위 스코어 병합
+  // (loadFromFirestore, onSnapshot 용: 리모트를 정본으로 사용)
   _mergeTournaments(localList, remoteList) {
     const localMap = new Map(localList.map(t => [t.id, t]));
     const merged = [];
@@ -338,6 +339,24 @@ const Storage = {
       const local = localMap.get(remote.id);
       if (!local) { merged.push(remote); continue; }
       merged.push(this._mergeOneTournament(local, remote));
+    }
+    return merged;
+  },
+
+  // Transaction 전용 양방향 병합: 양쪽 항목 모두 보존
+  // (로컬 새 대진표 + 리모트 동시 추가분 모두 유지, 삭제는 skipMerge로 별도 처리)
+  _mergeTournamentsBoth(listA, listB) {
+    const mapB = new Map(listB.map(t => [t.id, t]));
+    const seenIds = new Set();
+    const merged = [];
+    for (const a of listA) {
+      seenIds.add(a.id);
+      const b = mapB.get(a.id);
+      if (!b) { merged.push(a); continue; }
+      merged.push(this._mergeOneTournament(a, b));
+    }
+    for (const b of listB) {
+      if (!seenIds.has(b.id)) merged.push(b);
     }
     return merged;
   },
