@@ -1,12 +1,12 @@
-// storage.js - localStorage CRUD + Firestore 동기화
+// storage.js - 메모리 기반 데이터 관리 + Firestore 동기화
+// 원칙: Firestore(DB)가 정본. 메모리 캐시는 즉시 읽기용. localStorage 사용 안 함.
 const Storage = {
-  KEYS: {
-    PLAYERS: 'tennis_players',
-    TOURNAMENTS: 'tennis_tournaments',
-    TEAMS: 'tennis_teams',
-  },
 
-  // 멤버 모드 지원
+  // ─── 메모리 캐시 ───
+  _data: { players: [], tournaments: [], teams: [] },
+  _json: { players: '[]', tournaments: '[]', teams: '[]' },
+
+  // ─── 멤버 모드 ───
   _adminUID: null,
   _isMemberMode: false,
 
@@ -21,94 +21,67 @@ const Storage = {
     this._isMemberMode = false;
   },
 
-  get(key) {
-    try {
-      const data = localStorage.getItem(key);
-      return data ? JSON.parse(data) : null;
-    } catch (e) {
-      console.error('Storage get error:', e);
-      return null;
-    }
+  clearData() {
+    this._data = { players: [], tournaments: [], teams: [] };
+    this._json = { players: '[]', tournaments: '[]', teams: '[]' };
   },
 
-  set(key, value) {
-    try {
-      localStorage.setItem(key, JSON.stringify(value));
-      return true;
-    } catch (e) {
-      console.error('Storage set error:', e);
-      return false;
-    }
+  // ─── 읽기 (메모리에서 즉시 반환) ───
+  getPlayers() { return this._data.players; },
+  getTournaments() { return this._data.tournaments; },
+  getTeams() { return this._data.teams; },
+
+  getTournamentById(id) {
+    return this._data.tournaments.find(t => t.id === id) || null;
   },
 
-  // 멤버 관련
-  getPlayers() {
-    return this.get(this.KEYS.PLAYERS) || [];
-  },
-
+  // ─── 쓰기 (메모리 갱신 + Firestore 동기화) ───
   savePlayers(players) {
     if (this._isMemberMode) return false;
-    this._writeGuardPlayers++;
-    const result = this.set(this.KEYS.PLAYERS, players);
-    this.syncToFirestore('players', players);
-    return result;
-  },
-
-  // 팀 관련
-  getTeams() {
-    return this.get(this.KEYS.TEAMS) || [];
+    this._setLocal('players', players);
+    this._syncToFirestore('players');
+    return true;
   },
 
   saveTeams(teams) {
     if (this._isMemberMode) return false;
-    this._writeGuardTeams++;
-    const result = this.set(this.KEYS.TEAMS, teams);
-    this.syncToFirestore('teams', teams);
-    return result;
-  },
-
-  // 대회 관련
-  getTournaments() {
-    return this.get(this.KEYS.TOURNAMENTS) || [];
+    this._setLocal('teams', teams);
+    this._syncToFirestore('teams');
+    return true;
   },
 
   saveTournaments(tournaments) {
-    const result = this.set(this.KEYS.TOURNAMENTS, tournaments);
-    this._lastSyncedTournamentsJson = JSON.stringify(tournaments);
-    this.syncToFirestore('tournaments', tournaments);
-    return result;
-  },
-
-  getTournamentById(id) {
-    const tournaments = this.getTournaments();
-    return tournaments.find(t => t.id === id) || null;
+    this._setLocal('tournaments', tournaments);
+    this._syncToFirestore('tournaments');
+    return true;
   },
 
   updateTournament(updatedTournament) {
     updatedTournament.lastModified = Date.now();
-    const tournaments = this.getTournaments();
-    const index = tournaments.findIndex(t => t.id === updatedTournament.id);
-    if (index !== -1) {
-      tournaments[index] = updatedTournament;
-      this.saveTournaments(tournaments);
-      return true;
-    }
-    return false;
+    const list = this._data.tournaments;
+    const idx = list.findIndex(t => t.id === updatedTournament.id);
+    if (idx === -1) return false;
+    list[idx] = updatedTournament;
+    this._setLocal('tournaments', list);
+    this._syncToFirestore('tournaments');
+    return true;
   },
 
   deleteTournament(id) {
     if (this._isMemberMode) return;
-    const tournaments = this.getTournaments().filter(t => t.id !== id);
-    // 삭제는 병합 없이 직접 덮어쓰기 (삭제한 대진표가 remote에서 부활하지 않도록)
-    const result = this.set(this.KEYS.TOURNAMENTS, tournaments);
-    this._lastSyncedTournamentsJson = JSON.stringify(tournaments);
-    this.syncToFirestore('tournaments', tournaments, true);
-    return result;
+    const filtered = this._data.tournaments.filter(t => t.id !== id);
+    this._setLocal('tournaments', filtered);
+    this._syncToFirestore('tournaments');
   },
 
-  // 유틸리티
   generateId() {
     return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+  },
+
+  // ─── 내부: 메모리 캐시 갱신 ───
+  _setLocal(docName, data) {
+    this._data[docName] = data;
+    this._json[docName] = JSON.stringify(data);
   },
 
   // ─── Firestore 동기화 ───
@@ -117,63 +90,26 @@ const Storage = {
   _unsubTournaments: null,
   _unsubTeams: null,
 
-  // 쓰기 가드: 로컬 저장 직후 onSnapshot 자기 수신 차단
-  _writeGuardPlayers: 0,
-  _writeGuardTeams: 0,
-  // tournaments는 내용 비교 방식으로 echo 감지 (동시 입력 지원)
-  _lastSyncedTournamentsJson: null,
+  // 쓰기 진행 중 플래그 (onSnapshot 무시용)
+  _writing: { players: false, tournaments: false, teams: false },
 
-  // localStorage → Firestore (JSON 문자열로 직렬화하여 저장)
-  syncToFirestore(docName, data, skipMerge) {
+  // 메모리 → Firestore
+  _syncToFirestore(docName) {
     const uid = this._getDataUID();
     if (!uid) return;
-    // 멤버 모드에서는 대회(스코어 입력)만 쓰기 허용
     if (this._isMemberMode && docName !== 'tournaments') return;
 
+    this._writing[docName] = true;
     const docRef = fbDb.collection('users').doc(uid).collection('data').doc(docName);
-
-    if (docName === 'tournaments' && !skipMerge) {
-      // Transaction으로 병합 쓰기: 동시 쓰기 시 데이터 손실 방지
-      const localData = data;
-      fbDb.runTransaction(async (transaction) => {
-        const doc = await transaction.get(docRef);
-        let finalData = localData;
-        if (doc.exists) {
-          const remote = JSON.parse(doc.data().json || '[]');
-          finalData = this._mergeTournamentsBoth(localData, remote);
-        }
-        const finalJson = JSON.stringify(finalData || []);
-        transaction.set(docRef, { json: finalJson });
-        return finalJson;
-      }).then(finalJson => {
-        // Transaction 완료 후 실제 기록된 내용으로 echo guard 갱신
-        this._lastSyncedTournamentsJson = finalJson;
-      }).catch(err => {
-        console.error('Firestore transaction error:', err);
-        this._lastSyncedTournamentsJson = null;
-        // Transaction 실패 시 직접 쓰기로 폴백 (데이터 유실 방지)
-        docRef.set({ json: JSON.stringify(localData || []) }).then(() => {
-          this._lastSyncedTournamentsJson = JSON.stringify(localData || []);
-        }).catch(e2 => {
-          console.error('Firestore fallback write error:', e2);
-        });
+    docRef.set({ json: this._json[docName] })
+      .then(() => { this._writing[docName] = false; })
+      .catch(err => {
+        console.error('Firestore sync error:', err);
+        this._writing[docName] = false;
       });
-    } else {
-      // players/teams 또는 skipMerge(삭제 등)는 직접 덮어쓰기
-      docRef.set({ json: JSON.stringify(data || []) })
-        .catch(err => {
-          console.error('Firestore sync error:', err);
-          if (docName === 'tournaments') {
-            this._lastSyncedTournamentsJson = null;
-          } else {
-            const guardKey = '_writeGuard' + docName.charAt(0).toUpperCase() + docName.slice(1);
-            if (this[guardKey] > 0) this[guardKey]--;
-          }
-        });
-    }
   },
 
-  // Firestore → localStorage (관리자 로그인 시: 리모트 우선)
+  // Firestore → 메모리 (로그인 시 초기 로드)
   async loadFromFirestore() {
     const uid = this._getDataUID();
     if (!uid) return;
@@ -185,51 +121,15 @@ const Storage = {
         base.doc('teams').get()
       ]);
 
-      // Players: 리모트가 있으면 리모트 사용, 없으면 로컬 업로드
-      if (pDoc.exists) {
-        const d = pDoc.data();
-        const remote = d.json ? JSON.parse(d.json) : (d.items || []);
-        localStorage.setItem(this.KEYS.PLAYERS, JSON.stringify(remote));
-      } else {
-        const local = this.getPlayers();
-        if (local.length > 0) this.syncToFirestore('players', local);
-      }
-
-      // Tournaments: 양방향 병합으로 로컬 미동기 항목 보존
-      if (tDoc.exists) {
-        const d = tDoc.data();
-        const remoteJson = d.json || '[]';
-        const remote = JSON.parse(remoteJson);
-        const local = this.getTournaments();
-        // localStorage: 양방향 병합 (로컬 전용 항목 보존 — Transaction 미완료 시 유실 방지)
-        const merged = this._mergeTournamentsBoth(local, remote);
-        const mergedJson = JSON.stringify(merged);
-        localStorage.setItem(this.KEYS.TOURNAMENTS, mergedJson);
-        // Firestore에 병합 결과 반영 (Transaction이 양방향 병합하므로 안전)
-        if (mergedJson !== remoteJson) {
-          this._lastSyncedTournamentsJson = mergedJson;
-          this.syncToFirestore('tournaments', merged);
-        }
-      } else {
-        const local = this.getTournaments();
-        if (local.length > 0) this.syncToFirestore('tournaments', local);
-      }
-
-      // Teams: 리모트가 있으면 리모트 사용, 없으면 로컬 업로드
-      if (teamsDoc.exists) {
-        const d = teamsDoc.data();
-        const remote = d.json ? JSON.parse(d.json) : (d.items || []);
-        localStorage.setItem(this.KEYS.TEAMS, JSON.stringify(remote));
-      } else {
-        const local = this.getTeams();
-        if (local.length > 0) this.syncToFirestore('teams', local);
-      }
+      this._loadDoc('players', pDoc);
+      this._loadDoc('tournaments', tDoc);
+      this._loadDoc('teams', teamsDoc);
     } catch (err) {
       console.error('Firestore load error:', err);
     }
   },
 
-  // Firestore → localStorage (멤버 로그인 시: 관리자 데이터 읽기 전용)
+  // Firestore → 메모리 (멤버 로그인 시)
   async loadFromFirestoreAsAdmin(adminUID) {
     this._adminUID = adminUID;
     this._isMemberMode = true;
@@ -241,24 +141,20 @@ const Storage = {
         base.doc('teams').get()
       ]);
 
-      if (pDoc.exists) {
-        const d = pDoc.data();
-        const items = d.json ? JSON.parse(d.json) : (d.items || []);
-        localStorage.setItem(this.KEYS.PLAYERS, JSON.stringify(items));
-      }
-      if (tDoc.exists) {
-        const d = tDoc.data();
-        const items = d.json ? JSON.parse(d.json) : (d.items || []);
-        localStorage.setItem(this.KEYS.TOURNAMENTS, JSON.stringify(items));
-      }
-      if (teamsDoc.exists) {
-        const d = teamsDoc.data();
-        const items = d.json ? JSON.parse(d.json) : (d.items || []);
-        localStorage.setItem(this.KEYS.TEAMS, JSON.stringify(items));
-      }
+      this._loadDoc('players', pDoc);
+      this._loadDoc('tournaments', tDoc);
+      this._loadDoc('teams', teamsDoc);
     } catch (err) {
       console.error('Member Firestore load error:', err);
     }
+  },
+
+  _loadDoc(docName, doc) {
+    if (!doc.exists) return;
+    const d = doc.data();
+    const json = d.json || '[]';
+    this._json[docName] = json;
+    this._data[docName] = JSON.parse(json);
   },
 
   // ─── 실시간 동기화 (onSnapshot) ───
@@ -268,160 +164,32 @@ const Storage = {
     if (!uid) return;
     const base = fbDb.collection('users').doc(uid).collection('data');
 
-    this._unsubPlayers = base.doc('players').onSnapshot((doc) => {
-      if (doc.metadata.hasPendingWrites) return;
-      if (!doc.exists) return;
-      if (this._writeGuardPlayers > 0) {
-        this._writeGuardPlayers--;
-        return;
-      }
-      const d = doc.data();
-      const items = d.json ? JSON.parse(d.json) : (d.items || []);
-      const current = localStorage.getItem(this.KEYS.PLAYERS);
-      const newJson = JSON.stringify(items);
-      if (current !== newJson) {
-        localStorage.setItem(this.KEYS.PLAYERS, newJson);
+    const listen = (docName) => {
+      return base.doc(docName).onSnapshot((doc) => {
+        if (doc.metadata.hasPendingWrites) return;
+        if (!doc.exists) return;
+        if (this._writing[docName]) return; // 쓰기 진행 중이면 무시
+        const remoteJson = doc.data().json || '[]';
+        if (remoteJson === this._json[docName]) return; // 동일 데이터면 무시
+        // DB가 정본 → 메모리 갱신
+        this._json[docName] = remoteJson;
+        this._data[docName] = JSON.parse(remoteJson);
         this._onRemoteChange();
-      }
-    }, (err) => {
-      console.error('Players realtime sync error:', err);
-    });
+      }, (err) => {
+        console.error(`${docName} realtime sync error:`, err);
+      });
+    };
 
-    this._unsubTournaments = base.doc('tournaments').onSnapshot((doc) => {
-      if (doc.metadata.hasPendingWrites) return;
-      if (!doc.exists) return;
-      const d = doc.data();
-      const remoteJson = d.json || '[]';
-      // 내용 비교로 자기 echo 감지 (카운터 방식 대신)
-      if (this._lastSyncedTournamentsJson && remoteJson === this._lastSyncedTournamentsJson) {
-        this._lastSyncedTournamentsJson = null;
-        return;
-      }
-      this._lastSyncedTournamentsJson = null;
-      const remoteItems = JSON.parse(remoteJson);
-      // 양방향 병합: 로컬 전용 항목 보존 (Transaction 미완료 시 유실 방지)
-      const localItems = this.getTournaments();
-      const merged = this._mergeTournamentsBoth(localItems, remoteItems);
-      const current = localStorage.getItem(this.KEYS.TOURNAMENTS);
-      const newJson = JSON.stringify(merged);
-      if (current !== newJson) {
-        localStorage.setItem(this.KEYS.TOURNAMENTS, newJson);
-        this._onRemoteChange();
-      }
-      // 병합으로 로컬 스코어가 추가된 경우 Firestore에도 반영
-      if (newJson !== remoteJson) {
-        this._lastSyncedTournamentsJson = newJson;
-        this.syncToFirestore('tournaments', merged);
-      }
-    }, (err) => {
-      console.error('Tournaments realtime sync error:', err);
-    });
-
-    this._unsubTeams = base.doc('teams').onSnapshot((doc) => {
-      if (doc.metadata.hasPendingWrites) return;
-      if (!doc.exists) return;
-      if (this._writeGuardTeams > 0) {
-        this._writeGuardTeams--;
-        return;
-      }
-      const d = doc.data();
-      const items = d.json ? JSON.parse(d.json) : (d.items || []);
-      const current = localStorage.getItem(this.KEYS.TEAMS);
-      const newJson = JSON.stringify(items);
-      if (current !== newJson) {
-        localStorage.setItem(this.KEYS.TEAMS, newJson);
-        this._onRemoteChange();
-      }
-    }, (err) => {
-      console.error('Teams realtime sync error:', err);
-    });
-  },
-
-  // tournament 단위 병합: 리모트 기준, 양쪽 모두 있으면 매치 단위 스코어 병합
-  // (loadFromFirestore, onSnapshot 용: 리모트를 정본으로 사용)
-  _mergeTournaments(localList, remoteList) {
-    const localMap = new Map(localList.map(t => [t.id, t]));
-    const merged = [];
-    for (const remote of remoteList) {
-      const local = localMap.get(remote.id);
-      if (!local) { merged.push(remote); continue; }
-      merged.push(this._mergeOneTournament(local, remote));
-    }
-    return merged;
-  },
-
-  // Transaction 전용 양방향 병합: 양쪽 항목 모두 보존
-  // (로컬 새 대진표 + 리모트 동시 추가분 모두 유지, 삭제는 skipMerge로 별도 처리)
-  _mergeTournamentsBoth(listA, listB) {
-    const mapB = new Map(listB.map(t => [t.id, t]));
-    const seenIds = new Set();
-    const merged = [];
-    for (const a of listA) {
-      seenIds.add(a.id);
-      const b = mapB.get(a.id);
-      if (!b) { merged.push(a); continue; }
-      merged.push(this._mergeOneTournament(a, b));
-    }
-    for (const b of listB) {
-      if (!seenIds.has(b.id)) merged.push(b);
-    }
-    return merged;
-  },
-
-  // 단일 대회 매치 단위 병합: 스코어가 있는 매치를 우선 보존
-  _mergeOneTournament(local, remote) {
-    const lm = local.lastModified || 0;
-    const rm = remote.lastModified || 0;
-    const base = JSON.parse(JSON.stringify(lm >= rm ? local : remote));
-    const other = lm >= rm ? remote : local;
-
-    // 매치 맵 구축 (other 쪽)
-    const otherMatches = new Map();
-    this._forEachMatch(other, m => { if (m.id) otherMatches.set(m.id, m); });
-
-    // base의 각 매치에 대해: base에 스코어 없고 other에 있으면 other 스코어 적용
-    this._forEachMatch(base, m => {
-      if (!m.id) return;
-      const om = otherMatches.get(m.id);
-      if (!om) return;
-      if (!m.scores && om.scores) {
-        m.scores = om.scores;
-        m.winner = om.winner;
-      }
-    });
-
-    // lastModified는 더 최신 값 사용
-    base.lastModified = Math.max(lm, rm);
-    return base;
-  },
-
-  // 대회 내 모든 매치를 순회하는 헬퍼
-  _forEachMatch(tournament, fn) {
-    if (tournament.timeSlots) {
-      for (const slot of tournament.timeSlots) {
-        if (slot.matches) slot.matches.forEach(fn);
-      }
-    }
-    if (tournament.rounds) {
-      for (const round of tournament.rounds) {
-        if (Array.isArray(round)) round.forEach(fn);
-      }
-    }
+    this._unsubPlayers = listen('players');
+    this._unsubTournaments = listen('tournaments');
+    this._unsubTeams = listen('teams');
   },
 
   stopRealtimeSync() {
-    if (this._unsubPlayers) {
-      this._unsubPlayers();
-      this._unsubPlayers = null;
-    }
-    if (this._unsubTournaments) {
-      this._unsubTournaments();
-      this._unsubTournaments = null;
-    }
-    if (this._unsubTeams) {
-      this._unsubTeams();
-      this._unsubTeams = null;
-    }
+    ['Players', 'Tournaments', 'Teams'].forEach(name => {
+      const key = '_unsub' + name;
+      if (this[key]) { this[key](); this[key] = null; }
+    });
   },
 
   // 원격 변경 시 UI 갱신 (300ms 디바운싱)

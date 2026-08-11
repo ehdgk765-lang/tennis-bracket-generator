@@ -28,9 +28,7 @@ const Auth = {
             // ── 멤버 로그인 ──
             const adminUID = memberDoc.data().adminUID;
             this.loginMode = 'member';
-            localStorage.removeItem(Storage.KEYS.PLAYERS);
-            localStorage.removeItem(Storage.KEYS.TOURNAMENTS);
-            localStorage.removeItem(Storage.KEYS.TEAMS);
+            Storage.clearData();
 
             try {
               await Storage.loadFromFirestoreAsAdmin(adminUID);
@@ -79,9 +77,7 @@ const Auth = {
 
             const lastUid = localStorage.getItem('tennis_last_uid');
             if (lastUid && lastUid !== user.uid) {
-              localStorage.removeItem(Storage.KEYS.PLAYERS);
-              localStorage.removeItem(Storage.KEYS.TOURNAMENTS);
-              localStorage.removeItem(Storage.KEYS.TEAMS);
+              Storage.clearData();
             }
             localStorage.setItem('tennis_last_uid', user.uid);
 
@@ -580,9 +576,7 @@ const Auth = {
     if (this._logoutPending) return;
     this._logoutPending = true;
     if (await Modal.confirm('로그아웃 하시겠습니까?')) {
-      localStorage.removeItem(Storage.KEYS.PLAYERS);
-      localStorage.removeItem(Storage.KEYS.TOURNAMENTS);
-      localStorage.removeItem(Storage.KEYS.TEAMS);
+      Storage.clearData();
       localStorage.removeItem('tennis_last_uid');
       sessionStorage.removeItem('memberName');
       App.memberName = null;

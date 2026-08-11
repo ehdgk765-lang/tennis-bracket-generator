@@ -137,7 +137,7 @@ const Cipher = {
       return [...decoded].map((ch, i) =>
         String.fromCharCode(ch.charCodeAt(0) ^ k.charCodeAt(i % k.length))
       ).join('');
-    } catch { return ''; }
+    } catch (e) { return ''; }
   }
 };
 
