@@ -1,8 +1,11 @@
 {
   "name": "Happy Tennis Life",
   "short_name": "HTL",
+  "description": "테니스 대진표 생성/공유 웹앱",
   "start_url": ".",
+  "id": "/htl/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#ffffff",
   "theme_color": "#16a34a",
   "icons": [
@@ -15,6 +18,12 @@
       "src": "css/icon-512.png",
       "sizes": "512x512",
       "type": "image/png"
+    },
+    {
+      "src": "css/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
