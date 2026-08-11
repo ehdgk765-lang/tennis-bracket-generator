@@ -6,7 +6,7 @@ const App = {
   currentTab: 'players',
   currentTournamentId: null,
   _createSubTab: 'custom-bracket',
-  _scheduleSubTab: 'custom-schedule',
+  _scheduleSubTab: 'time-court',
 
   init() {
     this.applyRoleUI();
@@ -222,7 +222,7 @@ const App = {
       const setCount = parseInt(container.querySelector('input[name="setCount"]:checked').value);
       const config = GAME_TYPES[gameType];
 
-      if (!name) { alert('대회명을 입력해주세요.'); return; }
+      if (!name) { Modal.alert('대회명을 입력해주세요.'); return; }
 
       let participants;
 
@@ -231,7 +231,7 @@ const App = {
         if (!participants) return;
       } else {
         const selected = Array.from(container.querySelectorAll('.player-checkbox:checked')).map(cb => cb.value);
-        if (selected.length < 2) { alert('2명 이상 선택해주세요.'); return; }
+        if (selected.length < 2) { Modal.alert('2명 이상 선택해주세요.'); return; }
         participants = selected;
       }
 
@@ -434,11 +434,11 @@ const App = {
       const males = Array.from(container.querySelectorAll('.xd-male-cb:checked')).map(cb => cb.value);
       const females = Array.from(container.querySelectorAll('.xd-female-cb:checked')).map(cb => cb.value);
       if (males.length < 2 || females.length < 2) {
-        alert('혼합복식: 남자 2명, 여자 2명 이상 선택해주세요.');
+        Modal.alert('혼합복식: 남자 2명, 여자 2명 이상 선택해주세요.');
         return null;
       }
       if (males.length !== females.length) {
-        alert(`남녀 수가 같아야 합니다. (남 ${males.length}명, 여 ${females.length}명)`);
+        Modal.alert(`남녀 수가 같아야 합니다. (남 ${males.length}명, 여 ${females.length}명)`);
         return null;
       }
       const sm = this.shuffleArray(males);
@@ -447,11 +447,11 @@ const App = {
     } else {
       const selected = Array.from(container.querySelectorAll('.player-checkbox:checked')).map(cb => cb.value);
       if (selected.length < 4) {
-        alert('복식: 최소 4명 이상 선택해주세요.');
+        Modal.alert('복식: 최소 4명 이상 선택해주세요.');
         return null;
       }
       if (selected.length % 2 !== 0) {
-        alert('복식: 짝수 인원을 선택해주세요.');
+        Modal.alert('복식: 짝수 인원을 선택해주세요.');
         return null;
       }
       const shuffled = this.shuffleArray(selected);
@@ -872,14 +872,14 @@ const App = {
       const isSingles = container.querySelector('input[name="sch-match-type"]:checked')?.value === 'singles';
 
       if (startTime >= endTime) {
-        alert('종료 시간은 시작 시간보다 뒤여야 합니다.');
+        Modal.alert('종료 시간은 시작 시간보다 뒤여야 합니다.');
         return;
       }
 
       const totalPlayers = selectedMales.length + selectedFemales.length;
       const minPlayers = isSingles ? 2 : 4;
       if (totalPlayers < minPlayers) {
-        alert(`최소 ${minPlayers}명의 멤버를 선택해주세요.`);
+        Modal.alert(`최소 ${minPlayers}명의 멤버를 선택해주세요.`);
         return;
       }
 
@@ -889,9 +889,9 @@ const App = {
       const possibleTypes = Schedule.getPossibleTypes(selectedMales, selectedFemales, allowMixed, isSingles);
       if (possibleTypes.length === 0) {
         if (isSingles) {
-          alert('선택한 멤버 구성으로 단식 경기를 만들 수 없습니다.\n남자단식: 남2명, 여자단식: 여2명 이상 필요\n또는 섞어단식 허용을 체크해주세요.');
+          Modal.alert('선택한 멤버 구성으로 단식 경기를 만들 수 없습니다.\n남자단식: 남2명, 여자단식: 여2명 이상 필요\n또는 섞어단식 허용을 체크해주세요.');
         } else {
-          alert('선택한 멤버 구성으로 복식 경기를 만들 수 없습니다.\n혼합복식: 남2+여2, 남자복식: 남4, 여자복식: 여4 이상 필요\n또는 섞어복식 허용을 체크해주세요.');
+          Modal.alert('선택한 멤버 구성으로 복식 경기를 만들 수 없습니다.\n혼합복식: 남2+여2, 남자복식: 남4, 여자복식: 여4 이상 필요\n또는 섞어복식 허용을 체크해주세요.');
         }
         return;
       }
@@ -899,7 +899,7 @@ const App = {
       const timeSlots = Schedule.generate(selectedMales, selectedFemales, courts, startTime, endTime, allowMixed, isSingles);
 
       if (timeSlots.length === 0) {
-        alert('시간이 부족합니다. 최소 30분 이상 설정해주세요.');
+        Modal.alert('시간이 부족합니다. 최소 30분 이상 설정해주세요.');
         return;
       }
 
@@ -1169,10 +1169,10 @@ const App = {
     // 삭제 버튼 (관리자만)
     container.querySelectorAll('.delete-tournament-btn').forEach(btn => {
       if (!this.isAdmin) return;
-      btn.onclick = (e) => {
+      btn.onclick = async (e) => {
         e.stopPropagation();
         const name = Storage.getTournamentById(btn.dataset.id)?.name || '';
-        if (!confirm(`"${name}" 대회를 삭제하시겠습니까?`)) return;
+        if (!await Modal.confirm(`"${name}" 대회를 삭제하시겠습니까?`)) return;
         Storage.deleteTournament(btn.dataset.id);
         this.renderTournamentList(container);
       };
@@ -1324,7 +1324,7 @@ const App = {
 
               await secondaryAuth.signOut();
               modal.remove(); unlockScroll();
-              alert('멤버 계정이 생성되었습니다.');
+              Modal.alert('멤버 계정이 생성되었습니다.');
             } finally {
               await secondaryApp.delete();
             }
@@ -1346,7 +1346,7 @@ const App = {
 
               await secondaryAuth.signOut();
               modal.remove(); unlockScroll();
-              alert('비밀번호가 변경되었습니다.');
+              Modal.alert('비밀번호가 변경되었습니다.');
             } finally {
               await secondaryApp.delete();
             }
@@ -1381,7 +1381,7 @@ const App = {
       const deleteBtn = modal.querySelector('#ma-delete-btn');
       if (deleteBtn) {
         deleteBtn.onclick = async () => {
-          if (!confirm('멤버 계정을 삭제하시겠습니까?\n멤버들이 더 이상 로그인할 수 없습니다.')) return;
+          if (!await Modal.confirm('멤버 계정을 삭제하시겠습니까?\n멤버들이 더 이상 로그인할 수 없습니다.')) return;
           try {
             // 보조 앱으로 로그인하여 Auth 계정 삭제
             const authEmail = Auth.toMemberEmail(acctLoginId);
@@ -1399,7 +1399,7 @@ const App = {
             // Firestore 문서 삭제
             await fbDb.collection('memberAccounts').doc(acctUID).delete();
             modal.remove(); unlockScroll();
-            alert('멤버 계정이 삭제되었습니다.');
+            Modal.alert('멤버 계정이 삭제되었습니다.');
           } catch (e) {
             errorEl.textContent = '삭제 중 오류가 발생했습니다.';
             errorEl.classList.remove('hidden');
@@ -1412,7 +1412,7 @@ const App = {
       modal.onclick = (e) => { if (e.target === modal) { modal.remove(); unlockScroll(); } };
     }).catch(() => {
       modal.remove(); unlockScroll();
-      alert('멤버 계정 정보를 불러올 수 없습니다.');
+      Modal.alert('멤버 계정 정보를 불러올 수 없습니다.');
     });
   },
 };

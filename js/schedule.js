@@ -827,12 +827,12 @@ const Schedule = {
         // 대진표 재생성 버튼
         const regenBtn = overviewEl.querySelector('.assign-regen-btn');
         if (regenBtn) {
-          regenBtn.onclick = () => {
+          regenBtn.onclick = async () => {
             // 기존 스코어 확인
             const hasScores = (tournament.timeSlots || []).some(slot =>
               slot.matches.some(m => m.scores || m.winner)
             );
-            if (hasScores && !confirm('입력된 스코어가 초기화됩니다. 계속하시겠습니까?')) return;
+            if (hasScores && !await Modal.confirm('입력된 스코어가 초기화됩니다. 계속하시겠습니까?')) return;
 
             // lateEntries 수집
             const lateEntries = {};
@@ -994,7 +994,7 @@ const Schedule = {
             [t1[src.pos], t2[tgt.pos]] = [t2[tgt.pos], t1[src.pos]];
             const all = [...t1, ...t2];
             if (new Set(all).size !== all.length) {
-              alert('같은 멤버가 동일 경기에 중복됩니다.');
+              Modal.alert('같은 멤버가 동일 경기에 중복됩니다.');
               clearSel();
               return;
             }
@@ -1011,7 +1011,7 @@ const Schedule = {
 
             if (new Set([...srcTeam, ...srcOther]).size !== srcTeam.length + srcOther.length
               || new Set([...tgtTeam, ...tgtOther]).size !== tgtTeam.length + tgtOther.length) {
-              alert('같은 멤버가 동일 경기에 중복됩니다.');
+              Modal.alert('같은 멤버가 동일 경기에 중복됩니다.');
               clearSel();
               return;
             }
@@ -1031,7 +1031,7 @@ const Schedule = {
               const tgtSlotOthers = getNamesInSlot(tgt.slotIdx, tgt.matchIdx);
               // swap 후: tgt.name → srcSlot, src.name → tgtSlot
               if (srcSlotOthers.has(tgt.name) || tgtSlotOthers.has(src.name)) {
-                alert('같은 시간대에 동일 멤버가 중복됩니다.');
+                Modal.alert('같은 시간대에 동일 멤버가 중복됩니다.');
                 clearSel();
                 return;
               }
@@ -1117,14 +1117,14 @@ const Schedule = {
     // 대진 삭제 (X 버튼, 관리자만)
     container.querySelectorAll('.delete-match-btn').forEach(btn => {
       if (!App.isAdmin) return;
-      btn.onclick = (e) => {
+      btn.onclick = async (e) => {
         e.stopPropagation();
         const si = +btn.dataset.slotIdx;
         const mi = +btn.dataset.matchIdx;
         const match = tournament.timeSlots[si]?.matches[mi];
         if (!match) return;
         const label = `${match.player1} vs ${match.player2}`;
-        if (!confirm(`이 대진을 삭제하시겠습니까?\n${label}`)) return;
+        if (!await Modal.confirm(`이 대진을 삭제하시겠습니까?\n${label}`)) return;
         tournament.timeSlots[si].matches.splice(mi, 1);
         Storage.updateTournament(tournament);
         this.render(container, tournament);
@@ -1196,7 +1196,7 @@ const Schedule = {
           const dupInSrc = [...tgtMatchNames].filter(n => srcSlotOthers.has(n));
           if (dupInTgt.length > 0 || dupInSrc.length > 0) {
             const dups = [...new Set([...dupInTgt, ...dupInSrc])];
-            alert(`같은 시간대에 동일 멤버가 중복됩니다:\n${dups.join(', ')}`);
+            Modal.alert(`같은 시간대에 동일 멤버가 중복됩니다:\n${dups.join(', ')}`);
             return;
           }
         }
@@ -1397,7 +1397,7 @@ const Schedule = {
       pdf.save(`${tournament.name}.pdf`);
     } catch (e) {
       console.error('PDF 생성 오류:', e);
-      alert('PDF 생성 중 오류가 발생했습니다.');
+      Modal.alert('PDF 생성 중 오류가 발생했습니다.');
     } finally {
       btn.innerHTML = origText;
       btn.disabled = false;
@@ -1665,21 +1665,21 @@ const Schedule = {
         const { t1p1, t1p2, t2p1, t2p2 } = selected;
         if (isSingles) {
           if (!t1p1 || !t2p1) {
-            alert('모든 선수를 선택해주세요.');
+            Modal.alert('모든 선수를 선택해주세요.');
             return;
           }
           if (t1p1 === t2p1) {
-            alert('같은 선수를 선택할 수 없습니다.');
+            Modal.alert('같은 선수를 선택할 수 없습니다.');
             return;
           }
         } else {
           if (!t1p1 || !t1p2 || !t2p1 || !t2p2) {
-            alert('모든 멤버를 선택해주세요.');
+            Modal.alert('모든 멤버를 선택해주세요.');
             return;
           }
           const names = [t1p1, t1p2, t2p1, t2p2];
           if (new Set(names).size !== 4) {
-            alert('중복된 멤버가 있습니다.');
+            Modal.alert('중복된 멤버가 있습니다.');
             return;
           }
         }
@@ -1696,7 +1696,7 @@ const Schedule = {
           });
           const dupInSlot = newNames.filter(n => slotExisting.has(n));
           if (dupInSlot.length > 0) {
-            alert(`같은 시간대에 이미 배치된 멤버가 있습니다:\n${dupInSlot.join(', ')}`);
+            Modal.alert(`같은 시간대에 이미 배치된 멤버가 있습니다:\n${dupInSlot.join(', ')}`);
             return;
           }
         }
@@ -1874,8 +1874,8 @@ const Schedule = {
     const addCustom = () => {
       const val = searchInput.value.trim();
       if (!val) return;
-      if (usedNames.has(val)) { alert('이미 선택된 멤버입니다.'); return; }
-      if (busyNames.has(val)) { alert('같은 시간대에 이미 배치된 멤버입니다.'); return; }
+      if (usedNames.has(val)) { Modal.alert('이미 선택된 멤버입니다.'); return; }
+      if (busyNames.has(val)) { Modal.alert('같은 시간대에 이미 배치된 멤버입니다.'); return; }
       selected[slotKey] = val;
       closePicker();
       onDone();

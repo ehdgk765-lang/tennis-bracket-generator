@@ -118,6 +118,114 @@ function unlockScroll() {
   setVVH();
 })();
 
+// ── localStorage 비밀번호 난독화 ──
+const Cipher = {
+  _key: 'hTL_t3nN!s',
+  encode(str) {
+    if (!str) return '';
+    const k = this._key;
+    const encoded = [...str].map((ch, i) =>
+      String.fromCharCode(ch.charCodeAt(0) ^ k.charCodeAt(i % k.length))
+    ).join('');
+    return btoa(unescape(encodeURIComponent(encoded)));
+  },
+  decode(str) {
+    if (!str) return '';
+    try {
+      const decoded = decodeURIComponent(escape(atob(str)));
+      const k = this._key;
+      return [...decoded].map((ch, i) =>
+        String.fromCharCode(ch.charCodeAt(0) ^ k.charCodeAt(i % k.length))
+      ).join('');
+    } catch { return ''; }
+  }
+};
+
+// ── 커스텀 모달 (alert / confirm) ──
+const Modal = {
+  alert(message, title) {
+    return new Promise(resolve => {
+      const overlay = this._createOverlay(() => resolve());
+      const box = document.createElement('div');
+      box.className = 'custom-modal-box';
+      box.innerHTML = `
+        <div class="w-11 h-11 rounded-full bg-green-50 flex items-center justify-center mx-auto mb-3 flex-shrink-0">
+          <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+        </div>
+        <h3 class="modal-title">${this._escape(title || '알림')}</h3>
+        <p class="modal-message">${this._escape(message)}</p>
+        <div class="flex gap-2.5 mt-5">
+          <button class="modal-btn modal-btn-primary flex-1" data-action="ok">확인</button>
+        </div>`;
+      const okBtn = box.querySelector('[data-action="ok"]');
+      okBtn.onclick = () => { this._close(overlay); resolve(); };
+      const onKey = (e) => { if (e.key === 'Enter') { e.preventDefault(); document.removeEventListener('keydown', onKey); okBtn.click(); } };
+      document.addEventListener('keydown', onKey);
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
+      lockScroll();
+      requestAnimationFrame(() => { requestAnimationFrame(() => { overlay.classList.add('modal-active'); }); });
+    });
+  },
+
+  confirm(message, title) {
+    return new Promise(resolve => {
+      let onKey;
+      const cleanup = () => document.removeEventListener('keydown', onKey);
+      const overlay = this._createOverlay(() => { cleanup(); resolve(false); });
+      const box = document.createElement('div');
+      box.className = 'custom-modal-box';
+      box.innerHTML = `
+        <div class="w-11 h-11 rounded-full bg-amber-50 flex items-center justify-center mx-auto mb-3 flex-shrink-0">
+          <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+          </svg>
+        </div>
+        <h3 class="modal-title">${this._escape(title || '확인')}</h3>
+        <p class="modal-message">${this._escape(message)}</p>
+        <div class="flex gap-2.5 mt-5">
+          <button class="modal-btn modal-btn-cancel flex-1" data-action="cancel">취소</button>
+          <button class="modal-btn modal-btn-primary flex-1" data-action="ok">확인</button>
+        </div>`;
+      box.querySelector('[data-action="cancel"]').onclick = () => { cleanup(); this._close(overlay); resolve(false); };
+      const okBtn = box.querySelector('[data-action="ok"]');
+      okBtn.onclick = () => { cleanup(); this._close(overlay); resolve(true); };
+      onKey = (e) => { if (e.key === 'Enter') { e.preventDefault(); okBtn.click(); } };
+      document.addEventListener('keydown', onKey);
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
+      lockScroll();
+      requestAnimationFrame(() => { requestAnimationFrame(() => { overlay.classList.add('modal-active'); }); });
+    });
+  },
+
+  _createOverlay(onDismiss) {
+    const overlay = document.createElement('div');
+    overlay.className = 'custom-modal-overlay';
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay && onDismiss) {
+        this._close(overlay);
+        onDismiss();
+      }
+    });
+    return overlay;
+  },
+
+  _close(overlay) {
+    overlay.classList.remove('modal-active');
+    overlay.classList.add('modal-closing');
+    setTimeout(() => { overlay.remove(); unlockScroll(); }, 200);
+  },
+
+  _escape(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+};
+
 // ── 성별 뱃지 HTML ──
 function genderBadge(gender, style) {
   if (style === 'text') {

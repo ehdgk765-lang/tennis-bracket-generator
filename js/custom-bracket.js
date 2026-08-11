@@ -376,8 +376,8 @@ const CustomBracket = {
 
     const addCustom = () => {
       const val = searchInput.value.trim();
-      if (!val) { alert('멤버명을 입력해주세요.'); return; }
-      if (placedNames.has(val)) { alert('이미 배치된 이름입니다.'); return; }
+      if (!val) { Modal.alert('멤버명을 입력해주세요.'); return; }
+      if (placedNames.has(val)) { Modal.alert('이미 배치된 이름입니다.'); return; }
       this._commitPick(slotIndex, val, previewContainer);
     };
     picker.querySelector('#cb-custom-add').onclick = addCustom;
@@ -479,7 +479,7 @@ const CustomBracket = {
 
     const addName = (name) => {
       const emptyIdx = picked.indexOf(null);
-      if (emptyIdx === -1) { alert('이미 2명이 선택되었습니다.'); return; }
+      if (emptyIdx === -1) { Modal.alert('이미 2명이 선택되었습니다.'); return; }
       picked[emptyIdx] = name;
       refreshPicker();
     };
@@ -501,7 +501,7 @@ const CustomBracket = {
         const val = searchInput.value.trim();
         if (!val) return;
         const allUsed = new Set([...usedNames, ...picked.filter(Boolean)]);
-        if (allUsed.has(val)) { alert('이미 선택된 멤버입니다.'); return; }
+        if (allUsed.has(val)) { Modal.alert('이미 선택된 멤버입니다.'); return; }
         addName(val);
       };
       searchInput.addEventListener('keydown', (e) => {
@@ -545,11 +545,11 @@ const CustomBracket = {
   createTournament() {
     const { tournamentName: name, setCount, isDoubles, bracketSize: size, placements } = this._state;
 
-    if (!name) { alert('대회명을 입력해주세요.'); return null; }
+    if (!name) { Modal.alert('대회명을 입력해주세요.'); return null; }
 
     const filledSlots = Object.keys(placements).length;
     if (filledSlots < 2) {
-      alert('최소 2팀을 배치해주세요.');
+      Modal.alert('최소 2팀을 배치해주세요.');
       return null;
     }
 
@@ -566,12 +566,12 @@ const CustomBracket = {
       const allNames = [];
       nonNull.forEach(t => t.split(' / ').forEach(n => allNames.push(n)));
       if (new Set(allNames).size !== allNames.length) {
-        alert('중복 배치된 멤버가 있습니다.');
+        Modal.alert('중복 배치된 멤버가 있습니다.');
         return null;
       }
     } else {
       if (new Set(nonNull).size !== nonNull.length) {
-        alert('중복 배치된 팀이 있습니다.');
+        Modal.alert('중복 배치된 팀이 있습니다.');
         return null;
       }
     }

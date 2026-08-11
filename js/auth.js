@@ -53,8 +53,23 @@ const Auth = {
             if (savedName) {
               App.memberName = savedName;
               showApp();
+            } else if (this._pendingMemberName) {
+              const pendingName = this._pendingMemberName;
+              this._pendingMemberName = null;
+              const regPlayers = Storage.getPlayers();
+              const found = regPlayers.find(p => p.name === pendingName);
+              if (found) {
+                App.memberName = pendingName;
+                sessionStorage.setItem('memberName', pendingName);
+                showApp();
+              } else {
+                // 등록되지 않은 이름 — 로그아웃 후 로그인 화면에서 에러 표시
+                this._memberNameError = '등록된 멤버 이름이 아닙니다. 다시 확인해주세요.';
+                fbAuth.signOut();
+              }
             } else {
-              this.showMemberNameSelection(() => { showApp(); });
+              // pendingName 없이 진입 (세션 만료 등) — 로그인 화면으로
+              fbAuth.signOut();
             }
 
           } else {
@@ -183,11 +198,11 @@ const Auth = {
         </div>
 
         <!-- 관리자 로그인 카드 -->
-        <div id="admin-login-section" class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl shadow-green-100/50 p-6 border border-white/60">
+        <div id="admin-login-section" class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-6 border border-gray-100">
           <div class="flex justify-end mb-2">
             <label class="flex items-center gap-1.5 cursor-pointer select-none">
               <input type="checkbox" id="remember-admin-email" class="w-3.5 h-3.5 rounded accent-green-600">
-              <span class="text-xs text-gray-400">이메일 기억하기</span>
+              <span class="text-xs text-gray-400">로그인 정보 기억하기</span>
             </label>
           </div>
           <form id="admin-auth-form" class="space-y-4">
@@ -211,7 +226,7 @@ const Auth = {
             </div>
             <p id="admin-auth-error" class="text-sm text-red-500 hidden"></p>
             <button type="submit" id="admin-submit-btn"
-              class="w-full py-3.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl hover:from-green-600 hover:to-emerald-700 active:scale-[0.98] transition-all font-bold text-lg shadow-md shadow-green-200">
+              class="w-full py-3.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl hover:from-green-600 hover:to-emerald-700 active:scale-[0.98] transition-all font-bold text-lg shadow-md">
               로그인
             </button>
           </form>
@@ -222,11 +237,11 @@ const Auth = {
         </div>
 
         <!-- 멤버 로그인 카드 -->
-        <div id="member-login-section" class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl shadow-green-100/50 p-6 border border-white/60" style="display:none">
+        <div id="member-login-section" class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-6 border border-gray-100" style="display:none">
           <div class="flex justify-end mb-2">
             <label class="flex items-center gap-1.5 cursor-pointer select-none">
               <input type="checkbox" id="remember-member-id" class="w-3.5 h-3.5 rounded accent-blue-600">
-              <span class="text-xs text-gray-400">ID 기억하기</span>
+              <span class="text-xs text-gray-400">로그인 정보 기억하기</span>
             </label>
           </div>
           <form id="member-auth-form" class="space-y-4">
@@ -234,7 +249,7 @@ const Auth = {
               <label class="block text-xs font-semibold text-gray-500 mb-1.5 ml-1">멤버 ID</label>
               <input type="text" autocomplete="off" id="member-login-id" required
                 class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 focus:bg-white transition"
-                placeholder="관리자가 알려준 ID">
+                placeholder="호스트가 알려준 ID">
             </div>
             <div>
               <label class="block text-xs font-semibold text-gray-500 mb-1.5 ml-1">비밀번호</label>
@@ -242,13 +257,19 @@ const Auth = {
                 class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 focus:bg-white transition"
                 placeholder="숫자 비밀번호">
             </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-500 mb-1.5 ml-1">이름</label>
+              <input type="text" autocomplete="off" id="member-login-name" required
+                class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 focus:bg-white transition"
+                placeholder="호스트가 등록한 본인 이름">
+            </div>
             <p id="member-auth-error" class="text-sm text-red-500 hidden"></p>
             <button type="submit" id="member-submit-btn"
-              class="w-full py-3.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl hover:from-blue-600 hover:to-indigo-700 active:scale-[0.98] transition-all font-bold text-lg shadow-md shadow-blue-200">
+              class="w-full py-3.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl hover:from-blue-600 hover:to-indigo-700 active:scale-[0.98] transition-all font-bold text-lg shadow-md">
               멤버 로그인
             </button>
           </form>
-          <p class="text-center text-sm text-gray-400 mt-4">관리자에게 ID와 비밀번호를 문의하세요</p>
+          <p class="text-center text-sm text-gray-400 mt-4">호스트에게 ID와 비밀번호를 문의하세요</p>
         </div>
 
         <!-- 인스타그램 링크 -->
@@ -319,14 +340,36 @@ const Auth = {
     const savedAdminEmail = localStorage.getItem('tennis_saved_admin_email');
     if (savedAdminEmail) {
       adminEmailInput.value = savedAdminEmail;
+      const savedAdminPw = localStorage.getItem('tennis_saved_admin_pw');
+      if (savedAdminPw) container.querySelector('#auth-password').value = Cipher.decode(savedAdminPw);
       rememberAdminCb.checked = true;
     }
+    const memberNameInput = container.querySelector('#member-login-name');
+    const memberErrorEl = container.querySelector('#member-auth-error');
     const savedMemberId = localStorage.getItem('tennis_saved_member_id');
     if (savedMemberId) {
       memberIdInput.value = savedMemberId;
       rememberMemberCb.checked = true;
+      const savedMemberPw = localStorage.getItem('tennis_saved_member_pw');
+      if (savedMemberPw) container.querySelector('#member-login-pw').value = Cipher.decode(savedMemberPw);
+      const savedMemberName = localStorage.getItem('tennis_saved_member_name');
+      if (savedMemberName) memberNameInput.value = savedMemberName;
       // 저장된 멤버 ID가 있으면 멤버 탭으로 자동 전환
       tabMember.click();
+    }
+
+    // 이름 오류로 돌아온 경우 에러 표시 + 입력값 복원
+    if (this._memberNameError) {
+      tabMember.click();
+      memberErrorEl.textContent = this._memberNameError;
+      memberErrorEl.classList.remove('hidden');
+      this._memberNameError = null;
+      if (this._pendingMemberLogin) {
+        memberIdInput.value = this._pendingMemberLogin.id || '';
+        container.querySelector('#member-login-pw').value = this._pendingMemberLogin.pw || '';
+        memberNameInput.value = this._pendingMemberLogin.name || '';
+        this._pendingMemberLogin = null;
+      }
     }
 
     // ── 관리자: 로그인/회원가입 토글 ──
@@ -365,8 +408,13 @@ const Auth = {
           await fbAuth.signInWithEmailAndPassword(email, password);
         }
         // 기억하기 처리
-        if (rememberAdminCb.checked) localStorage.setItem('tennis_saved_admin_email', email);
-        else localStorage.removeItem('tennis_saved_admin_email');
+        if (rememberAdminCb.checked) {
+          localStorage.setItem('tennis_saved_admin_email', email);
+          localStorage.setItem('tennis_saved_admin_pw', Cipher.encode(password));
+        } else {
+          localStorage.removeItem('tennis_saved_admin_email');
+          localStorage.removeItem('tennis_saved_admin_pw');
+        }
       } catch (err) {
         adminErrorEl.textContent = this.getErrorMessage(err);
         adminErrorEl.classList.remove('hidden');
@@ -378,12 +426,12 @@ const Auth = {
     // ── 멤버: 폼 제출 ──
     const memberForm = container.querySelector('#member-auth-form');
     const memberSubmitBtn = container.querySelector('#member-submit-btn');
-    const memberErrorEl = container.querySelector('#member-auth-error');
 
     memberForm.onsubmit = async (e) => {
       e.preventDefault();
       const loginId = container.querySelector('#member-login-id').value.trim();
       const pin = container.querySelector('#member-login-pw').value.trim();
+      const memberName = container.querySelector('#member-login-name').value.trim();
       memberErrorEl.classList.add('hidden');
       memberSubmitBtn.disabled = true;
       memberSubmitBtn.textContent = '처리 중...';
@@ -391,11 +439,23 @@ const Auth = {
       try {
         if (!loginId) throw { message: 'ID를 입력해주세요.' };
         if (!pin) throw { message: '비밀번호를 입력해주세요.' };
+        if (!memberName) throw { message: '이름을 입력해주세요.' };
+        this._pendingMemberName = memberName;
+        this._pendingMemberLogin = { id: loginId, pw: pin, name: memberName };
         await this.handleMemberLogin(loginId, pin);
         // 기억하기 처리
-        if (rememberMemberCb.checked) localStorage.setItem('tennis_saved_member_id', loginId);
-        else localStorage.removeItem('tennis_saved_member_id');
+        if (rememberMemberCb.checked) {
+          localStorage.setItem('tennis_saved_member_id', loginId);
+          localStorage.setItem('tennis_saved_member_pw', Cipher.encode(pin));
+          localStorage.setItem('tennis_saved_member_name', memberName);
+        } else {
+          localStorage.removeItem('tennis_saved_member_id');
+          localStorage.removeItem('tennis_saved_member_pw');
+          localStorage.removeItem('tennis_saved_member_name');
+        }
       } catch (err) {
+        this._pendingMemberName = null;
+        this._pendingMemberLogin = null;
         memberErrorEl.textContent = err.message || '로그인에 실패했습니다.';
         memberErrorEl.classList.remove('hidden');
         memberSubmitBtn.disabled = false;
@@ -516,8 +576,10 @@ const Auth = {
     }
   },
 
-  logout() {
-    if (confirm('로그아웃 하시겠습니까?')) {
+  async logout() {
+    if (this._logoutPending) return;
+    this._logoutPending = true;
+    if (await Modal.confirm('로그아웃 하시겠습니까?')) {
       localStorage.removeItem(Storage.KEYS.PLAYERS);
       localStorage.removeItem(Storage.KEYS.TOURNAMENTS);
       localStorage.removeItem(Storage.KEYS.TEAMS);
@@ -527,5 +589,6 @@ const Auth = {
       this.loginMode = null;
       fbAuth.signOut();
     }
+    this._logoutPending = false;
   }
 };

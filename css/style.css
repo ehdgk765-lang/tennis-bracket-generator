@@ -13,6 +13,8 @@
 html, body {
   overflow-x: hidden;
   width: 100%;
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, 'Segoe UI', Roboto, sans-serif;
+  letter-spacing: -0.01em;
 }
 
 /* iOS에서 input 확대 방지 (16px 이상이면 확대 안 됨) */
@@ -40,16 +42,127 @@ header {
   padding-right: env(safe-area-inset-right, 0);
 }
 
-/* 탭 네비게이션 */
-.tab-active {
-  color: #16a34a !important;
-  border-bottom-color: #16a34a !important;
-  font-weight: 700;
-  background: linear-gradient(to top, rgba(22, 163, 74, 0.06), transparent);
+/* ── 색상 톤 세련화 ── */
+/* 배경: 미세한 웜 그레이 */
+body.bg-gray-50 {
+  background-color: #f5f6f3 !important;
 }
 
+/* 그린 틴트 그림자 → 중립 그림자 */
+.shadow-green-50\/30 { --tw-shadow-color: transparent !important; }
+.shadow-green-100\/30 { --tw-shadow-color: transparent !important; }
+.shadow-green-100\/50 { --tw-shadow-color: transparent !important; }
+.shadow-green-200\/50 { --tw-shadow-color: rgba(0, 0, 0, 0.06) !important; }
+.shadow-green-200 { --tw-shadow-color: rgba(0, 0, 0, 0.06) !important; }
+
+/* 그라디언트 버튼 → 깊은 포레스트 그린 */
+.from-green-500.to-emerald-600 {
+  --tw-gradient-from: #0b6b32 !important;
+  --tw-gradient-to: #139650 !important;
+}
+.hover\:from-green-600:hover.hover\:to-emerald-700:hover {
+  --tw-gradient-from: #09572a !important;
+  --tw-gradient-to: #0b6b32 !important;
+}
+
+/* 헤더 타이틀 → 깊고 풍부한 그라디언트 */
+header h1 {
+  background-image: linear-gradient(135deg, #08512a, #12874a) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+}
+
+/* 서브탭 활성 → 포레스트 그린 */
+.sub-tab.bg-green-600,
+.sub-tab[class*="bg-green-600"] {
+  background-color: #0b6b32 !important;
+}
+
+/* 포맷 선택 라디오 → 톤 통일 */
+.format-option input:checked + div,
+.peer:checked ~ .peer-checked\:border-green-500,
+.peer:checked ~ .peer-checked\:bg-green-50 {
+  border-color: #0b6b32 !important;
+}
+.peer:checked ~ .peer-checked\:bg-green-50 {
+  background-color: #edf5f0 !important;
+}
+
+/* 체크박스 어센트 */
+input[type="checkbox"].text-green-600,
+input[type="checkbox"].accent-green-600 {
+  accent-color: #0b6b32;
+}
+
+/* 텍스트 링크/강조 → 포레스트 그린 */
+.text-green-600 {
+  color: #0b6b32 !important;
+}
+.text-green-700 {
+  color: #095a2a !important;
+}
+
+/* ── 탭 네비게이션 ── */
 [data-tab] {
-  min-height: 44px; /* 최소 터치 영역 */
+  min-height: 44px;
+}
+
+.tab-active {
+  color: #0b6b32 !important;
+  font-weight: 700;
+}
+
+.tab-active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 3px;
+  background: linear-gradient(to right, #0b6b32, #139650);
+  border-radius: 3px;
+}
+
+/* ── 카드 디자인 차별화 ── */
+.tournament-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.tournament-card:hover {
+  transform: translateY(-2px);
+}
+.tournament-card:active {
+  transform: scale(0.98);
+  transition-duration: 0.1s;
+}
+
+/* ── 마이크로 인터랙션 ── */
+/* 주요 액션 버튼 터치 피드백 */
+button.bg-gradient-to-r:active,
+button.from-green-500:active,
+.sub-tab:active {
+  transform: scale(0.96);
+  transition: transform 0.1s ease;
+}
+
+/* 체크박스·라디오 라벨 터치 */
+label:active {
+  opacity: 0.85;
+}
+
+/* 부드러운 포커스 링 */
+input:focus-visible,
+select:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(11, 107, 50, 0.12);
+}
+
+/* 포커스 링 색상 통일 */
+.focus\:ring-green-500:focus {
+  --tw-ring-color: rgba(11, 107, 50, 0.25) !important;
+}
+.focus\:border-green-500:focus {
+  border-color: #0b6b32 !important;
 }
 
 /* 토너먼트 브래킷 */
@@ -126,8 +239,8 @@ header {
 
 /* 포맷 선택 라디오 */
 .format-option input:checked + div {
-  border-color: #16a34a;
-  background-color: #f0fdf4;
+  border-color: #0b6b32;
+  background-color: #edf5f0;
 }
 
 /* 애니메이션 */
@@ -144,6 +257,103 @@ header {
 #score-modal {
   animation: fadeIn 0.15s ease-out;
 }
+
+/* ── 커스텀 모달 ── */
+.custom-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  background: rgba(0, 0, 0, 0);
+  transition: background 0.2s ease;
+}
+.custom-modal-overlay.modal-active {
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.custom-modal-overlay.modal-closing {
+  background: rgba(0, 0, 0, 0);
+  backdrop-filter: blur(0);
+}
+.custom-modal-box {
+  background: #fff;
+  border-radius: 20px;
+  padding: 28px 24px 20px;
+  max-width: 320px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  transform: scale(0.92) translateY(16px);
+  opacity: 0;
+  transition: transform 0.3s cubic-bezier(0.34, 1.4, 0.64, 1), opacity 0.2s ease;
+}
+.modal-active .custom-modal-box {
+  transform: scale(1) translateY(0);
+  opacity: 1;
+}
+.modal-closing .custom-modal-box {
+  transform: scale(0.95) translateY(8px);
+  opacity: 0;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+.modal-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #1f2937;
+  text-align: center;
+  margin-bottom: 6px;
+}
+.modal-message {
+  font-size: 0.875rem;
+  color: #6b7280;
+  text-align: center;
+  white-space: pre-line;
+  line-height: 1.5;
+  word-break: keep-all;
+}
+.modal-btn {
+  padding: 11px 0;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.modal-btn:active {
+  transform: scale(0.97);
+}
+.modal-btn-primary {
+  background: #0b6b32;
+  color: #fff;
+}
+.modal-btn-primary:hover {
+  background: #095a2a;
+}
+.modal-btn-cancel {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+.modal-btn-cancel:hover {
+  background: #e5e7eb;
+}
+
+/* 모달 다크모드 */
+html.dark .custom-modal-box {
+  background: #1e293b;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+html.dark .modal-title { color: #e2e8f0; }
+html.dark .modal-message { color: #94a3b8; }
+html.dark .modal-btn-cancel { background: #334155; color: #94a3b8; }
+html.dark .modal-btn-cancel:hover { background: #475569; }
+html.dark .custom-modal-box .bg-green-50 { background: rgba(34, 197, 94, 0.12) !important; }
+html.dark .custom-modal-box .bg-amber-50 { background: rgba(245, 158, 11, 0.12) !important; }
+html.dark .custom-modal-box .text-green-600 { color: #4ade80 !important; }
+html.dark .custom-modal-box .text-amber-500 { color: #fbbf24 !important; }
 
 /* 검색형 드롭다운 */
 .searchable-dropdown {
@@ -244,9 +454,13 @@ header {
     font-size: 11px !important;
   }
   [data-tab] {
-    font-size: 12px !important;
-    padding-left: 4px !important;
-    padding-right: 4px !important;
+    font-size: 9px !important;
+    padding-left: 2px !important;
+    padding-right: 2px !important;
+  }
+  [data-tab] svg {
+    width: 16px;
+    height: 16px;
   }
 }
 
@@ -262,11 +476,11 @@ html.dark body {
 
 /* 헤더 */
 html.dark header {
-  background-color: rgba(15, 23, 42, 0.85) !important;
+  background-color: rgba(15, 23, 42, 0.9) !important;
   backdrop-filter: blur(12px) !important;
   -webkit-backdrop-filter: blur(12px) !important;
-  border-color: rgba(51, 65, 85, 0.5) !important;
-  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.3) !important;
+  border-color: rgba(51, 65, 85, 0.4) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;
 }
 html.dark header h1 {
   background-image: linear-gradient(to right, #4ade80, #34d399) !important;
@@ -278,8 +492,9 @@ html.dark header h1 {
 /* 탭 */
 html.dark .tab-active {
   color: #4ade80 !important;
-  border-bottom-color: #4ade80 !important;
-  background: linear-gradient(to top, rgba(74, 222, 128, 0.08), transparent) !important;
+}
+html.dark .tab-active::after {
+  background: #4ade80;
 }
 html.dark [data-tab] {
   color: #64748b;
@@ -444,14 +659,22 @@ html.dark .bg-red-50 {
 
 /* 포맷 선택 라디오 (다크) */
 html.dark .format-option input:checked + div {
-  border-color: #22c55e;
+  border-color: #34d399;
   background-color: rgba(34, 197, 94, 0.1);
 }
 html.dark .peer:checked ~ .peer-checked\:border-green-500 {
-  border-color: #22c55e !important;
+  border-color: #34d399 !important;
 }
 html.dark .peer:checked ~ .peer-checked\:bg-green-50 {
   background-color: rgba(34, 197, 94, 0.1) !important;
+}
+
+/* 다크모드에서 text-green 오버라이드 복원 */
+html.dark .text-green-600 {
+  color: #4ade80 !important;
+}
+html.dark .text-green-700 {
+  color: #4ade80 !important;
 }
 
 /* 스코어 모달 */

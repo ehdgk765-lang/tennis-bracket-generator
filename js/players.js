@@ -260,9 +260,9 @@ const Players = {
     });
 
     container.querySelectorAll('.delete-player-btn').forEach(btn => {
-      btn.onclick = () => {
+      btn.onclick = async () => {
         const id = btn.dataset.id;
-        if (!confirm('멤버를 삭제하시겠습니까?')) return;
+        if (!await Modal.confirm('멤버를 삭제하시겠습니까?')) return;
         const players = Storage.getPlayers();
         const deleted = players.find(p => p.id === id);
         Storage.savePlayers(players.filter(p => p.id !== id));
@@ -301,7 +301,7 @@ const Players = {
           }
           const players = Storage.getPlayers();
           if (players.some(p => p.name === newName && p.id !== id)) {
-            alert('이미 등록된 이름입니다.');
+            Modal.alert('이미 등록된 이름입니다.');
             saved = false;
             input.focus();
             input.select();
@@ -351,7 +351,7 @@ const Players = {
 
       const players = Storage.getPlayers();
       if (players.some(p => p.name === name)) {
-        alert('이미 등록된 멤버입니다.');
+        Modal.alert('이미 등록된 멤버입니다.');
         return;
       }
 
@@ -385,10 +385,10 @@ const Players = {
     // 선택 삭제
     const deleteSelectedBtn = container.querySelector('#delete-selected-btn');
     if (deleteSelectedBtn) {
-      deleteSelectedBtn.onclick = () => {
+      deleteSelectedBtn.onclick = async () => {
         const checkedIds = Array.from(container.querySelectorAll('.player-select-cb:checked')).map(cb => cb.dataset.id);
         if (checkedIds.length === 0) return;
-        if (!confirm(`선택한 ${checkedIds.length}명의 멤버를 삭제하시겠습니까?`)) return;
+        if (!await Modal.confirm(`선택한 ${checkedIds.length}명의 멤버를 삭제하시겠습니까?`)) return;
         const allPlayers = Storage.getPlayers();
         const deletedNames = allPlayers.filter(p => checkedIds.includes(p.id)).map(p => p.name);
         Storage.savePlayers(allPlayers.filter(p => !checkedIds.includes(p.id)));
@@ -483,14 +483,14 @@ const Players = {
         let msg = `${added}명 추가 완료`;
         if (skipped > 0) msg += `, ${skipped}명 중복 건너뜀`;
         if (errors.length > 0) msg += `\n\n오류:\n${errors.slice(0, 5).join('\n')}`;
-        alert(msg);
+        Modal.alert(msg);
 
         this._searchQuery = '';
         this._expanded = false;
         this.render(container);
       } catch (err) {
         console.error('엑셀 파싱 오류:', err);
-        alert('파일을 읽을 수 없습니다. 엑셀(.xlsx) 또는 CSV 파일인지 확인해주세요.');
+        Modal.alert('파일을 읽을 수 없습니다. 엑셀(.xlsx) 또는 CSV 파일인지 확인해주세요.');
       }
     };
     reader.readAsArrayBuffer(file);
@@ -518,26 +518,26 @@ const Players = {
 
   _importBackup(file, container) {
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const data = JSON.parse(e.target.result);
         if (!data.players || !data.tournaments) {
-          alert('올바른 백업 파일이 아닙니다.');
+          Modal.alert('올바른 백업 파일이 아닙니다.');
           return;
         }
         const pCount = data.players.length;
         const tCount = data.tournaments.length;
         const teamsCount = (data.teams || []).length;
         const exportDate = data.exportedAt ? new Date(data.exportedAt).toLocaleString('ko') : '알 수 없음';
-        if (!confirm(`이 백업을 복원하시겠습니까?\n\n백업 시점: ${exportDate}\n멤버: ${pCount}명\n대진표: ${tCount}개\n팀: ${teamsCount}개\n\n현재 데이터가 모두 덮어써집니다.`)) return;
+        if (!await Modal.confirm(`이 백업을 복원하시겠습니까?\n\n백업 시점: ${exportDate}\n멤버: ${pCount}명\n대진표: ${tCount}개\n팀: ${teamsCount}개\n\n현재 데이터가 모두 덮어써집니다.`)) return;
         Storage.savePlayers(data.players);
         Storage.saveTournaments(data.tournaments);
         Storage.saveTeams(data.teams || []);
-        alert('백업이 복원되었습니다.');
+        Modal.alert('백업이 복원되었습니다.');
         this.render(container);
       } catch (err) {
         console.error('백업 복원 오류:', err);
-        alert('백업 파일을 읽을 수 없습니다. JSON 파일인지 확인해주세요.');
+        Modal.alert('백업 파일을 읽을 수 없습니다. JSON 파일인지 확인해주세요.');
       }
     };
     reader.readAsText(file);
@@ -741,8 +741,8 @@ const Players = {
 
     // 팀 삭제
     subContent.querySelectorAll('.delete-team-btn').forEach(btn => {
-      btn.onclick = () => {
-        if (!confirm('팀을 삭제하시겠습니까?')) return;
+      btn.onclick = async () => {
+        if (!await Modal.confirm('팀을 삭제하시겠습니까?')) return;
         const teams = Storage.getTeams().filter(t => t.id !== btn.dataset.teamId);
         Storage.saveTeams(teams);
         this.renderTeams(subContent, container);
@@ -796,7 +796,7 @@ const Players = {
           }
           const teams = Storage.getTeams();
           if (teams.some(t => t.name === newName && t.id !== teamId)) {
-            alert('이미 존재하는 팀 이름입니다.');
+            Modal.alert('이미 존재하는 팀 이름입니다.');
             saved = false;
             input.focus();
             input.select();
