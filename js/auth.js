@@ -2,6 +2,7 @@
 const Auth = {
   initialized: false,
   loginMode: null, // 'admin' | 'member'
+  _authSeq: 0,
 
   // 멤버 ID → Firebase Auth 이메일 변환
   toMemberEmail(id) { return id + '@member.htl.app'; },
@@ -10,6 +11,7 @@ const Auth = {
 
   init() {
     fbAuth.onAuthStateChanged(async (user) => {
+      const seq = ++this._authSeq;
       const authEl = document.getElementById('auth-container');
       const appEl = document.getElementById('app-container');
 
@@ -23,6 +25,7 @@ const Auth = {
         // Firestore에서 멤버 계정인지 확인
         try {
           const memberDoc = await fbDb.collection('memberAccounts').doc(user.uid).get();
+          if (this._authSeq !== seq) return;
 
           if (memberDoc.exists) {
             // ── 멤버 로그인 ──
@@ -35,6 +38,7 @@ const Auth = {
             } catch (e) {
               console.error('Firestore 로드 실패:', e);
             }
+            if (this._authSeq !== seq) return;
             Storage.startRealtimeSync();
 
             App.isAdmin = false;
@@ -100,6 +104,7 @@ const Auth = {
             } catch (e) {
               console.error('Firestore 로드 실패 (오프라인 모드):', e);
             }
+            if (this._authSeq !== seq) return;
             Storage.startRealtimeSync();
 
             App.isAdmin = true;
@@ -117,6 +122,7 @@ const Auth = {
           this.loginMode = 'admin';
           Storage.resetMemberMode();
           try { await Storage.loadFromFirestore(); } catch (_) {}
+          if (this._authSeq !== seq) return;
           Storage.startRealtimeSync();
           App.isAdmin = true;
           App.memberName = null;
