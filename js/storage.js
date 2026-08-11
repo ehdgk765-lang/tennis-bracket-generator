@@ -90,8 +90,8 @@ const Storage = {
   _unsubTournaments: null,
   _unsubTeams: null,
 
-  // 쓰기 진행 중 플래그 (onSnapshot 무시용)
-  _writing: { players: false, tournaments: false, teams: false },
+  // 쓰기 보호: 기록 중인 JSON 값 저장 (null=보호없음, string=확인까지 보호)
+  _writing: { players: null, tournaments: null, teams: null },
 
   // 메모리 → Firestore
   _syncToFirestore(docName) {
@@ -99,13 +99,22 @@ const Storage = {
     if (!uid) return;
     if (this._isMemberMode && docName !== 'tournaments') return;
 
-    this._writing[docName] = true;
+    const jsonToWrite = this._json[docName];
+    this._writing[docName] = jsonToWrite;
     const docRef = fbDb.collection('users').doc(uid).collection('data').doc(docName);
-    docRef.set({ json: this._json[docName] })
-      .then(() => { this._writing[docName] = false; })
+    docRef.set({ json: jsonToWrite })
+      .then(() => {
+        // 안전장치: onSnapshot이 확인 못 한 경우 2초 후 해제
+        const wrote = jsonToWrite;
+        setTimeout(() => {
+          if (this._writing[docName] === wrote) {
+            this._writing[docName] = null;
+          }
+        }, 2000);
+      })
       .catch(err => {
         console.error('Firestore sync error:', err);
-        this._writing[docName] = false;
+        this._writing[docName] = null;
       });
   },
 
@@ -160,6 +169,8 @@ const Storage = {
   // ─── 실시간 동기화 (onSnapshot) ───
 
   startRealtimeSync() {
+    // 기존 리스너 정리 (중복 방지)
+    this.stopRealtimeSync();
     const uid = this._getDataUID();
     if (!uid) return;
     const base = fbDb.collection('users').doc(uid).collection('data');
@@ -168,15 +179,26 @@ const Storage = {
       return base.doc(docName).onSnapshot((doc) => {
         if (doc.metadata.hasPendingWrites) return;
         if (!doc.exists) return;
-        if (this._writing[docName]) return; // 쓰기 진행 중이면 무시
+
         const remoteJson = doc.data().json || '[]';
-        if (remoteJson === this._json[docName]) return; // 동일 데이터면 무시
+
+        // 쓰기 보호 중: 우리가 쓴 데이터인지 확인
+        if (this._writing[docName] !== null) {
+          if (remoteJson === this._writing[docName]) {
+            this._writing[docName] = null;
+          }
+          return;
+        }
+
+        // 동일 데이터면 무시 (에코)
+        if (remoteJson === this._json[docName]) return;
+
         // DB가 정본 → 메모리 갱신
         this._json[docName] = remoteJson;
         this._data[docName] = JSON.parse(remoteJson);
         this._onRemoteChange();
       }, (err) => {
-        console.error(`${docName} realtime sync error:`, err);
+        console.error(docName + ' realtime sync error:', err);
       });
     };
 

@@ -66,8 +66,22 @@ const Auth = {
                 fbAuth.signOut();
               }
             } else {
-              // pendingName 없이 진입 (세션 만료 등) — 로그인 화면으로
-              fbAuth.signOut();
+              // pendingName 없이 진입 (세션 만료 등)
+              // 로그인 정보 기억하기로 저장된 이름이 있으면 자동 로그인 시도
+              const rememberedName = localStorage.getItem('tennis_saved_member_name');
+              if (rememberedName) {
+                const regPlayers = Storage.getPlayers();
+                const found = regPlayers.find(p => p.name === rememberedName);
+                if (found) {
+                  App.memberName = rememberedName;
+                  sessionStorage.setItem('memberName', rememberedName);
+                  showApp();
+                } else {
+                  fbAuth.signOut();
+                }
+              } else {
+                fbAuth.signOut();
+              }
             }
 
           } else {
