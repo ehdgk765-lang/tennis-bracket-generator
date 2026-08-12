@@ -201,6 +201,29 @@ const Modal = {
     });
   },
 
+  // 비차단 토스트 알림 (type: 'error' | 'success' | undefined=정보)
+  toast(message, type) {
+    let wrap = document.getElementById('toast-wrap');
+    if (!wrap) {
+      wrap = document.createElement('div');
+      wrap.id = 'toast-wrap';
+      wrap.style.cssText = 'position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 76px);z-index:9999;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;padding:0 12px;';
+      document.body.appendChild(wrap);
+    }
+    const el = document.createElement('div');
+    const bg = type === 'error' ? '#dc2626' : (type === 'success' ? '#16a34a' : '#374151');
+    el.style.cssText = 'max-width:92vw;background:' + bg + ';color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;font-weight:500;line-height:1.4;box-shadow:0 8px 24px rgba(0,0,0,.22);opacity:0;transform:translateY(8px);transition:opacity .2s,transform .2s;pointer-events:auto;text-align:center;white-space:pre-line;';
+    el.textContent = message;
+    wrap.appendChild(el);
+    requestAnimationFrame(() => { el.style.opacity = '1'; el.style.transform = 'translateY(0)'; });
+    const dur = type === 'error' ? 4200 : 2200;
+    setTimeout(() => {
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(8px)';
+      setTimeout(() => el.remove(), 250);
+    }, dur);
+  },
+
   _createOverlay(onDismiss) {
     const overlay = document.createElement('div');
     overlay.className = 'custom-modal-overlay';

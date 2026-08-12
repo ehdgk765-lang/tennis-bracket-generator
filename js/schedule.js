@@ -1091,25 +1091,26 @@ const Schedule = {
         if (isMember && !this._isMyMatch(match)) return;
         const matchId = match.id;
         const tournamentId = tournament.id;
-        Results.showScoreModal(match, { setCount: 1, allowDraw: true, isTeamMode: tournament.isTeamMode, isCustom: tournament.isCustom }, (result) => {
-          // 최신 대회 데이터를 다시 읽어서 해당 매치만 패치 (동시 접속 데이터 유실 방지)
-          const freshTournament = Storage.getTournamentById(tournamentId);
-          if (!freshTournament) return;
-          let freshMatch = null;
-          for (const slot of freshTournament.timeSlots) {
-            freshMatch = slot.matches.find(m => m.id === matchId);
-            if (freshMatch) break;
-          }
-          if (!freshMatch) return;
-          freshMatch.scores = result.scores;
-          freshMatch.winner = result.winner;
-          const allDone = this.getAllMatches(freshTournament).every(m => m.winner || m.winner === 'draw');
-          if (allDone) {
-            freshTournament.status = 'completed';
-            freshTournament.completedAt = new Date().toISOString();
-          }
-          Storage.updateTournament(freshTournament);
-          this.render(container, freshTournament);
+        Results.showScoreModal(match, { setCount: 1, allowDraw: true, isTeamMode: tournament.isTeamMode, isCustom: tournament.isCustom }, async (result) => {
+          // 서버 최신값 기준으로 해당 매치만 원자적 패치 (동시 저장 유실 방지)
+          const ok = await Storage.updateTournamentTx(tournamentId, (t) => {
+            let m = null;
+            for (const slot of t.timeSlots) {
+              m = slot.matches.find(x => x.id === matchId);
+              if (m) break;
+            }
+            if (!m) return false;
+            m.scores = result.scores;
+            m.winner = result.winner;
+            const allDone = this.getAllMatches(t).every(x => x.winner || x.winner === 'draw');
+            if (allDone) {
+              t.status = 'completed';
+              t.completedAt = new Date().toISOString();
+            }
+          });
+          if (!ok) return;
+          const fresh = Storage.getTournamentById(tournamentId);
+          if (fresh) this.render(container, fresh);
         });
       };
     });

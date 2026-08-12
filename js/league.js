@@ -213,17 +213,18 @@ const League = {
         const match = rounds[round].find(m => m.id === matchId);
         if (!match || match.scores) return;
 
-        Results.showScoreModal(match, { ...tournament, allowDraw: true }, (result) => {
-          // 최신 대회 데이터를 다시 읽어서 해당 매치만 패치 (동시 접속 데이터 유실 방지)
-          const freshTournament = Storage.getTournamentById(tournament.id);
-          if (!freshTournament) return;
-          const freshMatch = freshTournament.rounds[round]?.find(m => m.id === matchId);
-          if (!freshMatch) return;
-          freshMatch.scores = result.scores;
-          freshMatch.winner = result.winner;
-
-          Storage.updateTournament(freshTournament);
-          this.render(container, freshTournament);
+        Results.showScoreModal(match, { ...tournament, allowDraw: true }, async (result) => {
+          // 서버 최신값 기준으로 해당 매치만 원자적 패치 (동시 저장 유실 방지)
+          const tid = tournament.id;
+          const ok = await Storage.updateTournamentTx(tid, (t) => {
+            const m = t.rounds[round]?.find(x => x.id === matchId);
+            if (!m) return false;
+            m.scores = result.scores;
+            m.winner = result.winner;
+          });
+          if (!ok) return;
+          const fresh = Storage.getTournamentById(tid);
+          if (fresh) this.render(container, fresh);
         });
       };
     });
