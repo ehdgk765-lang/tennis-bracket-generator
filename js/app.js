@@ -903,10 +903,8 @@ const App = {
         typeDistribution = {};
         container.querySelectorAll('.type-count-input').forEach(el => {
           const count = parseInt(el.textContent) || 0;
-          console.log('[Submit] type-count-input:', el.dataset.type, '=', el.textContent, '→', count);
           if (count > 0) typeDistribution[el.dataset.type] = count;
         });
-        console.log('[Submit] typeDistribution:', JSON.stringify(typeDistribution));
         const total = Object.values(typeDistribution).reduce((s, v) => s + v, 0);
         const slots = Schedule.calculateTimeSlots(startTime, endTime);
         const expectedTotal = slots.length * courts;

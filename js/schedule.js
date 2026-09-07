@@ -1,5 +1,5 @@
 // schedule.js - 시간/코트 기반 대진표 생성 + 렌더링
-console.log('[Schedule] loaded, forcedPlan 지원 버전');
+// console.log('[Schedule] loaded, forcedPlan 지원 버전');
 
 const Schedule = {
   // 시간 슬롯 계산 (30분 단위)
@@ -255,11 +255,7 @@ const Schedule = {
     let plan;
     if (forcedPlan) {
       plan = forcedPlan;
-      console.log('[SlotMatch] forcedPlan 사용:', JSON.stringify(forcedPlan));
     } else {
-      if (arguments.length < 8) console.warn('[SlotMatch] forcedPlan 파라미터 누락 (arguments:', arguments.length, ')');
-      console.log('[SlotMatch] 자동 플랜 선택 (forcedPlan:', forcedPlan, ')');
-
       // 코트를 최대한 채우는 유효한 플랜 찾기
       let validPlans = [];
       for (let n = courts; n >= 1; n--) {
@@ -407,7 +403,6 @@ const Schedule = {
         }
         for (const [t, cnt] of Object.entries(typeDistribution)) {
           if ((planCounts[t] || 0) !== cnt) {
-            console.error('[Schedule] distributeTypesToSlots 결과 불일치:', JSON.stringify(typeDistribution), '→', JSON.stringify(planCounts));
             slotPlans = null; // 재시도
             break;
           }
@@ -417,7 +412,6 @@ const Schedule = {
       if (!slotPlans) {
         slotPlans = this.distributeTypesToSlots(typeDistribution, slots.length, courts, males.length, females.length);
       }
-      console.log('[Schedule] typeDistribution:', JSON.stringify(typeDistribution), 'slotPlans:', JSON.stringify(slotPlans));
     }
 
     const timeSlots = slots.map((time, idx) => {
@@ -444,9 +438,9 @@ const Schedule = {
         const actual = actualCounts[type] || 0;
         if (actual !== expected) mismatches.push(`${SCHEDULE_GAME_TYPES[type].label}: ${expected}→${actual}`);
       }
-      if (mismatches.length > 0) {
-        console.error('[Schedule] 수동배분 결과 불일치:', mismatches.join(', '), 'slotPlans:', JSON.stringify(slotPlans));
-      }
+      // if (mismatches.length > 0) {
+      //   console.error('[Schedule] 수동배분 결과 불일치:', mismatches.join(', '));
+      // }
     }
 
     return timeSlots;
