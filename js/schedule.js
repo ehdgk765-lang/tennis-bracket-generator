@@ -1,4 +1,5 @@
 // schedule.js - 시간/코트 기반 대진표 생성 + 렌더링
+console.log('[Schedule] loaded, forcedPlan 지원 버전');
 
 const Schedule = {
   // 시간 슬롯 계산 (30분 단위)
@@ -153,6 +154,73 @@ const Schedule = {
     return remainM >= 0 && remainF >= 0 && (remainM + remainF) >= needAny;
   },
 
+  // 수동 설정된 게임 종류 분배를 타임슬롯별 플랜으로 변환 (백트래킹)
+  distributeTypesToSlots(typeDistribution, numSlots, courts, maleCount, femaleCount) {
+    const types = Object.keys(typeDistribution).filter(t => typeDistribution[t] > 0);
+    const remaining = {};
+    types.forEach(t => { remaining[t] = typeDistribution[t]; });
+    const slotPlans = Array.from({ length: numSlots }, () => []);
+
+    // 주어진 잔여 수량으로 size 크기의 유효한 조합 생성
+    const validPlansForSlot = (rem, size) => {
+      const avail = types.filter(t => rem[t] > 0);
+      if (size === 0 || avail.length === 0) return [[]];
+      const results = [];
+      const build = (combo, startIdx, used) => {
+        if (combo.length === size) {
+          if (this.isPlanValid(combo, maleCount, femaleCount)) results.push([...combo]);
+          return;
+        }
+        for (let i = startIdx; i < avail.length; i++) {
+          const t = avail[i];
+          if ((used[t] || 0) < rem[t]) {
+            combo.push(t);
+            used[t] = (used[t] || 0) + 1;
+            build(combo, i, used);
+            combo.pop();
+            used[t]--;
+          }
+        }
+      };
+      build([], 0, {});
+      return results;
+    };
+
+    const solve = (slotIdx) => {
+      const totalRem = types.reduce((s, t) => s + remaining[t], 0);
+      if (totalRem === 0) return true;
+      if (slotIdx >= numSlots) return false;
+
+      const size = Math.min(courts, totalRem);
+      const plans = validPlansForSlot(remaining, size);
+
+      // 셔플 (재생성 시 매번 다른 배분)
+      for (let i = plans.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [plans[i], plans[j]] = [plans[j], plans[i]];
+      }
+
+      for (const plan of plans) {
+        plan.forEach(t => remaining[t]--);
+        slotPlans[slotIdx] = plan;
+        if (solve(slotIdx + 1)) return true;
+        plan.forEach(t => remaining[t]++);
+      }
+      slotPlans[slotIdx] = [];
+      return false;
+    };
+
+    if (!solve(0)) return null;
+
+    // 슬롯 순서 셔플 (시간대 고정 방지)
+    for (let i = slotPlans.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [slotPlans[i], slotPlans[j]] = [slotPlans[j], slotPlans[i]];
+    }
+
+    return slotPlans;
+  },
+
   // 플랜 실행 시 예상되는 게임 수 편차(max-min) 계산
   scorePlan(plan, gameCounts, males, females) {
     let needM = 0, needF = 0, needAny = 0;
@@ -182,31 +250,40 @@ const Schedule = {
     return Math.max(...counts) - Math.min(...counts);
   },
 
-  // 한 타임슬롯의 매치 생성 (플랜 기반)
-  generateSlotMatches(males, females, courts, gameCounts, allowMixed, usedTeams, isSingles) {
-    // 코트를 최대한 채우는 유효한 플랜 찾기
-    let validPlans = [];
-    for (let n = courts; n >= 1; n--) {
-      const plans = this.generatePlans(n, allowMixed, isSingles);
-      validPlans = plans.filter(p => this.isPlanValid(p, males.length, females.length));
-      if (validPlans.length > 0) break;
-    }
+  // 한 타임슬롯의 매치 생성 (플랜 기반, forcedPlan: 수동 모드 시 외부에서 전달된 플랜)
+  generateSlotMatches(males, females, courts, gameCounts, allowMixed, usedTeams, isSingles, forcedPlan) {
+    let plan;
+    if (forcedPlan) {
+      plan = forcedPlan;
+      console.log('[SlotMatch] forcedPlan 사용:', JSON.stringify(forcedPlan));
+    } else {
+      if (arguments.length < 8) console.warn('[SlotMatch] forcedPlan 파라미터 누락 (arguments:', arguments.length, ')');
+      console.log('[SlotMatch] 자동 플랜 선택 (forcedPlan:', forcedPlan, ')');
 
-    if (validPlans.length === 0) return [];
-
-    // 유효한 플랜 중 게임 수 편차가 가장 적은 플랜 선택 (동점 시 랜덤)
-    let bestScore = Infinity;
-    let bestPlans = [];
-    for (const p of validPlans) {
-      const score = this.scorePlan(p, gameCounts, males, females);
-      if (score < bestScore) {
-        bestScore = score;
-        bestPlans = [p];
-      } else if (score === bestScore) {
-        bestPlans.push(p);
+      // 코트를 최대한 채우는 유효한 플랜 찾기
+      let validPlans = [];
+      for (let n = courts; n >= 1; n--) {
+        const plans = this.generatePlans(n, allowMixed, isSingles);
+        validPlans = plans.filter(p => this.isPlanValid(p, males.length, females.length));
+        if (validPlans.length > 0) break;
       }
+
+      if (validPlans.length === 0) return [];
+
+      // 유효한 플랜 중 게임 수 편차가 가장 적은 플랜 선택 (동점 시 랜덤)
+      let bestScore = Infinity;
+      let bestPlans = [];
+      for (const p of validPlans) {
+        const score = this.scorePlan(p, gameCounts, males, females);
+        if (score < bestScore) {
+          bestScore = score;
+          bestPlans = [p];
+        } else if (score === bestScore) {
+          bestPlans.push(p);
+        }
+      }
+      plan = bestPlans[Math.floor(Math.random() * bestPlans.length)];
     }
-    const plan = bestPlans[Math.floor(Math.random() * bestPlans.length)];
 
     // NTRP 맵 + 가용 멤버 정렬: 경기 수 적은 순 (동점 셔플)
     const ntrpMap = this.buildNtrpMap();
@@ -301,8 +378,8 @@ const Schedule = {
     return matches;
   },
 
-  // 대진표 생성 (lateEntries: { playerName: "HH:MM" } — 해당 시간부터 참여)
-  generate(males, females, courts, startTime, endTime, allowMixed, isSingles, lateEntries) {
+  // 대진표 생성 (lateEntries: { playerName: "HH:MM" }, typeDistribution: { MD: 3, XD: 2, WD: 3 } | null)
+  generate(males, females, courts, startTime, endTime, allowMixed, isSingles, lateEntries, typeDistribution) {
     const slots = this.calculateTimeSlots(startTime, endTime);
     const gameCounts = {};
     [...males, ...females].forEach(p => { gameCounts[p] = 0; });
@@ -318,15 +395,59 @@ const Schedule = {
       }
     }
 
-    const timeSlots = slots.map(time => {
+    // 수동 모드: 게임 종류 분배를 슬롯별 플랜으로 변환
+    let slotPlans = null;
+    if (typeDistribution) {
+      slotPlans = this.distributeTypesToSlots(typeDistribution, slots.length, courts, males.length, females.length);
+      if (slotPlans) {
+        // 분배 결과 검증: slotPlans의 타입 카운트가 요청과 일치하는지 확인
+        const planCounts = {};
+        for (const sp of slotPlans) {
+          for (const t of sp) planCounts[t] = (planCounts[t] || 0) + 1;
+        }
+        for (const [t, cnt] of Object.entries(typeDistribution)) {
+          if ((planCounts[t] || 0) !== cnt) {
+            console.error('[Schedule] distributeTypesToSlots 결과 불일치:', JSON.stringify(typeDistribution), '→', JSON.stringify(planCounts));
+            slotPlans = null; // 재시도
+            break;
+          }
+        }
+      }
+      // distributeTypesToSlots 실패 시 한번 더 시도
+      if (!slotPlans) {
+        slotPlans = this.distributeTypesToSlots(typeDistribution, slots.length, courts, males.length, females.length);
+      }
+      console.log('[Schedule] typeDistribution:', JSON.stringify(typeDistribution), 'slotPlans:', JSON.stringify(slotPlans));
+    }
+
+    const timeSlots = slots.map((time, idx) => {
       let slotMales = males, slotFemales = females;
       if (lateEntries) {
         slotMales = males.filter(p => !lateEntries[p] || lateEntries[p] <= time);
         slotFemales = females.filter(p => !lateEntries[p] || lateEntries[p] <= time);
       }
-      const matches = this.generateSlotMatches(slotMales, slotFemales, courts, gameCounts, allowMixed, usedTeams, isSingles);
+      const forcedPlan = slotPlans ? slotPlans[idx] : null;
+      const matches = this.generateSlotMatches(slotMales, slotFemales, courts, gameCounts, allowMixed, usedTeams, isSingles, forcedPlan);
       return { time, matches };
     });
+
+    // 수동 모드: 생성 결과 검증
+    if (typeDistribution) {
+      const actualCounts = {};
+      for (const slot of timeSlots) {
+        for (const m of slot.matches) {
+          actualCounts[m.gameType] = (actualCounts[m.gameType] || 0) + 1;
+        }
+      }
+      const mismatches = [];
+      for (const [type, expected] of Object.entries(typeDistribution)) {
+        const actual = actualCounts[type] || 0;
+        if (actual !== expected) mismatches.push(`${SCHEDULE_GAME_TYPES[type].label}: ${expected}→${actual}`);
+      }
+      if (mismatches.length > 0) {
+        console.error('[Schedule] 수동배분 결과 불일치:', mismatches.join(', '), 'slotPlans:', JSON.stringify(slotPlans));
+      }
+    }
 
     return timeSlots;
   },
@@ -850,7 +971,8 @@ const Schedule = {
               tournament.males, tournament.females, tournament.courts,
               tournament.startTime, tournament.endTime,
               tournament.allowMixed, tournament.isSingles,
-              Object.keys(lateEntries).length > 0 ? lateEntries : null
+              Object.keys(lateEntries).length > 0 ? lateEntries : null,
+              tournament.typeDistribution || null
             );
 
             tournament.timeSlots = newTimeSlots;
