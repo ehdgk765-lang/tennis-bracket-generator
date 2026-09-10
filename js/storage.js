@@ -471,6 +471,6 @@ const Storage = {
       if (typeof App !== 'undefined' && App.currentTab) {
         App.navigate(App.currentTab, App.currentTournamentId);
       }
-    }, 300);
+    }, 100);
   },
 };
