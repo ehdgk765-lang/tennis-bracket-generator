@@ -44,11 +44,12 @@ const Auth = {
             App.isAdmin = false;
 
             const showApp = () => {
-              authEl.style.display = 'none';
-              appEl.style.display = '';
+              // 컨테이너를 숨긴 채로 먼저 렌더링 (빈 화면 깜빡임 방지)
               this.updateRoleBadge();
               if (!this.initialized) { App.init(); this.initialized = true; }
               else App.navigate(App.currentTab);
+              authEl.style.display = 'none';
+              appEl.style.display = '';
             };
 
             const savedName = sessionStorage.getItem('memberName');
@@ -109,12 +110,11 @@ const Auth = {
 
             App.isAdmin = true;
             App.memberName = null;
-            authEl.style.display = 'none';
-            appEl.style.display = '';
             this.updateRoleBadge();
-
             if (!this.initialized) { App.init(); this.initialized = true; }
             else App.navigate(App.currentTab);
+            authEl.style.display = 'none';
+            appEl.style.display = '';
           }
         } catch (e) {
           console.error('계정 유형 확인 실패:', e);
@@ -126,11 +126,11 @@ const Auth = {
           Storage.startRealtimeSync();
           App.isAdmin = true;
           App.memberName = null;
-          authEl.style.display = 'none';
-          appEl.style.display = '';
           this.updateRoleBadge();
           if (!this.initialized) { App.init(); this.initialized = true; }
           else App.navigate(App.currentTab);
+          authEl.style.display = 'none';
+          appEl.style.display = '';
         }
 
       } else {

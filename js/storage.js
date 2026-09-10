@@ -390,6 +390,10 @@ const Storage = {
     const parent = fbDb.collection('users').doc(uid);
     const dataBase = parent.collection('data');
 
+    // 초기 onSnapshot 콜백 억제 (loadFromFirestore에서 이미 로드한 데이터)
+    this._initialSyncDone = false;
+    setTimeout(() => { this._initialSyncDone = true; }, 800);
+
     // players / teams: 단일 문서 리스너
     const listenDoc = (docName) => {
       return dataBase.doc(docName).onSnapshot((doc) => {
@@ -454,11 +458,13 @@ const Storage = {
       const key = '_unsub' + name;
       if (this[key]) { this[key](); this[key] = null; }
     });
+    this._initialSyncDone = true;
   },
 
   // 원격 변경 시 UI 갱신 (300ms 디바운싱)
   _remoteChangeTimer: null,
   _onRemoteChange() {
+    if (this._initialSyncDone === false) return;
     if (this._remoteChangeTimer) clearTimeout(this._remoteChangeTimer);
     this._remoteChangeTimer = setTimeout(() => {
       this._remoteChangeTimer = null;
