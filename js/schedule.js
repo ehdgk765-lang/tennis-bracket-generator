@@ -1494,19 +1494,19 @@ const Schedule = {
     const contentW = W - PAD * 2;
     const headerH = 120;
     const rosterColCount = 4;
-    const rosterCellH = 34;
+    const rosterCellH = 26;
     const rosterRows = Math.ceil(allPlayers.length / rosterColCount);
-    const rosterH = rosterRows > 0 ? 36 + rosterRows * rosterCellH + 16 : 0;
-    const warmupH = (warmupMins > 0 && tournament.startTime) ? 44 : 0;
+    const rosterH = rosterRows > 0 ? 28 + rosterRows * rosterCellH + 10 : 0;
+    const warmupH = (warmupMins > 0 && tournament.startTime) ? 36 : 0;
     const tblHeaderH = 40;
     const roundInfoW = 110;
     const rightInfoW = 100;
     const courtColW = Math.floor((contentW - roundInfoW - rightInfoW) / courtCount);
     // 매치 셀 높이 (가로 배치: 팀1 | VS | 팀2)
-    const nameCellH = 28;
-    const scoreH = 20;
+    const nameCellH = 34;
+    const scoreH = 22;
     const hasAnyScore = slots.some(s => s.matches.some(m => m.scores && m.scores.length > 0));
-    const matchCellH = nameCellH * 2 + (hasAnyScore ? scoreH : 0) + 16;
+    const matchCellH = nameCellH * 2 + (hasAnyScore ? scoreH : 0) + 20;
 
     // 쉬는 멤버 계산
     const restingPerSlot = slots.map(slot => {
@@ -1577,14 +1577,14 @@ const Schedule = {
       ctx.lineWidth = 1;
       ctx.stroke();
 
-      ctx.font = `bold 13px ${FONT}`;
+      ctx.font = `bold 11px ${FONT}`;
       ctx.fillStyle = '#15803d';
       const mCount = allPlayers.filter(n => isMale(n)).length;
       const fCount = allPlayers.filter(n => isFemale(n)).length;
       const rosterTitle = `참가자 명단 (남 ${mCount} · 여 ${fCount}) — ${allPlayers.length}명`;
-      ctx.fillText(rosterTitle, PAD + 16, curY + 20);
+      ctx.fillText(rosterTitle, PAD + 14, curY + 16);
 
-      const rosterStartY = curY + 36;
+      const rosterStartY = curY + 28;
       const rosterCellW = Math.floor((contentW - 32) / rosterColCount);
 
       // 여자 먼저, 남자 나중 정렬
@@ -1596,22 +1596,22 @@ const Schedule = {
       sortedPlayers.forEach((name, i) => {
         const col = i % rosterColCount;
         const row = Math.floor(i / rosterColCount);
-        const cx = PAD + 16 + col * rosterCellW;
+        const cx = PAD + 14 + col * rosterCellW;
         const cy = rosterStartY + row * rosterCellH;
 
         // 성별 색상 dot
         const color = pColor(name);
         ctx.beginPath();
-        ctx.arc(cx + 10, cy + rosterCellH / 2, 6, 0, Math.PI * 2);
+        ctx.arc(cx + 8, cy + rosterCellH / 2, 4, 0, Math.PI * 2);
         ctx.fillStyle = color;
         ctx.fill();
 
         // 이름
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
-        ctx.font = `13px ${FONT}`;
+        ctx.font = `11px ${FONT}`;
         ctx.fillStyle = '#1f2937';
-        ctx.fillText(name, cx + 22, cy + rosterCellH / 2);
+        ctx.fillText(name, cx + 17, cy + rosterCellH / 2);
       });
 
       curY += rosterH;
@@ -1621,28 +1621,28 @@ const Schedule = {
     if (warmupH > 0) {
       const wBannerY = curY;
       // 시간 박스
-      const timeBoxW = 120;
+      const timeBoxW = 110;
       this._roundRect(ctx, PAD, wBannerY, timeBoxW, warmupH, 8);
       ctx.fillStyle = '#15803d';
       ctx.fill();
       const warmupEnd = this._addMinutes(tournament.startTime, warmupMins);
-      ctx.font = `bold 14px ${FONT}`;
+      ctx.font = `bold 12px ${FONT}`;
       ctx.fillStyle = '#ffffff';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(`${tournament.startTime}`, PAD + timeBoxW / 2, wBannerY + 14);
-      ctx.font = `11px ${FONT}`;
-      ctx.fillText(`~ ${warmupEnd}`, PAD + timeBoxW / 2, wBannerY + 30);
+      ctx.fillText(`${tournament.startTime}`, PAD + timeBoxW / 2, wBannerY + 12);
+      ctx.font = `10px ${FONT}`;
+      ctx.fillText(`~ ${warmupEnd}`, PAD + timeBoxW / 2, wBannerY + 26);
       ctx.textAlign = 'left';
 
       // 내용 박스
       this._roundRect(ctx, PAD + timeBoxW, wBannerY, contentW - timeBoxW, warmupH, 8);
       ctx.fillStyle = '#dcfce7';
       ctx.fill();
-      ctx.font = `bold 15px ${FONT}`;
+      ctx.font = `bold 13px ${FONT}`;
       ctx.fillStyle = '#15803d';
       ctx.textBaseline = 'middle';
-      ctx.fillText(`몸풀기 (${warmupMins}분)`, PAD + timeBoxW + 16, wBannerY + warmupH / 2);
+      ctx.fillText(`몸풀기 (${warmupMins}분)`, PAD + timeBoxW + 14, wBannerY + warmupH / 2);
 
       curY += warmupH + 10;
     }
@@ -1657,7 +1657,7 @@ const Schedule = {
     ctx.fillStyle = '#15803d';
     ctx.fill();
 
-    ctx.font = `bold 13px ${FONT}`;
+    ctx.font = `bold 14px ${FONT}`;
     ctx.fillStyle = '#ffffff';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -1672,7 +1672,7 @@ const Schedule = {
       ctx.strokeStyle = 'rgba(255,255,255,0.3)';
       ctx.lineWidth = 1;
       ctx.stroke();
-      ctx.font = `bold 13px ${FONT}`;
+      ctx.font = `bold 14px ${FONT}`;
       ctx.fillStyle = '#ffffff';
       ctx.textAlign = 'center';
       ctx.fillText(`코트 ${ci + 1}`, colX + courtColW / 2, tblY + tblHeaderH / 2);
@@ -1685,7 +1685,7 @@ const Schedule = {
     ctx.strokeStyle = 'rgba(255,255,255,0.3)';
     ctx.lineWidth = 1;
     ctx.stroke();
-    ctx.font = `bold 13px ${FONT}`;
+    ctx.font = `bold 14px ${FONT}`;
     ctx.fillStyle = '#ffffff';
     ctx.textAlign = 'center';
     ctx.fillText('정보', rightColX + rightInfoW / 2, tblY + tblHeaderH / 2);
@@ -1693,27 +1693,38 @@ const Schedule = {
 
     let rowY = tblY + tblHeaderH;
 
-    // ─ 개별 이름 셀 그리기 헬퍼 ─
-    const drawNameCell = (name, x, y, w, h) => {
+    // ─ 개별 이름 셀 그리기 헬퍼 (align: 'left' | 'right') ─
+    const drawNameCell = (name, x, y, w, h, align) => {
       const color = pColor(name);
       // 성별 배경 (꽉 채움)
-      this._roundRect(ctx, x + 1, y + 1, w - 2, h - 2, 5);
+      this._roundRect(ctx, x + 1, y + 1, w - 2, h - 2, 6);
       ctx.fillStyle = pBg(name);
       ctx.fill();
       ctx.strokeStyle = isFemale(name) ? 'rgba(236,72,153,0.25)' : 'rgba(59,130,246,0.25)';
       ctx.lineWidth = 1;
       ctx.stroke();
-      // 좌측 색상 dot
-      ctx.beginPath();
-      ctx.arc(x + 12, y + h / 2, 4, 0, Math.PI * 2);
-      ctx.fillStyle = color;
-      ctx.fill();
-      // 이름 텍스트
-      ctx.font = `bold 12px ${FONT}`;
+      ctx.font = `bold 14px ${FONT}`;
       ctx.fillStyle = '#1f2937';
-      ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.fillText(name, x + 20, y + h / 2);
+      if (align === 'right') {
+        // 오른쪽 정렬: [이름 ●]
+        ctx.beginPath();
+        ctx.arc(x + w - 14, y + h / 2, 5, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.fillStyle = '#1f2937';
+        ctx.textAlign = 'right';
+        ctx.fillText(name, x + w - 24, y + h / 2);
+      } else {
+        // 왼쪽 정렬: [● 이름]
+        ctx.beginPath();
+        ctx.arc(x + 14, y + h / 2, 5, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.fillStyle = '#1f2937';
+        ctx.textAlign = 'left';
+        ctx.fillText(name, x + 24, y + h / 2);
+      }
     };
 
     // ─ 라운드 행 그리기 ─
@@ -1737,17 +1748,17 @@ const Schedule = {
       const roundLabelW = roundInfoW;
 
       // 라운드 번호
-      ctx.font = `bold 15px ${FONT}`;
+      ctx.font = `bold 17px ${FONT}`;
       ctx.fillStyle = '#15803d';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(`${si + 1}R`, roundLabelX + roundLabelW / 2, rowY + rowH / 2 - 10);
+      ctx.fillText(`${si + 1}R`, roundLabelX + roundLabelW / 2, rowY + rowH / 2 - 12);
 
       // 시간
       const timeLabel = gameMins > 0
         ? `${slot.time} ~ ${this._addMinutes(slot.time, gameMins)}`
         : slot.time;
-      ctx.font = `11px ${FONT}`;
+      ctx.font = `12px ${FONT}`;
       ctx.fillStyle = '#6b7280';
       ctx.fillText(timeLabel, roundLabelX + roundLabelW / 2, rowY + rowH / 2 + 8);
       ctx.textAlign = 'left';
@@ -1811,25 +1822,25 @@ const Schedule = {
           const singleY = cellY + nameCellH / 2;
           const p1 = match.player1 || '?';
           const p2 = match.player2 || '?';
-          drawNameCell(p1, t1X, singleY, teamW, nameCellH);
-          drawNameCell(p2, t2X, singleY, teamW, nameCellH);
+          drawNameCell(p1, t1X, singleY, teamW, nameCellH, 'right');
+          drawNameCell(p2, t2X, singleY, teamW, nameCellH, 'left');
         } else {
           const t1Names = (match.player1 || '?').split(' / ');
-          drawNameCell(t1Names[0] || '?', t1X, cellY, teamW, nameCellH);
-          drawNameCell(t1Names[1] || '?', t1X, cellY + nameCellH, teamW, nameCellH);
+          drawNameCell(t1Names[0] || '?', t1X, cellY, teamW, nameCellH, 'right');
+          drawNameCell(t1Names[1] || '?', t1X, cellY + nameCellH, teamW, nameCellH, 'right');
           const t2Names = (match.player2 || '?').split(' / ');
-          drawNameCell(t2Names[0] || '?', t2X, cellY, teamW, nameCellH);
-          drawNameCell(t2Names[1] || '?', t2X, cellY + nameCellH, teamW, nameCellH);
+          drawNameCell(t2Names[0] || '?', t2X, cellY, teamW, nameCellH, 'left');
+          drawNameCell(t2Names[1] || '?', t2X, cellY + nameCellH, teamW, nameCellH, 'left');
         }
 
         // VS 원형 뱃지 (중앙)
         const vsCenterX = vsX + vsW / 2;
         const vsCenterY = cellY + playersH / 2;
         ctx.beginPath();
-        ctx.arc(vsCenterX, vsCenterY, 13, 0, Math.PI * 2);
+        ctx.arc(vsCenterX, vsCenterY, 15, 0, Math.PI * 2);
         ctx.fillStyle = '#72c28fff';
         ctx.fill();
-        ctx.font = `bold 10px ${FONT}`;
+        ctx.font = `bold 11px ${FONT}`;
         ctx.fillStyle = '#ffffff';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -1841,7 +1852,7 @@ const Schedule = {
           const isWin1 = match.winner === 'team1';
           const isWin2 = match.winner === 'team2';
           const isDraw = match.winner === 'draw';
-          ctx.font = `bold 11px ${FONT}`;
+          ctx.font = `bold 12px ${FONT}`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillStyle = '#b45309';
