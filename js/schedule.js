@@ -342,17 +342,20 @@ const Schedule = {
           idx = availF.indexOf(p);
           if (idx >= 0) availF.splice(idx, 1);
         });
-        [team1, team2] = this.balancedPair(picked, ntrpMap, usedTeams);
-        // 여자를 앞에 표시
-        const femSort = (a, b) => (males.includes(a) ? 1 : 0) - (males.includes(b) ? 1 : 0);
-        team1.sort(femSort);
-        team2.sort(femSort);
         picked.forEach(p => gameCounts[p]++);
 
-        // 실제 성별 구성에 따라 표시 타입 결정
-        const mCount = picked.filter(p => males.includes(p)).length;
-        if (mCount === 4) displayType = 'MD';
-        else if (mCount === 0) displayType = 'WD';
+        // 실제 성별 구성에 따라 페어링 + 표시 타입 결정
+        const mPicked = picked.filter(p => males.includes(p));
+        const fPicked = picked.filter(p => !males.includes(p));
+        if (mPicked.length === 2 && fPicked.length === 2) {
+          // 남2+여2 → 혼합복식 페어링 (남여 vs 남여)
+          [team1, team2] = this.balancedPairXD(mPicked, fPicked, ntrpMap, usedTeams);
+          displayType = 'XD';
+        } else {
+          [team1, team2] = this.balancedPair(picked, ntrpMap, usedTeams);
+          if (mPicked.length === 4) displayType = 'MD';
+          else if (mPicked.length === 0) displayType = 'WD';
+        }
       } else if (gameType === 'XD') {
         const mPicked = availM.splice(0, 2);
         const fPicked = availF.splice(0, 2);
