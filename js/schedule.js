@@ -390,8 +390,8 @@ const Schedule = {
     return matches;
   },
 
-  // 대진표 생성 (lateEntries: { playerName: "HH:MM" }, typeDistribution: { MD: 3, XD: 2, WD: 3 } | null)
-  generate(males, females, courts, startTime, endTime, allowMixed, isSingles, lateEntries, typeDistribution, warmupMinutes, gameMinutes) {
+  // 대진표 생성 (lateEntries: { playerName: "HH:MM" }, earlyLeaves: { playerName: "HH:MM" }, typeDistribution: { MD: 3, XD: 2, WD: 3 } | null)
+  generate(males, females, courts, startTime, endTime, allowMixed, isSingles, lateEntries, earlyLeaves, typeDistribution, warmupMinutes, gameMinutes) {
     const slots = this.calculateTimeSlots(startTime, endTime, warmupMinutes, gameMinutes);
     const gameCounts = {};
     [...males, ...females].forEach(p => { gameCounts[p] = 0; });
@@ -403,6 +403,16 @@ const Schedule = {
         const missedSlots = slots.filter(t => t < lateTime).length;
         if (missedSlots > 0 && gameCounts.hasOwnProperty(player)) {
           gameCounts[player] = -missedSlots;
+        }
+      }
+    }
+
+    // 일찍 귀가하는 멤버: 빠지는 슬롯 수만큼 음수 가산 → 참여 슬롯에서 우선 배정
+    if (earlyLeaves) {
+      for (const [player, earlyTime] of Object.entries(earlyLeaves)) {
+        const missedSlots = slots.filter(t => t > earlyTime).length;
+        if (missedSlots > 0 && gameCounts.hasOwnProperty(player)) {
+          gameCounts[player] = (gameCounts[player] || 0) - missedSlots;
         }
       }
     }
@@ -435,6 +445,10 @@ const Schedule = {
       if (lateEntries) {
         slotMales = males.filter(p => !lateEntries[p] || lateEntries[p] <= time);
         slotFemales = females.filter(p => !lateEntries[p] || lateEntries[p] <= time);
+      }
+      if (earlyLeaves) {
+        slotMales = slotMales.filter(p => !earlyLeaves[p] || earlyLeaves[p] >= time);
+        slotFemales = slotFemales.filter(p => !earlyLeaves[p] || earlyLeaves[p] >= time);
       }
       const forcedPlan = slotPlans ? slotPlans[idx] : null;
       const matches = this.generateSlotMatches(slotMales, slotFemales, courts, gameCounts, allowMixed, usedTeams, isSingles, forcedPlan);
@@ -717,6 +731,7 @@ const Schedule = {
           const slots = tournament.timeSlots || [];
           const slotTimes = slots.map(s => s.time);
           const savedLate = tournament.lateEntries || {};
+          const savedEarly = tournament.earlyLeaves || {};
           // 슬롯별 배정 멤버 수집
           const slotBusyMap = slots.map(slot => {
             const busy = new Set();
@@ -745,12 +760,14 @@ const Schedule = {
                     <th class="text-left px-3 py-2 sticky left-0 bg-white/90 z-10 font-medium">멤버</th>
                     <th class="text-center px-1 py-2 font-medium assign-start-col" style="display:none">시작</th>
                     ${slotTimes.map(t => `<th class="text-center px-1.5 py-2 font-medium whitespace-nowrap">${t}</th>`).join('')}
+                    <th class="text-center px-1 py-2 font-medium assign-end-col" style="display:none">종료</th>
                     <th class="text-center px-2 py-2 font-medium">경기</th>
                   </tr>
                 </thead>
                 <tbody>
                   ${playerData.map(p => {
                     const curStart = savedLate[p.name] || slotTimes[0];
+                    const curEnd = savedEarly[p.name] || slotTimes[slotTimes.length - 1];
                     return `
                     <tr class="border-b border-gray-50 hover:bg-gray-50/50">
                       <td class="px-3 py-1.5 sticky left-0 bg-white/90 z-10 text-gray-700 font-medium whitespace-nowrap">${Results.escapeHtml(p.name)}</td>
@@ -763,6 +780,11 @@ const Schedule = {
                         ? '<td class="text-center py-1.5"><span class="inline-block w-2 h-2 rounded-full bg-green-400"></span></td>'
                         : '<td class="text-center py-1.5 text-gray-300">-</td>'
                       ).join('')}
+                      <td class="text-center py-1 assign-end-col" style="display:none">
+                        <select class="early-leave-select text-xs border border-gray-200 rounded px-1 py-0.5 bg-white" data-player="${Results.escapeHtml(p.name)}">
+                          ${slotTimes.map(t => `<option value="${t}" ${t === curEnd ? 'selected' : ''}>${t}</option>`).join('')}
+                        </select>
+                      </td>
                       <td class="text-center py-1.5 font-bold ${p.games < playerData[playerData.length - 1].games ? 'text-orange-500' : 'text-gray-600'}">${p.games}</td>
                     </tr>`;
                   }).join('')}
@@ -948,6 +970,7 @@ const Schedule = {
         overviewEl.style.display = '';
         // 시작 시간 컬럼 + 재생성 버튼 표시
         overviewEl.querySelectorAll('.assign-start-col').forEach(el => el.style.display = '');
+        overviewEl.querySelectorAll('.assign-end-col').forEach(el => el.style.display = '');
         const regenWrap = overviewEl.querySelector('.assign-regen-wrap');
         if (regenWrap) regenWrap.style.display = '';
 
@@ -983,18 +1006,31 @@ const Schedule = {
               }
             });
 
+            // earlyLeaves 수집
+            const earlyLeaves = {};
+            const lastTime = (tournament.timeSlots[tournament.timeSlots.length - 1] || {}).time || tournament.endTime;
+            overviewEl.querySelectorAll('.early-leave-select').forEach(sel => {
+              const player = sel.dataset.player;
+              const endTime = sel.value;
+              if (endTime !== lastTime) {
+                earlyLeaves[player] = endTime;
+              }
+            });
+
             // 대진표 재생성
             const newTimeSlots = Schedule.generate(
               tournament.males, tournament.females, tournament.courts,
               tournament.startTime, tournament.endTime,
               tournament.allowMixed, tournament.isSingles,
               Object.keys(lateEntries).length > 0 ? lateEntries : null,
+              Object.keys(earlyLeaves).length > 0 ? earlyLeaves : null,
               tournament.typeDistribution || null,
               tournament.warmupMinutes || 10, tournament.gameMinutes || 25
             );
 
             tournament.timeSlots = newTimeSlots;
             tournament.lateEntries = lateEntries;
+            tournament.earlyLeaves = earlyLeaves;
             tournament.lastModified = Date.now();
             Storage.updateTournament(tournament);
             this.render(container, tournament);
@@ -1474,15 +1510,56 @@ const Schedule = {
     const W = 1080;
     const PAD = 30;
     const courtCount = tournament.courts || 1;
-    const slots = tournament.timeSlots || [];
     const gameMins = tournament.gameMinutes || 0;
     const warmupMins = tournament.warmupMinutes || 0;
     const isSingles = tournament.isSingles;
-    const allPlayers = tournament.players || [];
+    const isCustom = tournament.isCustom;
+
+    // ─ 커스텀 대진표: 코트별 매치를 가상 슬롯으로 변환 ─
+    let slots;
+    if (isCustom) {
+      const allMatchesRaw = (tournament.timeSlots || []).flatMap(s => s.matches || []);
+      const courtBuckets = {};
+      for (let c = 1; c <= courtCount; c++) courtBuckets[c] = [];
+      allMatchesRaw.forEach(m => {
+        const c = m.court || 1;
+        if (courtBuckets[c]) courtBuckets[c].push(m);
+      });
+      const maxPerCourt = Math.max(1, ...Object.values(courtBuckets).map(a => a.length));
+      slots = [];
+      for (let i = 0; i < maxPerCourt; i++) {
+        const matches = [];
+        for (let c = 1; c <= courtCount; c++) {
+          if (courtBuckets[c][i]) matches.push(courtBuckets[c][i]);
+        }
+        slots.push({ time: `${i + 1}R`, matches });
+      }
+    } else {
+      slots = tournament.timeSlots || [];
+    }
+
+    // ─ 참가자 목록 (커스텀 대진표: 매치에서 추출) ─
+    let allPlayers = (tournament.players && tournament.players.length > 0) ? tournament.players : [];
+    if (allPlayers.length === 0) {
+      const nameSet = new Set();
+      (tournament.timeSlots || []).forEach(s => (s.matches || []).forEach(m => {
+        if (m.player1) m.player1.split(' / ').forEach(n => nameSet.add(n));
+        if (m.player2) m.player2.split(' / ').forEach(n => nameSet.add(n));
+      }));
+      allPlayers = [...nameSet];
+    }
 
     // ─ 성별 기반 색상 ─
     const maleSet = new Set(tournament.males || []);
     const femaleSet = new Set(tournament.females || []);
+    // 커스텀 대진표: males/females가 비어있으면 Storage에서 성별 조회
+    if (maleSet.size === 0 && femaleSet.size === 0 && allPlayers.length > 0) {
+      const playerData = Storage.getPlayers();
+      playerData.forEach(pd => {
+        if (pd.gender === 'M') maleSet.add(pd.name);
+        else if (pd.gender === 'F') femaleSet.add(pd.name);
+      });
+    }
     const isMale = (name) => maleSet.has(name);
     const isFemale = (name) => femaleSet.has(name);
     // 성별 색상: 남=파랑, 여=분홍
@@ -1493,23 +1570,58 @@ const Schedule = {
     const pColor = (name) => isFemale(name) ? FEMALE_DOT : MALE_DOT;
     const pBg = (name) => isFemale(name) ? FEMALE_BG : MALE_BG;
 
+    // ─ 팀전 모드: 팀 이름 맵 ─
+    const teamMap = tournament.isTeamMode ? buildTeamMap() : {};
+
     // ─ 레이아웃 상수 ─
     const contentW = W - PAD * 2;
     const headerH = 120;
     const rosterColCount = 4;
     const rosterCellH = 26;
     const rosterRows = Math.ceil(allPlayers.length / rosterColCount);
-    const rosterH = rosterRows > 0 ? 28 + rosterRows * rosterCellH + 10 : 0;
+    // 팀전 모드: 팀별 가로 레이아웃 사전 계산
+    const teamBadgeW = 70;
+    let teamGroups = null; // [{name, members}]
+    let rosterH;
+    if (tournament.isTeamMode && allPlayers.length > 0) {
+      const teamOrder = [];
+      const teamMembersMap = {};
+      allPlayers.forEach(n => {
+        const t = teamMap[n] || '미배정';
+        if (!teamMembersMap[t]) { teamMembersMap[t] = []; teamOrder.push(t); }
+        teamMembersMap[t].push(n);
+      });
+      // 팀 내 성별 정렬 (여 → 남)
+      teamGroups = teamOrder.map(t => ({
+        name: t,
+        members: teamMembersMap[t].sort((a, b) => (isFemale(a) ? 0 : 1) - (isFemale(b) ? 0 : 1))
+      }));
+      const memberAreaW = contentW - 32 - teamBadgeW;
+      const memberSlotW = 90;
+      const membersPerRow = Math.max(1, Math.floor(memberAreaW / memberSlotW));
+      const teamRowPad = 8; // 팀 행 내부 상하 패딩
+      const teamGap = 6;    // 팀 간 간격
+      let totalH = 0;
+      teamGroups.forEach((g, gi) => {
+        const rows = Math.ceil(g.members.length / membersPerRow);
+        totalH += rows * rosterCellH + teamRowPad * 2;
+        if (gi < teamGroups.length - 1) totalH += teamGap;
+      });
+      rosterH = 28 + totalH + 10;
+    } else {
+      rosterH = rosterRows > 0 ? 28 + rosterRows * rosterCellH + 10 : 0;
+    }
     const warmupH = (warmupMins > 0 && tournament.startTime) ? 36 : 0;
     const tblHeaderH = 40;
-    const roundInfoW = 110;
+    const roundInfoW = isCustom ? 60 : 110;
     const rightInfoW = 100;
     const courtColW = Math.floor((contentW - roundInfoW - rightInfoW) / courtCount);
     // 매치 셀 높이 (가로 배치: 팀1 | VS | 팀2)
     const nameCellH = 34;
+    const teamLabelH = tournament.isTeamMode ? 22 : 0;
     const scoreH = 22;
     const hasAnyScore = slots.some(s => s.matches.some(m => m.scores && m.scores.length > 0));
-    const matchCellH = nameCellH * 2 + (hasAnyScore ? scoreH : 0) + 20;
+    const matchCellH = teamLabelH + nameCellH * 2 + (hasAnyScore ? scoreH : 0) + 20;
 
     // 쉬는 멤버 계산
     const restingPerSlot = slots.map(slot => {
@@ -1584,38 +1696,102 @@ const Schedule = {
       ctx.fillStyle = '#15803d';
       const mCount = allPlayers.filter(n => isMale(n)).length;
       const fCount = allPlayers.filter(n => isFemale(n)).length;
-      const rosterTitle = `참가자 명단 (남 ${mCount} · 여 ${fCount}) — ${allPlayers.length}명`;
+      const teamCount = tournament.isTeamMode ? [...new Set(allPlayers.map(n => teamMap[n] || '미배정'))].length : 0;
+      const rosterTitle = tournament.isTeamMode
+        ? `참가자 명단 (${teamCount}팀 · 남 ${mCount} · 여 ${fCount}) — ${allPlayers.length}명`
+        : `참가자 명단 (남 ${mCount} · 여 ${fCount}) — ${allPlayers.length}명`;
       ctx.fillText(rosterTitle, PAD + 14, curY + 16);
 
       const rosterStartY = curY + 28;
       const rosterCellW = Math.floor((contentW - 32) / rosterColCount);
 
-      // 여자 먼저, 남자 나중 정렬
+      // 팀전: 팀별 → 성별 정렬 / 일반: 성별 정렬
       const sortedPlayers = [...allPlayers].sort((a, b) => {
+        if (tournament.isTeamMode) {
+          const aT = teamMap[a] || '';
+          const bT = teamMap[b] || '';
+          if (aT !== bT) return aT.localeCompare(bT);
+        }
         const aF = isFemale(a) ? 0 : 1;
         const bF = isFemale(b) ? 0 : 1;
         return aF - bF;
       });
-      sortedPlayers.forEach((name, i) => {
-        const col = i % rosterColCount;
-        const row = Math.floor(i / rosterColCount);
-        const cx = PAD + 14 + col * rosterCellW;
-        const cy = rosterStartY + row * rosterCellH;
 
-        // 성별 색상 dot
-        const color = pColor(name);
-        ctx.beginPath();
-        ctx.arc(cx + 8, cy + rosterCellH / 2, 4, 0, Math.PI * 2);
-        ctx.fillStyle = color;
-        ctx.fill();
+      if (tournament.isTeamMode && teamGroups) {
+        // 팀별 가로 레이아웃: [팀뱃지] 멤버1 멤버2 멤버3 ...
+        const memberAreaW = contentW - 32 - teamBadgeW;
+        const memberSlotW = 90;
+        const membersPerRow = Math.max(1, Math.floor(memberAreaW / memberSlotW));
+        const teamRowPad = 8;
+        const teamGap = 6;
+        let drawY = rosterStartY;
+        teamGroups.forEach((group, gi) => {
+          const rows = Math.ceil(group.members.length / membersPerRow);
+          const blockH = rows * rosterCellH + teamRowPad * 2;
+          // 팀 행 테두리 배경
+          this._roundRect(ctx, PAD + 10, drawY, contentW - 20, blockH, 6);
+          ctx.fillStyle = gi % 2 === 0 ? '#f0fdf4' : '#ffffff';
+          ctx.fill();
+          ctx.strokeStyle = '#bbf7d0';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          // 팀 뱃지 (세로 중앙)
+          const badgeH = 18;
+          const badgeY = drawY + blockH / 2 - badgeH / 2;
+          ctx.font = `bold 10px ${FONT}`;
+          const badgeTW = ctx.measureText(group.name).width;
+          const badgeRW = Math.min(teamBadgeW - 4, badgeTW + 16);
+          this._roundRect(ctx, PAD + 16, badgeY, badgeRW, badgeH, 4);
+          ctx.fillStyle = '#15803d';
+          ctx.fill();
+          ctx.fillStyle = '#ffffff';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(group.name, PAD + 16 + badgeRW / 2, badgeY + badgeH / 2);
+          // 멤버 가로 나열
+          const mx0 = PAD + 16 + teamBadgeW;
+          const memberStartY = drawY + teamRowPad;
+          group.members.forEach((name, mi) => {
+            const col = mi % membersPerRow;
+            const row = Math.floor(mi / membersPerRow);
+            const cx = mx0 + col * memberSlotW;
+            const cy = memberStartY + row * rosterCellH;
+            // 성별 dot
+            ctx.beginPath();
+            ctx.arc(cx + 8, cy + rosterCellH / 2, 4, 0, Math.PI * 2);
+            ctx.fillStyle = pColor(name);
+            ctx.fill();
+            // 이름
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.font = `11px ${FONT}`;
+            ctx.fillStyle = '#1f2937';
+            ctx.fillText(name, cx + 17, cy + rosterCellH / 2);
+          });
+          drawY += blockH + teamGap;
+        });
+      } else {
+        sortedPlayers.forEach((name, i) => {
+          const col = i % rosterColCount;
+          const row = Math.floor(i / rosterColCount);
+          const cx = PAD + 14 + col * rosterCellW;
+          const cy = rosterStartY + row * rosterCellH;
 
-        // 이름
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'middle';
-        ctx.font = `11px ${FONT}`;
-        ctx.fillStyle = '#1f2937';
-        ctx.fillText(name, cx + 17, cy + rosterCellH / 2);
-      });
+          // 성별 색상 dot
+          const color = pColor(name);
+          ctx.beginPath();
+          ctx.arc(cx + 8, cy + rosterCellH / 2, 4, 0, Math.PI * 2);
+          ctx.fillStyle = color;
+          ctx.fill();
+
+          // 이름
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'middle';
+          ctx.font = `11px ${FONT}`;
+          ctx.fillStyle = '#1f2937';
+          ctx.fillText(name, cx + 17, cy + rosterCellH / 2);
+        });
+      }
 
       curY += rosterH;
     }
@@ -1664,7 +1840,7 @@ const Schedule = {
     ctx.fillStyle = '#ffffff';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('라운드 / 시간', tblX + roundInfoW / 2, tblY + tblHeaderH / 2);
+    ctx.fillText(isCustom ? '#' : '라운드 / 시간', tblX + roundInfoW / 2, tblY + tblHeaderH / 2);
 
     // 코트 헤더
     for (let ci = 0; ci < courtCount; ci++) {
@@ -1755,15 +1931,18 @@ const Schedule = {
       ctx.fillStyle = '#15803d';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(`${si + 1}R`, roundLabelX + roundLabelW / 2, rowY + rowH / 2 - 12);
-
-      // 시간
-      const timeLabel = gameMins > 0
-        ? `${slot.time} ~ ${this._addMinutes(slot.time, gameMins)}`
-        : slot.time;
-      ctx.font = `12px ${FONT}`;
-      ctx.fillStyle = '#6b7280';
-      ctx.fillText(timeLabel, roundLabelX + roundLabelW / 2, rowY + rowH / 2 + 8);
+      if (isCustom) {
+        ctx.fillText(`${si + 1}`, roundLabelX + roundLabelW / 2, rowY + rowH / 2);
+      } else {
+        ctx.fillText(`${si + 1}R`, roundLabelX + roundLabelW / 2, rowY + rowH / 2 - 12);
+        // 시간
+        const timeLabel = gameMins > 0
+          ? `${slot.time} ~ ${this._addMinutes(slot.time, gameMins)}`
+          : slot.time;
+        ctx.font = `12px ${FONT}`;
+        ctx.fillStyle = '#6b7280';
+        ctx.fillText(timeLabel, roundLabelX + roundLabelW / 2, rowY + rowH / 2 + 8);
+      }
       ctx.textAlign = 'left';
 
       // 세로 구분선 (라운드 | 코트들)
@@ -1814,31 +1993,67 @@ const Schedule = {
         const teamW = Math.floor((courtColW - cellPad * 2 - vsW - gapW * 2) / 2);
         const actualScoreH = (hasAnyScore && match.scores && match.scores.length > 0) ? scoreH : 0;
         const playersH = nameCellH * 2;
-        const contentH = playersH + actualScoreH;
+        const contentH = teamLabelH + playersH + actualScoreH;
         const cellY = rowY + Math.floor((rowH - contentH) / 2);
 
         const t1X = colX + cellPad;
         const vsX = t1X + teamW + gapW;
         const t2X = vsX + vsW + gapW;
 
+        // 팀전 모드: 팀 이름 라벨
+        let nameStartY = cellY;
+        if (tournament.isTeamMode) {
+          const t1Names = (match.player1 || '').split(' / ');
+          const t2Names = (match.player2 || '').split(' / ');
+          const t1Team = [...new Set(t1Names.map(n => teamMap[n]).filter(Boolean))].join('/');
+          const t2Team = [...new Set(t2Names.map(n => teamMap[n]).filter(Boolean))].join('/');
+          ctx.font = `bold 12px ${FONT}`;
+          ctx.textBaseline = 'middle';
+          if (t1Team) {
+            const tw1 = ctx.measureText(t1Team).width;
+            ctx.fillStyle = '#dcfce7';
+            this._roundRect(ctx, t1X + teamW / 2 - tw1 / 2 - 8, cellY, tw1 + 16, 18, 4);
+            ctx.fill();
+            ctx.strokeStyle = '#86efac';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.fillStyle = '#15803d';
+            ctx.textAlign = 'center';
+            ctx.fillText(t1Team, t1X + teamW / 2, cellY + 9);
+          }
+          if (t2Team) {
+            const tw2 = ctx.measureText(t2Team).width;
+            ctx.fillStyle = '#dcfce7';
+            this._roundRect(ctx, t2X + teamW / 2 - tw2 / 2 - 8, cellY, tw2 + 16, 18, 4);
+            ctx.fill();
+            ctx.strokeStyle = '#86efac';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.fillStyle = '#15803d';
+            ctx.textAlign = 'center';
+            ctx.fillText(t2Team, t2X + teamW / 2, cellY + 9);
+          }
+          nameStartY = cellY + teamLabelH;
+        }
+
         if (isSingles) {
-          const singleY = cellY + nameCellH / 2;
+          const singleY = nameStartY + nameCellH / 2;
           const p1 = match.player1 || '?';
           const p2 = match.player2 || '?';
           drawNameCell(p1, t1X, singleY, teamW, nameCellH, 'right');
           drawNameCell(p2, t2X, singleY, teamW, nameCellH, 'left');
         } else {
           const t1Names = (match.player1 || '?').split(' / ');
-          drawNameCell(t1Names[0] || '?', t1X, cellY, teamW, nameCellH, 'right');
-          drawNameCell(t1Names[1] || '?', t1X, cellY + nameCellH, teamW, nameCellH, 'right');
+          drawNameCell(t1Names[0] || '?', t1X, nameStartY, teamW, nameCellH, 'right');
+          drawNameCell(t1Names[1] || '?', t1X, nameStartY + nameCellH, teamW, nameCellH, 'right');
           const t2Names = (match.player2 || '?').split(' / ');
-          drawNameCell(t2Names[0] || '?', t2X, cellY, teamW, nameCellH, 'left');
-          drawNameCell(t2Names[1] || '?', t2X, cellY + nameCellH, teamW, nameCellH, 'left');
+          drawNameCell(t2Names[0] || '?', t2X, nameStartY, teamW, nameCellH, 'left');
+          drawNameCell(t2Names[1] || '?', t2X, nameStartY + nameCellH, teamW, nameCellH, 'left');
         }
 
         // VS 원형 뱃지 (중앙)
         const vsCenterX = vsX + vsW / 2;
-        const vsCenterY = cellY + playersH / 2;
+        const vsCenterY = nameStartY + playersH / 2;
         ctx.beginPath();
         ctx.arc(vsCenterX, vsCenterY, 15, 0, Math.PI * 2);
         ctx.fillStyle = '#72c28fff';
@@ -1852,15 +2067,15 @@ const Schedule = {
         // 스코어 (팀 영역 아래)
         if (hasAnyScore && match.scores && match.scores.length > 0) {
           const scoreStr = match.scores.map(s => `${s[0]}:${s[1]}`).join('  ');
-          const isWin1 = match.winner === 'team1';
-          const isWin2 = match.winner === 'team2';
           const isDraw = match.winner === 'draw';
+          const isWin1 = !isDraw && match.winner === match.player1;
+          const isWin2 = !isDraw && match.winner === match.player2;
           ctx.font = `bold 12px ${FONT}`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillStyle = '#b45309';
           const prefix = isDraw ? '무 ' : isWin1 ? '▲ ' : isWin2 ? '▼ ' : '';
-          ctx.fillText(prefix + scoreStr, colX + courtColW / 2, cellY + playersH + scoreH / 2);
+          ctx.fillText(prefix + scoreStr, colX + courtColW / 2, nameStartY + playersH + scoreH / 2);
           ctx.textAlign = 'left';
         }
       }
@@ -1879,7 +2094,15 @@ const Schedule = {
       for (let ci = 0; ci < courtCount; ci++) {
         const m = courtMap[ci + 1] && courtMap[ci + 1][0];
         if (!m) continue;
-        const tc = this._typeColors[m.gameType] || { label: '?', bg: '#f3f4f6', text: '#374151', border: '#d1d5db' };
+        // gameType이 없으면 성별 기반 자동 판별
+        let gt = m.gameType;
+        if (!gt) {
+          const names = [...(m.player1 || '').split(' / '), ...(m.player2 || '').split(' / ')].filter(Boolean);
+          const mCnt = names.filter(n => maleSet.has(n)).length;
+          if (names.length === 2) { gt = mCnt === 2 ? 'MS' : mCnt === 0 ? 'WS' : 'FS'; }
+          else if (names.length === 4) { gt = mCnt === 4 ? 'MD' : mCnt === 0 ? 'WD' : mCnt === 2 ? 'XD' : 'FD'; }
+        }
+        const tc = this._typeColors[gt] || { label: '?', bg: '#f3f4f6', text: '#374151', border: '#d1d5db' };
         const label = courtCount > 1 ? `C${ci + 1} ${tc.label}` : tc.label;
         this._roundRect(ctx, riX + 8, riY, tbW, 18, 4);
         ctx.fillStyle = tc.bg;
@@ -2272,8 +2495,29 @@ const Schedule = {
             else gameType = 'FD';
           }
         } else {
-          const gtEl = modal.querySelector('input[name="am-gametype"]:checked');
-          gameType = tournament.isCustom ? null : (gtEl ? gtEl.value : null);
+          if (tournament.isCustom) {
+            // 커스텀 대진표: 성별 기반 경기 종류 자동 감지
+            const getGender = (name) => { const p = allPlayers.find(pl => pl.name === name); return p ? p.gender : null; };
+            if (isSingles) {
+              const g1 = getGender(t1p1), g2 = getGender(t2p1);
+              if (g1 === 'M' && g2 === 'M') gameType = 'MS';
+              else if (g1 === 'F' && g2 === 'F') gameType = 'WS';
+              else gameType = 'FS';
+            } else {
+              const genders = [t1p1, t1p2, t2p1, t2p2].map(n => { const p = allPlayers.find(pl => pl.name === n); return p ? p.gender : null; });
+              const allM = genders.every(g => g === 'M');
+              const allF = genders.every(g => g === 'F');
+              const mixedPairs = (genders[0] !== genders[1]) && (genders[2] !== genders[3])
+                && genders.filter(g => g === 'M').length === 2 && genders.filter(g => g === 'F').length === 2;
+              if (allM) gameType = 'MD';
+              else if (allF) gameType = 'WD';
+              else if (mixedPairs) gameType = 'XD';
+              else gameType = 'FD';
+            }
+          } else {
+            const gtEl = modal.querySelector('input[name="am-gametype"]:checked');
+            gameType = gtEl ? gtEl.value : null;
+          }
         }
         const courtEl = modal.querySelector('input[name="am-court"]:checked');
         const court = courtEl ? parseInt(courtEl.value) : selectedCourt;

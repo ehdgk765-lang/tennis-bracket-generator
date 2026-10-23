@@ -924,7 +924,7 @@ const App = {
         }
       }
 
-      const timeSlots = Schedule.generate(selectedMales, selectedFemales, courts, startTime, endTime, allowMixed, isSingles, null, typeDistribution, 10, 25);
+      const timeSlots = Schedule.generate(selectedMales, selectedFemales, courts, startTime, endTime, allowMixed, isSingles, null, null, typeDistribution, 10, 25);
 
       if (timeSlots.length === 0) {
         Modal.alert('시간이 부족합니다. 시간 설정을 확인해주세요.');
