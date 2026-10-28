@@ -373,13 +373,59 @@ html.dark .custom-modal-box .text-amber-500 { color: #fbbf24 !important; }
 
 .schedule-match-card {
   min-height: 80px;
+  overflow: hidden;
+}
+
+/* 매치 카드: 선수 이름 줄바꿈 방지 */
+.schedule-match-card .swap-player {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 /* 모바일 최적화 */
 @media (max-width: 640px) {
-  /* 대진표: 모바일에서 1열로 */
+  /* 대진표: 모바일에서 2열 유지, 카드 컴팩트화 */
   .schedule-grid {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 6px !important;
+  }
+  .schedule-match-card {
+    padding: 5px 6px !important;
+    min-height: auto !important;
+    border-radius: 8px !important;
+  }
+  /* 게임타입 뱃지 축소 */
+  .schedule-match-card .change-gametype-btn {
+    font-size: 9px !important;
+    padding: 1px 5px !important;
+  }
+  /* 선수 이름 축소 */
+  .schedule-match-card .swap-player {
+    font-size: 11px !important;
+  }
+  /* 팀 이름 뱃지 축소 */
+  .schedule-match-card .space-y-0\.5 > div {
+    padding: 3px 4px !important;
+    border-radius: 6px !important;
+  }
+  /* 점수 축소 */
+  .schedule-match-card .match-score {
+    font-size: 11px !important;
+    padding: 1px 4px !important;
+    min-width: 1.2rem !important;
+  }
+  /* 삭제 버튼 축소 */
+  .schedule-match-card .delete-match-btn {
+    width: 18px !important;
+    height: 18px !important;
+    top: -4px !important;
+    right: -4px !important;
+  }
+  .schedule-match-card .delete-match-btn svg {
+    width: 10px !important;
+    height: 10px !important;
   }
   /* 브래킷 축소 */
   .bracket-round {

@@ -685,7 +685,7 @@ const Schedule = {
                   <span class="text-sm font-bold text-gray-700 bg-gray-100 px-3 py-1 rounded-full">${_gameMins > 0 ? `${slot.time} ~ ${Schedule._addMinutes(slot.time, _gameMins)}` : slot.time}</span>
                   <div class="flex-1 border-t border-gray-200"></div>
                 </div>
-                <div class="grid gap-3 ${gridCols}">
+                <div class="schedule-grid grid gap-3 ${gridCols}">
                   ${Array.from({length: courtCount}, (_, ci) => {
                     const c = ci + 1;
                     const items = courtMap[c];
@@ -2202,7 +2202,7 @@ const Schedule = {
     });
 
     const gridCols = courtCount <= 1 ? 'grid-cols-1' : `grid-cols-2${courtCount > 2 ? ` sm:grid-cols-${courtCount}` : ''}`;
-    return `<div class="grid gap-3 ${gridCols}">
+    return `<div class="schedule-grid grid gap-3 ${gridCols}">
       ${Array.from({length: courtCount}, (_, i) => {
         const c = i + 1;
         const matches = courtMatches[c];
@@ -2270,6 +2270,11 @@ const Schedule = {
     const t2TextClass = isDraw ? 'text-yellow-700' : (isWin2 ? 'text-green-700' : 'text-gray-800');
     const s1Class = isDraw ? 'text-yellow-600 bg-yellow-100' : (isWin1 ? 'text-green-700 bg-green-100' : 'text-gray-500 bg-gray-100');
     const s2Class = isDraw ? 'text-yellow-600 bg-yellow-100' : (isWin2 ? 'text-green-700 bg-green-100' : 'text-gray-500 bg-gray-100');
+    // 좌측 보더 색상으로 승/무/패 표시
+    const t1Border = isDraw ? 'border-l-2 border-l-yellow-400' : (isWin1 ? 'border-l-2 border-l-green-500' : '');
+    const t2Border = isDraw ? 'border-l-2 border-l-yellow-400' : (isWin2 ? 'border-l-2 border-l-green-500' : '');
+    // 점수 영역 결과 라벨
+    const resultLabel = isDraw ? '<span class="text-[10px] font-bold text-yellow-500">무</span>' : (isWin1 ? '<span class="text-[10px] font-bold text-green-600">▲</span>' : (isWin2 ? '<span class="text-[10px] font-bold text-green-600">▼</span>' : ''));
 
     const myMatchClass = isMember && isMyMatch ? 'my-match' : '';
     const myBorderColor = isMember && isMyMatch ? 'border-blue-400 ring-2 ring-blue-200' : borderColor;
@@ -2280,27 +2285,27 @@ const Schedule = {
         <button type="button" class="delete-match-btn absolute -top-2 -right-2 w-6 h-6 flex items-center justify-center rounded-full bg-white border border-gray-200 text-gray-400 hover:bg-red-50 hover:border-red-300 hover:text-red-500 shadow-sm transition z-10" data-slot-idx="${slotIdx}" data-match-idx="${matchIdx}">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
-        ${cfg ? `<div class="flex items-center mb-2 pr-5">
+        ${cfg ? `<div class="flex items-center mb-1 pr-5">
           <span class="change-gametype-btn text-xs px-2 py-0.5 rounded-full font-medium ${cfg.badgeClass} cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-green-400 transition" data-match-id="${match.id}">${cfg.label}</span>
         </div>` : ''}
         <div class="space-y-0.5">
-          <div class="${t1Bg} rounded-lg px-2 ${t1TeamName ? 'pt-1.5 pb-2' : 'py-2'}">
-            ${t1TeamName ? `<div class="text-center mb-1"><span class="inline-block text-[10px] leading-tight px-1.5 py-0.5 rounded bg-green-50 text-green-600 border border-green-200 font-medium">${t1TeamName}</span></div>` : ''}
-            <div class="text-sm sm:text-xs font-medium ${t1TextClass} text-center">
-              ${isWin1 ? '🏆 ' : ''}${isDraw ? '🤝 ' : ''}${t1Html}
+          <div class="${t1Bg} ${t1Border} rounded-lg px-2 py-1.5 overflow-hidden">
+            ${t1TeamName ? `<div class="text-center mb-0.5"><span class="inline-block text-[10px] leading-tight px-1.5 py-0.5 rounded bg-green-50 text-green-600 border border-green-200 font-medium truncate max-w-full">${t1TeamName}</span></div>` : ''}
+            <div class="text-xs font-medium ${t1TextClass} text-center truncate">
+              ${t1Html}
             </div>
           </div>
-          ${hasResult && match.scores
-            ? `<div class="flex items-center justify-center gap-1.5 py-0.5">
-                <span class="match-score text-sm font-bold ${s1Class} px-2 py-0.5 rounded-md min-w-[1.5rem] text-center">${match.scores[0][0]}</span>
-                <span class="text-xs text-gray-400 font-medium">:</span>
-                <span class="match-score text-sm font-bold ${s2Class} px-2 py-0.5 rounded-md min-w-[1.5rem] text-center">${match.scores[0][1]}</span>
-              </div>`
-            : `<div class="text-center text-xs text-gray-300 leading-tight">vs</div>`}
-          <div class="${t2Bg} rounded-lg px-2 ${t2TeamName ? 'pt-1.5 pb-2' : 'py-2'}">
-            ${t2TeamName ? `<div class="text-center mb-1"><span class="inline-block text-[10px] leading-tight px-1.5 py-0.5 rounded bg-green-50 text-green-600 border border-green-200 font-medium">${t2TeamName}</span></div>` : ''}
-            <div class="text-sm sm:text-xs font-medium ${t2TextClass} text-center">
-              ${isWin2 ? '🏆 ' : ''}${isDraw ? '🤝 ' : ''}${t2Html}
+          <div class="flex items-center justify-center gap-1 py-0.5 min-h-[22px]">
+            ${hasResult && match.scores
+              ? `${resultLabel}<span class="match-score text-sm font-bold ${s1Class} px-2 py-0.5 rounded-md min-w-[1.2rem] text-center">${match.scores[0][0]}</span>
+                 <span class="text-[10px] text-gray-400 font-medium">:</span>
+                 <span class="match-score text-sm font-bold ${s2Class} px-2 py-0.5 rounded-md min-w-[1.2rem] text-center">${match.scores[0][1]}</span>`
+              : `<span class="text-xs text-gray-300 font-medium">vs</span>`}
+          </div>
+          <div class="${t2Bg} ${t2Border} rounded-lg px-2 py-1.5 overflow-hidden">
+            ${t2TeamName ? `<div class="text-center mb-0.5"><span class="inline-block text-[10px] leading-tight px-1.5 py-0.5 rounded bg-green-50 text-green-600 border border-green-200 font-medium truncate max-w-full">${t2TeamName}</span></div>` : ''}
+            <div class="text-xs font-medium ${t2TextClass} text-center truncate">
+              ${t2Html}
             </div>
           </div>
         </div>
