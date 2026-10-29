@@ -526,8 +526,9 @@ const Schedule = {
       s.matchPoints = s.wins * 3 + s.draws * 1;
     });
 
-    // 현재 멤버 목록에 있는 선수만 표시
+    // 현재 멤버 목록 + 게스트 포함
     const currentNames = new Set(Storage.getPlayers().map(p => p.name));
+    if (tournament.guests) tournament.guests.forEach(g => currentNames.add(g));
     const filtered = Object.values(stats).filter(s => currentNames.has(s.name));
 
     return filtered.sort((a, b) => b.scorePoints - a.scorePoints || b.matchPoints - a.matchPoints || b.wins - a.wins || b.games - a.games);
@@ -618,13 +619,16 @@ const Schedule = {
     let maleCount = 0, femaleCount = 0, unknownCount = 0;
     uniqueNames.forEach(name => {
       const pd = allPlayersData.find(p => p.name === name);
-      if (pd?.gender === 'M') maleCount++;
-      else if (pd?.gender === 'F') femaleCount++;
+      const gender = pd?.gender || (tournament.males?.includes(name) ? 'M' : tournament.females?.includes(name) ? 'F' : null);
+      if (gender === 'M') maleCount++;
+      else if (gender === 'F') femaleCount++;
       else unknownCount++;
     });
+    const guestCount = tournament.guests?.filter(g => uniqueNames.has(g)).length || 0;
+    const guestSuffix = guestCount > 0 ? ` (게${guestCount})` : '';
     const playerInfo = unknownCount > 0
-      ? `${uniqueNames.size}명 (남${maleCount} 여${femaleCount} 기타${unknownCount})`
-      : `남${maleCount} 여${femaleCount}`;
+      ? `${uniqueNames.size}명 (남${maleCount} 여${femaleCount} 기타${unknownCount})${guestSuffix}`
+      : `남${maleCount} 여${femaleCount}${guestSuffix}`;
     const maxCourts = Math.max(tournament.courts, ...tournament.timeSlots.map(s => s.matches.length));
 
     morphHTML(container, `
@@ -854,12 +858,14 @@ const Schedule = {
                   <th class="text-center px-2 py-2">패</th>
                   <th class="text-center px-2 py-2">득실</th>
                   <th class="text-center px-2 py-2">승점</th>
+                  ${App.isAdmin ? '<th class="text-center px-2 py-2"></th>' : ''}
                 </tr>
               </thead>
               <tbody>
                 ${(() => { const allPlayersData = Storage.getPlayers(); const medalPos = ['0%', '50%', '100%']; return playerStats.map((s, idx) => {
                   const pd = allPlayersData.find(pl => pl.name === s.name);
-                  const gender = pd?.gender;
+                  const gender = pd?.gender || (tournament.males?.includes(s.name) ? 'M' : tournament.females?.includes(s.name) ? 'F' : null);
+                  const isGuest = tournament.guests?.includes(s.name);
                   const teamName = (() => { const teams = Storage.getTeams(); for (const t of teams) { if ((t.members || []).includes(s.name)) return t.name; } return ''; })();
                   const rank = playerStats.findIndex(p => p.scorePoints === s.scorePoints && p.matchPoints === s.matchPoints);
                   const medalHtml = isComplete && rank < 3 ? '<span style="display:inline-block;width:22px;height:26px;background:url(\'css/medal.png\') no-repeat;background-size:300% auto;background-position:' + medalPos[rank] + ' center;vertical-align:middle;margin-right:2px;"></span>' : '';
@@ -867,6 +873,7 @@ const Schedule = {
                   return '<tr class="border-b border-gray-50 hover:bg-gray-50' + (rowBg ? ' bg-gradient-to-r' + rowBg + ' to-transparent' : '') + '"' + (idx >= 10 ? ' data-expandable="sch-member-team" style="display:none"' : '') + '>' +
                     '<td class="px-4 py-2 font-medium text-gray-800 sticky left-0 bg-white/95 dark:bg-slate-800/95 z-[1]">' + medalHtml + Results.escapeHtml(s.name) +
                       ' ' + genderBadge(gender) +
+                      (isGuest ? ' <span class="text-[10px] px-1 py-0.5 rounded font-medium bg-amber-100 text-amber-700">게</span>' : '') +
                       (teamName ? ' <span class="text-xs px-1 py-0.5 rounded font-medium bg-green-50 text-green-600 border border-green-200">' + Results.escapeHtml(teamName) + '</span>' : '') +
                     '</td>' +
                     '<td class="text-center px-2 py-2 text-gray-600">' + s.games + '</td>' +
@@ -876,6 +883,7 @@ const Schedule = {
                     '<td class="text-center px-2 py-2 text-red-500">' + s.losses + '</td>' +
                     '<td class="text-center px-2 py-2 text-purple-600 font-bold">' + s.scorePoints + '</td>' +
                     '<td class="text-center px-2 py-2 text-orange-600 font-medium">' + s.matchPoints + '</td>' +
+                    (App.isAdmin ? '<td class="text-center px-1 py-2"><button class="sch-replace-btn text-xs text-green-500 hover:text-green-700 hover:bg-green-50 px-2 py-1 rounded-lg transition font-medium whitespace-nowrap" data-old-name="' + Results.escapeHtml(s.name) + '">교체</button></td>' : '') +
                   '</tr>';
                 }).join(''); })()}
               </tbody>
@@ -901,13 +909,15 @@ const Schedule = {
                 <th class="text-center px-2 py-2">패</th>
                 <th class="text-center px-2 py-2">득실</th>
                 <th class="text-center px-2 py-2">승점</th>
+                ${App.isAdmin ? '<th class="text-center px-2 py-2"></th>' : ''}
               </tr>
             </thead>
             <tbody>
               ${(() => { const allPlayersData = Storage.getPlayers(); return playerStats.map((s, idx) => {
                 const pd = allPlayersData.find(pl => pl.name === s.name);
-                const gender = pd?.gender;
+                const gender = pd?.gender || (tournament.males?.includes(s.name) ? 'M' : tournament.females?.includes(s.name) ? 'F' : null);
                 const ntrp = pd?.ntrp || 2.5;
+                const isGuest = tournament.guests?.includes(s.name);
                 const medalPos = ['0%', '50%', '100%'];
                 const rank = playerStats.findIndex(p => p.scorePoints === s.scorePoints && p.matchPoints === s.matchPoints);
                 const medalHtml = isComplete && rank < 3 ? '<span style="display:inline-block;width:22px;height:26px;background:url(\'css/medal.png\') no-repeat;background-size:300% auto;background-position:' + medalPos[rank] + ' center;vertical-align:middle;margin-right:2px;"></span>' : '';
@@ -915,6 +925,7 @@ const Schedule = {
                   '<td class="px-4 py-2 font-medium text-gray-800 sticky left-0 bg-white/95 dark:bg-slate-800/95 z-[1]">' +
                     medalHtml + Results.escapeHtml(s.name) +
                     ' ' + genderBadge(gender) +
+                    (isGuest ? ' <span class="text-[10px] px-1 py-0.5 rounded font-medium bg-amber-100 text-amber-700">게</span>' : '') +
                     (!App.isAdmin ? '' : ' <span class="text-xs px-1 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">' + ntrp.toFixed(1) + '</span>') +
                   '</td>' +
                   '<td class="text-center px-2 py-2 text-gray-600">' + s.games + '</td>' +
@@ -924,6 +935,7 @@ const Schedule = {
                   '<td class="text-center px-2 py-2 text-red-500">' + s.losses + '</td>' +
                   '<td class="text-center px-2 py-2 text-purple-600 font-bold">' + s.scorePoints + '</td>' +
                   '<td class="text-center px-2 py-2 text-orange-600 font-medium">' + s.matchPoints + '</td>' +
+                  (App.isAdmin ? '<td class="text-center px-1 py-2"><button class="sch-replace-btn text-xs text-green-500 hover:text-green-700 hover:bg-green-50 px-2 py-1 rounded-lg transition font-medium whitespace-nowrap" data-old-name="' + Results.escapeHtml(s.name) + '">교체</button></td>' : '') +
                 '</tr>';
               }).join(''); })()}
             </tbody>
@@ -962,6 +974,15 @@ const Schedule = {
 
     // 쉬는 멤버 표시 (모든 멤버 공개)
     container.querySelectorAll('.resting-players').forEach(el => el.style.display = '');
+
+    // 멤버 교체 버튼 (관리자 전용)
+    if (App.isAdmin) {
+      container.querySelectorAll('.sch-replace-btn').forEach(btn => {
+        btn.onclick = () => {
+          this._showReplaceModal(btn.dataset.oldName, tournament, container);
+        };
+      });
+    }
 
     if (App.isAdmin) {
       // 배정 현황 오버뷰 표시 + 토글
@@ -1572,6 +1593,11 @@ const Schedule = {
 
     // ─ 팀전 모드: 팀 이름 맵 ─
     const teamMap = tournament.isTeamMode ? buildTeamMap() : {};
+    // ─ 게스트 ─
+    const guestSet = new Set(tournament.guests || []);
+    const isGuest = (name) => guestSet.has(name);
+    const GUEST_BG = '#fef3c7';   // amber-100
+    const GUEST_TEXT = '#b45309'; // amber-700
 
     // ─ 레이아웃 상수 ─
     const contentW = W - PAD * 2;
@@ -1767,6 +1793,18 @@ const Schedule = {
             ctx.font = `11px ${FONT}`;
             ctx.fillStyle = '#1f2937';
             ctx.fillText(name, cx + 17, cy + rosterCellH / 2);
+            // 게스트 뱃지
+            if (isGuest(name)) {
+              const nw = ctx.measureText(name).width;
+              ctx.font = `bold 8px ${FONT}`;
+              const gw = ctx.measureText('게').width + 5;
+              this._roundRect(ctx, cx + 17 + nw + 3, cy + rosterCellH / 2 - 5, gw, 10, 2);
+              ctx.fillStyle = GUEST_BG;
+              ctx.fill();
+              ctx.fillStyle = GUEST_TEXT;
+              ctx.textAlign = 'center';
+              ctx.fillText('게', cx + 17 + nw + 3 + gw / 2, cy + rosterCellH / 2);
+            }
           });
           drawY += blockH + teamGap;
         });
@@ -1790,6 +1828,18 @@ const Schedule = {
           ctx.font = `11px ${FONT}`;
           ctx.fillStyle = '#1f2937';
           ctx.fillText(name, cx + 17, cy + rosterCellH / 2);
+          // 게스트 뱃지
+          if (isGuest(name)) {
+            const nw = ctx.measureText(name).width;
+            ctx.font = `bold 8px ${FONT}`;
+            const gw = ctx.measureText('게').width + 5;
+            this._roundRect(ctx, cx + 17 + nw + 3, cy + rosterCellH / 2 - 5, gw, 10, 2);
+            ctx.fillStyle = GUEST_BG;
+            ctx.fill();
+            ctx.fillStyle = GUEST_TEXT;
+            ctx.textAlign = 'center';
+            ctx.fillText('게', cx + 17 + nw + 3 + gw / 2, cy + rosterCellH / 2);
+          }
         });
       }
 
@@ -1885,17 +1935,31 @@ const Schedule = {
       ctx.font = `bold 14px ${FONT}`;
       ctx.fillStyle = '#1f2937';
       ctx.textBaseline = 'middle';
+      const guest = isGuest(name);
       if (align === 'right') {
-        // 오른쪽 정렬: [이름 ●]
+        // 오른쪽 정렬: [이름 (게) ●]
         ctx.beginPath();
         ctx.arc(x + w - 14, y + h / 2, 5, 0, Math.PI * 2);
         ctx.fillStyle = color;
         ctx.fill();
+        let nameEndX = x + w - 24;
+        if (guest) {
+          ctx.font = `bold 9px ${FONT}`;
+          const gw = ctx.measureText('게').width + 6;
+          this._roundRect(ctx, nameEndX - gw - 2, y + h / 2 - 6, gw, 12, 3);
+          ctx.fillStyle = GUEST_BG;
+          ctx.fill();
+          ctx.fillStyle = GUEST_TEXT;
+          ctx.textAlign = 'center';
+          ctx.fillText('게', nameEndX - 2 - gw / 2, y + h / 2);
+          nameEndX -= gw + 4;
+          ctx.font = `bold 14px ${FONT}`;
+        }
         ctx.fillStyle = '#1f2937';
         ctx.textAlign = 'right';
-        ctx.fillText(name, x + w - 24, y + h / 2);
+        ctx.fillText(name, nameEndX, y + h / 2);
       } else {
-        // 왼쪽 정렬: [● 이름]
+        // 왼쪽 정렬: [● 이름 (게)]
         ctx.beginPath();
         ctx.arc(x + 14, y + h / 2, 5, 0, Math.PI * 2);
         ctx.fillStyle = color;
@@ -1903,6 +1967,18 @@ const Schedule = {
         ctx.fillStyle = '#1f2937';
         ctx.textAlign = 'left';
         ctx.fillText(name, x + 24, y + h / 2);
+        if (guest) {
+          const nameW = ctx.measureText(name).width;
+          ctx.font = `bold 9px ${FONT}`;
+          const gw = ctx.measureText('게').width + 6;
+          this._roundRect(ctx, x + 24 + nameW + 3, y + h / 2 - 6, gw, 12, 3);
+          ctx.fillStyle = GUEST_BG;
+          ctx.fill();
+          ctx.fillStyle = GUEST_TEXT;
+          ctx.textAlign = 'center';
+          ctx.fillText('게', x + 24 + nameW + 3 + gw / 2, y + h / 2);
+          ctx.font = `bold 14px ${FONT}`;
+        }
       }
     };
 
@@ -2183,10 +2259,13 @@ const Schedule = {
     const pd = allPlayers.find(p => p.name === name);
     const isCustom = this._tournament?.isCustom;
     const ntrpHtml = !App.isAdmin ? '' : `<span class="text-yellow-600 text-xs">${(pd?.ntrp || 2.5).toFixed(1)}</span>`;
-    const genderHtml = pd ? genderBadge(pd.gender, 'text') : '';
+    const gender = pd?.gender || (this._tournament?.males?.includes(name) ? 'M' : this._tournament?.females?.includes(name) ? 'F' : null);
+    const genderHtml = gender ? genderBadge(gender, 'text') : '';
+    const isGuest = this._tournament?.guests?.includes(name);
+    const guestHtml = isGuest ? '<span class="text-[10px] px-1 py-0.5 rounded font-medium bg-amber-100 text-amber-700">게</span>' : '';
     return `<span class="swap-player cursor-pointer hover:bg-yellow-100 rounded px-0.5 transition inline-flex items-center gap-0.5"
       data-slot-idx="${slotIdx}" data-match-idx="${matchIdx}" data-team="${team}" data-pos="${pos}"
-      data-name="${Results.escapeHtml(name)}">${Results.escapeHtml(name)}${genderHtml}${ntrpHtml}</span>`;
+      data-name="${Results.escapeHtml(name)}">${Results.escapeHtml(name)}${genderHtml}${guestHtml}${ntrpHtml}</span>`;
   },
 
   // 커스텀 대진표: 코트별 세로 레이아웃
@@ -2832,5 +2911,180 @@ const Schedule = {
         this.render(container, tournament);
       };
     });
+  },
+
+  // ── 멤버 교체 모달 ──
+  _showReplaceModal(oldName, tournament, container) {
+    // 현재 대진표에 있는 이름 수집
+    const currentNames = new Set();
+    for (const slot of tournament.timeSlots) {
+      for (const m of slot.matches) {
+        if (m.player1) m.player1.split(' / ').forEach(n => currentNames.add(n));
+        if (m.player2) m.player2.split(' / ').forEach(n => currentNames.add(n));
+      }
+    }
+
+    // 후보 목록: 등록 멤버 중 현재 대진표에 없는 사람
+    const allPlayers = Storage.getPlayers();
+    const candidates = allPlayers.filter(p => !currentNames.has(p.name));
+    const candidatesM = candidates.filter(p => p.gender === 'M');
+    const candidatesF = candidates.filter(p => p.gender === 'F');
+    const candidatesU = candidates.filter(p => p.gender !== 'M' && p.gender !== 'F');
+
+    const genderBadgeHtml = (g) => g === 'M'
+      ? '<span class="text-[10px] px-1 py-0.5 rounded font-medium bg-blue-100 text-blue-700 ml-1">남</span>'
+      : g === 'F' ? '<span class="text-[10px] px-1 py-0.5 rounded font-medium bg-pink-100 text-pink-700 ml-1">여</span>' : '';
+    const renderCandidates = (list, gender) => list.map(p =>
+      '<button class="replace-candidate w-full text-left px-3 py-2.5 text-sm rounded-xl hover:bg-green-50 active:bg-green-100 transition truncate flex items-center" data-name="' + Results.escapeHtml(p.name) + '" data-gender="' + (gender || '') + '">' +
+        Results.escapeHtml(p.name) + genderBadgeHtml(gender) +
+      '</button>'
+    ).join('');
+
+    let listHtml = renderCandidates(candidatesM, 'M') + renderCandidates(candidatesF, 'F') + renderCandidates(candidatesU, '');
+    if (!listHtml) {
+      listHtml = '<p class="text-gray-400 text-sm text-center py-4">교체 가능한 멤버가 없습니다.</p>';
+    }
+
+    const modalHtml = '<div id="replace-modal-overlay" class="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" style="animation:fadeIn .15s">' +
+      '<div class="bg-white w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl shadow-2xl max-h-[80vh] flex flex-col" style="animation:slideUp .2s">' +
+        '<div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between flex-shrink-0">' +
+          '<h3 class="font-bold text-gray-800 text-base">' + Results.escapeHtml(oldName) + ' 교체</h3>' +
+          '<button id="replace-modal-close" class="text-gray-400 hover:text-gray-600 p-1"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>' +
+        '</div>' +
+        '<div class="px-4 py-3 border-b border-gray-100 flex-shrink-0">' +
+          '<p class="text-xs text-gray-500 mb-2">게스트 또는 새 멤버로 교체</p>' +
+          '<div class="flex gap-1.5">' +
+            '<input type="text" id="replace-custom-input" class="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500" placeholder="이름 입력" autocomplete="off">' +
+            '<select id="replace-gender-select" class="px-2 py-2 border border-gray-300 rounded-xl text-sm">' +
+              '<option value="M">남</option>' +
+              '<option value="F">여</option>' +
+            '</select>' +
+            '<label class="flex items-center gap-1 text-xs text-amber-700 whitespace-nowrap"><input type="checkbox" id="replace-guest-cb" class="w-3.5 h-3.5 rounded border-gray-300 text-amber-500" checked>게스트</label>' +
+            '<button id="replace-custom-btn" class="px-3 py-2 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 active:scale-95 transition flex-shrink-0">교체</button>' +
+          '</div>' +
+        '</div>' +
+        (listHtml.indexOf('replace-candidate') >= 0
+          ? '<div class="px-4 pt-2 flex-shrink-0"><p class="text-xs text-gray-500 mb-1.5">기존 멤버에서 선택</p>' +
+              '<input type="text" id="replace-search-input" class="w-full px-3 py-1.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500" placeholder="이름 또는 초성 검색" autocomplete="off">' +
+            '</div>'
+          : '') +
+        '<div id="replace-candidate-list" class="flex-1 overflow-y-auto px-3 py-2 space-y-0.5">' +
+          listHtml +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+    const existing = document.getElementById('replace-modal-overlay');
+    if (existing) existing.remove();
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    const overlay = document.getElementById('replace-modal-overlay');
+    const close = () => overlay.remove();
+    const self = this;
+
+    document.getElementById('replace-modal-close').onclick = close;
+    overlay.onclick = (e) => { if (e.target === overlay) close(); };
+
+    // 직접 입력 교체 (게스트 포함)
+    const customInput = document.getElementById('replace-custom-input');
+    document.getElementById('replace-custom-btn').onclick = () => {
+      const newName = customInput.value.trim();
+      if (!newName) { customInput.focus(); return; }
+      if (currentNames.has(newName)) {
+        Modal.alert('"' + newName + '"은(는) 이미 대진표에 있습니다.');
+        return;
+      }
+      const gender = document.getElementById('replace-gender-select').value;
+      const isGuest = document.getElementById('replace-guest-cb').checked;
+      close();
+      self._executeReplace(oldName, newName, tournament, container, { gender: gender, isGuest: isGuest });
+    };
+    customInput.onkeydown = (e) => {
+      if (e.key === 'Enter') document.getElementById('replace-custom-btn').click();
+    };
+
+    // 초성 검색 필터링
+    const searchInput = document.getElementById('replace-search-input');
+    if (searchInput) {
+      searchInput.oninput = () => {
+        const q = searchInput.value.trim();
+        overlay.querySelectorAll('.replace-candidate').forEach(btn => {
+          btn.style.display = matchesKoreanSearch(btn.dataset.name, q) ? '' : 'none';
+        });
+      };
+    }
+
+    // 후보 목록 클릭 교체 (기존 멤버 — 게스트 아님)
+    overlay.querySelectorAll('.replace-candidate').forEach(btn => {
+      btn.onclick = () => {
+        close();
+        self._executeReplace(oldName, btn.dataset.name, tournament, container, { gender: btn.dataset.gender, isGuest: false });
+      };
+    });
+  },
+
+  // ── 일괄 교체 실행 ──
+  async _executeReplace(oldName, newName, tournament, container, options) {
+    const tid = tournament.id;
+    const opts = options || {};
+
+    const replaceName = (str) => {
+      if (!str) return str;
+      return str.split(' / ').map(n => n === oldName ? newName : n).join(' / ');
+    };
+
+    const ok = await Storage.updateTournamentTx(tid, (t) => {
+      // players 배열 교체
+      if (t.players) {
+        t.players = t.players.map(p => p === oldName ? newName : p);
+        if (!t.players.includes(newName)) t.players.push(newName);
+      }
+
+      // males/females 배열: 기존 이름의 성별 확인 후 제거
+      const wasInMales = t.males && t.males.includes(oldName);
+      const wasInFemales = t.females && t.females.includes(oldName);
+      if (t.males) t.males = t.males.filter(n => n !== oldName);
+      if (t.females) t.females = t.females.filter(n => n !== oldName);
+      // 새 이름을 성별에 맞게 추가 (명시된 성별 > 기존 이름의 성별)
+      const newGender = opts.gender || (wasInMales ? 'M' : wasInFemales ? 'F' : null);
+      if (newGender === 'M') {
+        if (!t.males) t.males = [];
+        if (!t.males.includes(newName)) t.males.push(newName);
+      } else if (newGender === 'F') {
+        if (!t.females) t.females = [];
+        if (!t.females.includes(newName)) t.females.push(newName);
+      }
+
+      // guests 배열 처리
+      if (!t.guests) t.guests = [];
+      t.guests = t.guests.filter(n => n !== oldName);
+      if (opts.isGuest) {
+        if (!t.guests.includes(newName)) t.guests.push(newName);
+      }
+
+      // 모든 타임슬롯의 모든 매치 교체
+      if (t.timeSlots) {
+        for (const slot of t.timeSlots) {
+          for (const m of (slot.matches || [])) {
+            m.player1 = replaceName(m.player1);
+            m.player2 = replaceName(m.player2);
+            if (m.winner) m.winner = replaceName(m.winner);
+          }
+          // 쉬는 멤버 배열 교체
+          if (slot.resting) {
+            slot.resting = slot.resting.map(n => n === oldName ? newName : n);
+          }
+        }
+      }
+    });
+
+    if (!ok) {
+      Modal.toast('교체에 실패했습니다.', 'error');
+      return;
+    }
+
+    Modal.toast(oldName + ' → ' + newName + ' 교체 완료', 'success');
+    const fresh = Storage.getTournamentById(tid);
+    if (fresh) this.render(container, fresh);
   },
 };

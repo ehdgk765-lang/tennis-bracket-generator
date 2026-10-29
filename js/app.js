@@ -717,9 +717,10 @@ const App = {
 
         <!-- 남자 멤버 선택 -->
         <div>
-          <label class="block text-sm font-semibold text-gray-700 mb-2">
+          <label class="block text-sm font-semibold text-gray-700 mb-1">
             남자 멤버 <span id="male-count" class="text-green-600 font-normal">(0/${males.length}명 선택)</span>
           </label>
+          <div id="male-selected-badges" class="flex flex-wrap gap-1 mb-1.5 empty:hidden"></div>
           ${males.length === 0 ? '<p class="text-sm text-gray-400">등록된 남자 멤버가 없습니다.</p>' : `
           <input type="text" id="sch-male-search" placeholder="이름 검색..."
             class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm mb-2">
@@ -740,13 +741,25 @@ const App = {
               </label>`;
             }).join('')}
           </div>`}
+          <div id="sch-male-guest-container" class="divide-y divide-gray-50"></div>
+          <div class="flex gap-1.5 mt-1.5">
+            <span class="flex items-center text-xs text-amber-700 font-medium whitespace-nowrap">게스트</span>
+            <input type="text" id="male-guest-input" placeholder="이름" autocomplete="off"
+              class="flex-1 min-w-0 px-3 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
+            <select id="male-guest-ntrp" class="px-1 py-1.5 border border-gray-300 rounded-lg text-xs w-14">
+              <option value="2.0">2.0</option><option value="2.5" selected>2.5</option><option value="3.0">3.0</option><option value="3.5">3.5</option><option value="4.0">4.0</option><option value="4.5">4.5</option><option value="5.0">5.0</option>
+            </select>
+            <button type="button" id="male-guest-add-btn"
+              class="px-3 py-1.5 bg-amber-500 text-white rounded-lg text-xs font-medium hover:bg-amber-600 active:scale-95 transition">추가</button>
+          </div>
         </div>
 
         <!-- 여자 멤버 선택 -->
         <div>
-          <label class="block text-sm font-semibold text-gray-700 mb-2">
+          <label class="block text-sm font-semibold text-gray-700 mb-1">
             여자 멤버 <span id="female-count" class="text-green-600 font-normal">(0/${females.length}명 선택)</span>
           </label>
+          <div id="female-selected-badges" class="flex flex-wrap gap-1 mb-1.5 empty:hidden"></div>
           ${females.length === 0 ? '<p class="text-sm text-gray-400">등록된 여자 멤버가 없습니다.</p>' : `
           <input type="text" id="sch-female-search" placeholder="이름 검색..."
             class="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm mb-2">
@@ -767,6 +780,17 @@ const App = {
               </label>`;
             }).join('')}
           </div>`}
+          <div id="sch-female-guest-container" class="divide-y divide-gray-50"></div>
+          <div class="flex gap-1.5 mt-1.5">
+            <span class="flex items-center text-xs text-amber-700 font-medium whitespace-nowrap">게스트</span>
+            <input type="text" id="female-guest-input" placeholder="이름" autocomplete="off"
+              class="flex-1 min-w-0 px-3 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
+            <select id="female-guest-ntrp" class="px-1 py-1.5 border border-gray-300 rounded-lg text-xs w-14">
+              <option value="2.0">2.0</option><option value="2.5" selected>2.5</option><option value="3.0">3.0</option><option value="3.5">3.5</option><option value="4.0">4.0</option><option value="4.5">4.5</option><option value="5.0">5.0</option>
+            </select>
+            <button type="button" id="female-guest-add-btn"
+              class="px-3 py-1.5 bg-amber-500 text-white rounded-lg text-xs font-medium hover:bg-amber-600 active:scale-95 transition">추가</button>
+          </div>
         </div>
 
         <!-- 미리보기 정보 -->
@@ -782,8 +806,37 @@ const App = {
     const updateCounts = () => {
       const maleChecked = container.querySelectorAll('.male-cb:checked').length;
       const femaleChecked = container.querySelectorAll('.female-cb:checked').length;
-      container.querySelector('#male-count').textContent = `(${maleChecked}/${males.length}명 선택)`;
-      container.querySelector('#female-count').textContent = `(${femaleChecked}/${females.length}명 선택)`;
+      container.querySelector('#male-count').textContent = `(${maleChecked}명 선택)`;
+      container.querySelector('#female-count').textContent = `(${femaleChecked}명 선택)`;
+      // 선택된 멤버 + 게스트 이름 뱃지 렌더링
+      ['male', 'female'].forEach(prefix => {
+        const badgeContainer = container.querySelector(`#${prefix}-selected-badges`);
+        if (!badgeContainer) return;
+        const checked = container.querySelectorAll(`.${prefix}-cb:checked`);
+        badgeContainer.innerHTML = Array.from(checked).map(cb => {
+          const n = cb.value;
+          const isG = cb.classList.contains('guest-cb');
+          const bgClass = isG ? 'bg-amber-100 text-amber-800' : (prefix === 'male' ? 'bg-blue-50 text-blue-700' : 'bg-pink-50 text-pink-700');
+          const guestTag = isG ? '<span class="text-amber-500 ml-0.5">게</span>' : '';
+          return `<span class="selected-badge inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full ${bgClass} font-medium cursor-pointer hover:opacity-70 transition" data-name="${Results.escapeHtml(n)}" data-guest="${isG}">${Results.escapeHtml(n)}${guestTag}</span>`;
+        }).join('');
+        badgeContainer.querySelectorAll('.selected-badge').forEach(badge => {
+          badge.onclick = () => {
+            const name = badge.dataset.name;
+            const isG = badge.dataset.guest === 'true';
+            if (isG) {
+              // 게스트: 목록에서 완전 제거
+              const label = container.querySelector(`#sch-${prefix}-guest-container .guest-item input[value="${CSS.escape(name)}"]`)?.closest('label');
+              if (label) label.remove();
+            } else {
+              // 기존 멤버: 체크 해제
+              const cb = container.querySelector(`.${prefix}-cb[value="${CSS.escape(name)}"]:checked`);
+              if (cb) cb.checked = false;
+            }
+            updateCounts();
+          };
+        });
+      });
       this.updateSchedulePreview(container);
     };
 
@@ -829,6 +882,58 @@ const App = {
 
     bindScheduleList('male', 'male-cb');
     bindScheduleList('female', 'female-cb');
+
+    // 게스트 추가 (남/여 각각) — 항상 게스트로 추가 + NTRP
+    const bindGuestAdd = (prefix, cbClass, genderLabel, genderColor) => {
+      const input = container.querySelector(`#${prefix}-guest-input`);
+      const btn = container.querySelector(`#${prefix}-guest-add-btn`);
+      const ntrpSelect = container.querySelector(`#${prefix}-guest-ntrp`);
+      if (!input || !btn) return;
+
+      const addGuest = () => {
+        const name = input.value.trim();
+        if (!name) { input.focus(); return; }
+        // 중복 확인
+        const allValues = Array.from(container.querySelectorAll('.male-cb, .female-cb, .guest-cb')).map(cb => cb.value);
+        if (allValues.includes(name)) {
+          Modal.alert('이미 추가된 멤버입니다.');
+          return;
+        }
+        const ntrp = ntrpSelect ? parseFloat(ntrpSelect.value) || 2.5 : 2.5;
+        // 해당 성별 게스트 컨테이너에 추가
+        const listContainer = container.querySelector(`#sch-${prefix}-guest-container`);
+        if (listContainer) {
+          const label = document.createElement('label');
+          label.className = `sch-${prefix}-item guest-item flex items-center px-4 py-2.5 hover:bg-gray-50 cursor-pointer transition`;
+          label.dataset.name = name.toLowerCase();
+          label.dataset.ntrp = ntrp;
+          label.innerHTML =
+            '<input type="checkbox" value="' + Results.escapeHtml(name) + '" class="' + cbClass + ' guest-cb w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500" checked>' +
+            '<span class="ml-3 text-sm text-gray-800">' + Results.escapeHtml(name) + '</span>' +
+            '<span class="ml-2 text-xs px-1.5 py-0.5 rounded font-medium ' + genderColor + '">' + genderLabel + '</span>' +
+            '<span class="ml-1 text-[10px] px-1 py-0.5 rounded font-medium bg-amber-100 text-amber-700">게스트</span>' +
+            '<span class="text-xs px-1.5 py-0.5 rounded font-medium bg-yellow-100 text-yellow-700">' + ntrp.toFixed(1) + '</span>' +
+            '<button type="button" class="inline-guest-remove-btn ml-auto text-xs text-gray-400 hover:text-red-500 font-bold px-1">&times;</button>';
+          label.querySelector('input').onchange = updateCounts;
+          label.querySelector('.inline-guest-remove-btn').onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            label.remove();
+            updateCounts();
+          };
+          listContainer.appendChild(label);
+        }
+        input.value = '';
+        input.focus();
+        updateCounts();
+      };
+
+      btn.onclick = addGuest;
+      input.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); addGuest(); } };
+    };
+
+    bindGuestAdd('male', 'male-cb', '남', 'bg-blue-100 text-blue-700');
+    bindGuestAdd('female', 'female-cb', '여', 'bg-pink-100 text-pink-700');
 
     container.querySelector('#start-time').onchange = () => this.updateSchedulePreview(container);
     container.querySelector('#end-time').onchange = () => this.updateSchedulePreview(container);
@@ -931,6 +1036,9 @@ const App = {
         return;
       }
 
+      // 게스트 수집
+      const guests = Array.from(container.querySelectorAll('.guest-item input:checked')).map(cb => cb.value);
+
       const gameDate = container.querySelector('#schedule-date').value || new Date().toISOString().slice(0, 10);
       const customName = container.querySelector('#schedule-name').value.trim();
       const tournament = {
@@ -955,6 +1063,7 @@ const App = {
         typeDistribution,
         warmupMinutes: 10,
         gameMinutes: 25,
+        guests,
       };
 
       const tournaments = Storage.getTournaments();
@@ -1228,7 +1337,9 @@ const App = {
         let mCount = 0, fCount = 0;
         playerNames.forEach(name => {
           const p = regPlayers.find(rp => rp.name === name);
-          if (p) { if (p.gender === 'M') mCount++; else fCount++; }
+          const gender = p?.gender || (t.males?.includes(name) ? 'M' : t.females?.includes(name) ? 'F' : null);
+          if (gender === 'M') mCount++;
+          else if (gender === 'F') fCount++;
         });
         return `
           <div class="tournament-card relative bg-white/80 backdrop-blur-sm border ${myCardClass} rounded-2xl p-4 cursor-pointer hover:shadow-lg hover:shadow-green-100/50 hover:border-green-200 transition-all shadow-sm shadow-green-50/30"
