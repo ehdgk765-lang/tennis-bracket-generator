@@ -578,12 +578,13 @@ const CustomBracket = {
 
     const rounds = this.generateBracketFromPlacements(orderedPlayers);
 
-    return {
+    const t = {
       id: Storage.generateId(),
       name,
       format: 'tournament',
       setCount,
       isDoubles,
+      isTeamMode: this._state.isTeamMode,
       gameDate: this._state.gameDate || new Date().toISOString().slice(0, 10),
       players: nonNull,
       status: 'active',
@@ -591,6 +592,8 @@ const CustomBracket = {
       completedAt: null,
       rounds,
     };
+    if (this._state.isTeamMode) t.teamMap = buildTeamMap();
+    return t;
   },
 
   generateBracketFromPlacements(orderedPlayers) {

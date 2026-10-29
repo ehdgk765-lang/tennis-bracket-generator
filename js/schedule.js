@@ -536,7 +536,7 @@ const Schedule = {
 
   // 팀별 통계 계산
   calcTeamStats(tournament) {
-    const teamMap = buildTeamMap();
+    const teamMap = getTeamMapFor(tournament);
 
     const stats = {};
     const ensureTeam = (name) => {
@@ -1592,7 +1592,7 @@ const Schedule = {
     const pBg = (name) => isFemale(name) ? FEMALE_BG : MALE_BG;
 
     // ─ 팀전 모드: 팀 이름 맵 ─
-    const teamMap = tournament.isTeamMode ? buildTeamMap() : {};
+    const teamMap = tournament.isTeamMode ? getTeamMapFor(tournament) : {};
     // ─ 게스트 ─
     const guestSet = new Set(tournament.guests || []);
     const isGuest = (name) => guestSet.has(name);
@@ -2331,7 +2331,7 @@ const Schedule = {
     // 팀전 모드: 팀 이름
     let t1TeamName = '', t2TeamName = '';
     if (this._tournament?.isTeamMode) {
-      const _tm = buildTeamMap();
+      const _tm = getTeamMapFor(this._tournament);
       const getTeam = (names) => {
         const tns = [...new Set(names.map(n => _tm[n]).filter(Boolean))];
         return tns.map(tn => Results.escapeHtml(tn)).join(' / ');
@@ -2397,7 +2397,7 @@ const Schedule = {
     if (existing) existing.remove();
 
     const allPlayers = Storage.getPlayers().sort((a, b) => a.name.localeCompare(b.name, 'ko'));
-    const _teamMap = tournament.isTeamMode ? buildTeamMap() : {};
+    const _teamMap = tournament.isTeamMode ? getTeamMapFor(tournament) : {};
     const isSingles = !!tournament.isSingles;
     const selected = { t1p1: null, t1p2: null, t2p1: null, t2p2: null };
     let selectedCourt = presetCourt || 1;
@@ -2667,7 +2667,7 @@ const Schedule = {
 
     const usedNames = new Set(Object.values(selected).filter(Boolean));
     const busyNames = slotBusyNames || new Set();
-    const _teamMap = this._tournament?.isTeamMode ? buildTeamMap() : {};
+    const _teamMap = this._tournament?.isTeamMode ? getTeamMapFor(this._tournament) : {};
 
     // 팀 모드: 허용/제외 팀 결정
     let allowedTeam = null, excludedTeam = null;
@@ -2795,7 +2795,7 @@ const Schedule = {
     });
     slotBusyNames.delete(oldName);
 
-    const _teamMap = tournament.isTeamMode ? buildTeamMap() : {};
+    const _teamMap = tournament.isTeamMode ? getTeamMapFor(tournament) : {};
 
     // 팀 모드: 같은 편 멤버의 팀으로 필터링
     const sideTeam = tournament.isTeamMode
@@ -3060,6 +3060,16 @@ const Schedule = {
       t.guests = t.guests.filter(n => n !== oldName);
       if (opts.isGuest) {
         if (!t.guests.includes(newName)) t.guests.push(newName);
+      }
+
+      // teamMap 스냅샷 업데이트
+      if (t.teamMap) {
+        const oldTeam = t.teamMap[oldName];
+        delete t.teamMap[oldName];
+        // 새 멤버의 팀: 현재 팀 데이터에서 조회, 없으면 기존 멤버의 팀 유지
+        const currentTeamMap = buildTeamMap();
+        t.teamMap[newName] = currentTeamMap[newName] || oldTeam || undefined;
+        if (!t.teamMap[newName]) delete t.teamMap[newName];
       }
 
       // 모든 타임슬롯의 모든 매치 교체

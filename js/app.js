@@ -606,6 +606,7 @@ const App = {
         completedAt: null,
         timeSlots: [{ time: '', matches: [] }],
       };
+      if (isTeamMode) tournament.teamMap = buildTeamMap();
 
       const tournaments = Storage.getTournaments();
       tournaments.push(tournament);
@@ -1065,6 +1066,7 @@ const App = {
         gameMinutes: 25,
         guests,
       };
+      if (isTeamMode) tournament.teamMap = buildTeamMap();
 
       const tournaments = Storage.getTournaments();
       tournaments.push(tournament);

@@ -19,7 +19,7 @@ const Results = {
     // 팀전 모드: 팀 이름 조회
     let t1Team = '', t2Team = '';
     if (tournament.isTeamMode) {
-      const _tm = buildTeamMap();
+      const _tm = getTeamMapFor(tournament);
       const getTeam = (pName) => {
         const names = pName.split(' / ');
         const tns = [...new Set(names.map(n => _tm[n]).filter(Boolean))];

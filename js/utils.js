@@ -40,6 +40,12 @@ function buildTeamMap() {
   return map;
 }
 
+// 대진표용 팀 맵: 스냅샷이 있으면 우선 사용, 없거나 비어있으면 현재 데이터
+function getTeamMapFor(tournament) {
+  return (tournament.teamMap && Object.keys(tournament.teamMap).length > 0)
+    ? tournament.teamMap : buildTeamMap();
+}
+
 // ── 모달 배경 스크롤 잠금 ──
 let _scrollLockCount = 0;
 let _savedScrollY = 0;

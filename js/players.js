@@ -140,9 +140,6 @@ const Players = {
     const isSearching = query.length > 0;
     const lowerQuery = query.toLowerCase();
 
-    // 멤버→팀 매핑
-    const teamMap = buildTeamMap();
-
     const indexed = allPlayers.map((p, i) => ({ player: p, num: i + 1 }));
     const filtered = isSearching
       ? indexed.filter(item => matchesKoreanSearch(item.player.name, query))
@@ -161,7 +158,6 @@ const Players = {
         : '<p class="text-gray-400 text-center py-8">등록된 멤버가 없습니다.</p>';
     } else {
       html += visible.map(({ player: p, num }) => {
-        const teamName = teamMap[p.name];
         return `
         <div class="flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition">
           <div class="flex items-center gap-3 min-w-0">
@@ -172,7 +168,6 @@ const Players = {
               data-id="${p.id}">${p.gender === 'M' ? '남' : '여'}</button>
             <button class="ntrp-toggle-btn text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0 cursor-pointer active:scale-95 transition bg-yellow-100 text-yellow-700"
               data-id="${p.id}">${(p.ntrp || 2.5).toFixed(1)}</button>
-            ${teamName ? `<span class="text-xs px-1.5 py-0.5 rounded font-medium bg-green-50 text-green-600 border border-green-200 flex-shrink-0">${this.escapeHtml(teamName)}</span>` : ''}
           </div>
           <button class="delete-player-btn text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg px-3 py-1 transition text-sm flex-shrink-0 ml-2"
             data-id="${p.id}">삭제</button>
@@ -555,6 +550,33 @@ const Players = {
     return field.split(' / ').map(n => n === oldName ? newName : n).join(' / ');
   },
 
+  // 팀 변경 전: teamMap 스냅샷 없는 팀전 대진표에 현재 매핑 저장
+  _snapshotTeamMapForTournaments() {
+    const currentMap = buildTeamMap();
+    const tournaments = Storage.getTournaments();
+    tournaments.forEach(t => {
+      if (!t.isTeamMode) return;
+      if (t.teamMap && Object.keys(t.teamMap).length > 0) return;
+      // 모든 소스에서 참가자 이름 수집
+      const names = new Set(t.players || []);
+      (t.males || []).forEach(n => names.add(n));
+      (t.females || []).forEach(n => names.add(n));
+      (t.timeSlots || []).forEach(s => (s.matches || []).forEach(m => {
+        if (m.player1) m.player1.split(' / ').forEach(n => names.add(n));
+        if (m.player2) m.player2.split(' / ').forEach(n => names.add(n));
+      }));
+      (t.rounds || []).forEach(round => {
+        if (Array.isArray(round)) round.forEach(m => {
+          if (m.player1) m.player1.split(' / ').forEach(n => names.add(n));
+          if (m.player2) m.player2.split(' / ').forEach(n => names.add(n));
+        });
+      });
+      t.teamMap = {};
+      names.forEach(n => { if (currentMap[n]) t.teamMap[n] = currentMap[n]; });
+      Storage.updateTournament(t);
+    });
+  },
+
   _syncNameToTournaments(oldName, newName) {
     const tournaments = Storage.getTournaments();
     let changed = false;
@@ -596,6 +618,13 @@ const Players = {
         t.timeSlots.forEach(slot => {
           if (slot.matches) slot.matches.forEach(updateMatch);
         });
+      }
+
+      // teamMap 스냅샷 동기화
+      if (t.teamMap && t.teamMap[oldName] !== undefined) {
+        t.teamMap[newName] = t.teamMap[oldName];
+        delete t.teamMap[oldName];
+        changed = true;
       }
 
     });
@@ -743,6 +772,7 @@ const Players = {
     subContent.querySelectorAll('.delete-team-btn').forEach(btn => {
       btn.onclick = async () => {
         if (!await Modal.confirm('팀을 삭제하시겠습니까?')) return;
+        this._snapshotTeamMapForTournaments();
         const teams = Storage.getTeams().filter(t => t.id !== btn.dataset.teamId);
         Storage.saveTeams(teams);
         this.renderTeams(subContent, container);
@@ -753,6 +783,7 @@ const Players = {
     subContent.querySelectorAll('.remove-team-member-btn').forEach(btn => {
       btn.onclick = (e) => {
         e.stopPropagation();
+        this._snapshotTeamMapForTournaments();
         const teams = Storage.getTeams();
         const team = teams.find(t => t.id === btn.dataset.teamId);
         if (!team) return;
@@ -802,6 +833,9 @@ const Players = {
             input.select();
             return;
           }
+          // 팀 이름 변경 전: teamMap 스냅샷 없는 팀전 대진표에 현재 매핑 저장
+          this._snapshotTeamMapForTournaments();
+
           const team = teams.find(t => t.id === teamId);
           if (team) {
             team.name = newName;
